@@ -48,12 +48,18 @@ DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
 EXTRACT = "acceptance_builder.extract_v1"
 COMPARE = "acceptance_builder.compare_v1"
+DETECT = "acceptance_builder.detect_issues_v1"
+QUESTIONS = "acceptance_builder.generate_questions_v1"
 STEPS = {
-    DRAFT: (EXTRACT,),
+    DRAFT: (EXTRACT, DETECT, QUESTIONS),
     CHECK: (EXTRACT, COMPARE),
 }
 ACTION_TYPES = {
-    DRAFT: ("text.extract_structured_fields",),
+    DRAFT: (
+        "text.extract_structured_fields",
+        "text.detect_issues_by_taxonomy",
+        "text.generate_clarifying_questions",
+    ),
     CHECK: (
         "text.extract_structured_fields",
         "text.compare_and_classify",
@@ -94,6 +100,9 @@ def _expected_output(scenario_id: str, suffix: str = "") -> dict[str, Any]:
     output: dict[str, Any] = {"extracted": _fixture(EXTRACT + suffix)}
     if scenario_id == CHECK:
         output["comparison"] = _fixture(COMPARE + suffix)
+    else:
+        output.update(_fixture(DETECT + suffix))
+        output["questions"] = _fixture(QUESTIONS + suffix)["questions"] if output["issues"] else []
     return output
 
 
@@ -247,6 +256,11 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes(scenario_id:
     invalid = _shared_invalid_outputs(valid)
     if scenario_id == CHECK:
         invalid.update(_comparison_mutations(valid))
+    else:
+        question = _fixture(QUESTIONS)["questions"][0]
+        invalid["missing_issues"] = _mutated(valid, lambda o: o.pop("issues"))
+        invalid["unknown_question_key"] = dict(valid, questions=[dict(question, extra=True)])
+        invalid["too_many_questions"] = dict(valid, questions=[question] * 6)
     for name, candidate in invalid.items():
         assert not validator.is_valid(candidate), name
 
@@ -447,8 +461,8 @@ def test_draft_happy_path_composes_the_structured_result(
         app, request_platform_api, session_factory, DRAFT, {"brief_text": BRIEF_TEXT}, adapter
     )
 
-    assert tuple(call.action_config_id for call in adapter.calls) == STEPS[DRAFT]
-    assert tuple(call.step_id for call in adapter.calls) == ("extract",)
+    assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT)
+    assert tuple(call.step_id for call in adapter.calls) == ("extract", "detect_issues")
     assert output == _expected_output(DRAFT)
 
     extract_input = adapter.input_payload(0)
@@ -537,6 +551,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
         {"brief_text": WEAK_BRIEF_TEXT},
         draft_adapter,
     )
+    assert tuple(call.action_config_id for call in draft_adapter.calls) == STEPS[DRAFT]
     assert draft_output == _expected_output(DRAFT, ".weak_input")
     assert draft_output["extracted"]["missing_fields"]  # a vague brief reports gaps, not a failure
 
@@ -604,7 +619,9 @@ def test_multilingual_canonical_output_and_original_language_source(
     assert output == expected  # Includes summary, evidence, rationale and every section.
     source = case["input"]["brief_text"]
     assert adapter.input_payload(0)["source_text"] == source
-    if case["scenario_id"] == CHECK:
+    if case["scenario_id"] == DRAFT:
+        assert adapter.input_payload(1)["source_text"] == source
+    else:
         assert adapter.input_payload(1)["reference_text"] == source
         assert adapter.input_payload(1)["subject_text"] == case["input"]["deliverable_text"]
 

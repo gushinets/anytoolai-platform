@@ -353,6 +353,10 @@ def write_provider_fixtures(directory: Path, case: dict[str, Any]) -> dict[str, 
         }
         if scenario == "acceptance_builder.check_v1":
             actions["acceptance_builder.compare_v1"] = output["comparison"]
+        else:
+            actions["acceptance_builder.detect_issues_v1"] = {"issues": output["issues"]}
+            if output["issues"]:
+                actions["acceptance_builder.generate_questions_v1"] = {"questions": output["questions"]}
     for action, response in actions.items():
         (directory / f"{action}.json").write_text(
             json.dumps({"response_json": response}, ensure_ascii=False), encoding="utf-8"

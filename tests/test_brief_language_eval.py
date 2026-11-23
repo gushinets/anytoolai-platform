@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "scripts/agent"))
 evaluation = importlib.import_module("brief_language_eval")
 
 
-def record():
+def record(steps=("extract", "compare")):
     case = next(case for case in CASES if case["id"] == "ANY761-AB-C-RU-basic")
     return {
         "case": case,
@@ -34,7 +34,7 @@ def record():
                     "status": "succeeded",
                     "scenario_session_id": "session-1",
                 }
-                for step in ("extract", "compare")
+                for step in steps
             ],
             "actions": [
                 {
@@ -44,7 +44,7 @@ def record():
                     "output_artifact_id": "result-1",
                     "scenario_session_id": "session-1",
                 }
-                for step in ("extract", "compare")
+                for step in steps
             ],
             "artifacts": [
                 {
@@ -337,12 +337,16 @@ def cli_args(command, out):
 
 
 def ab_record(case_id):
-    run = record()
-    run["case"] = next(case for case in CASES if case["id"] == case_id)
-    run["output"] = deepcopy(CANONICAL[case_id])
-    if run["case"]["scenario_id"] == "acceptance_builder.draft_v1":
-        run["ledger"]["actions"] = run["ledger"]["actions"][:1]
-        run["ledger"]["calls"] = run["ledger"]["calls"][:1]
+    case = next(case for case in CASES if case["id"] == case_id)
+    output = deepcopy(CANONICAL[case_id])
+    steps = ["extract", "compare"]
+    if case["scenario_id"] == "acceptance_builder.draft_v1":
+        steps = ["extract", "detect_issues"]
+        if output["issues"]:
+            steps.append("generate_questions")
+    run = record(steps)
+    run["case"] = case
+    run["output"] = output
     run["ledger"]["artifacts"][0]["content_json"] = run["output"]
     return run
 

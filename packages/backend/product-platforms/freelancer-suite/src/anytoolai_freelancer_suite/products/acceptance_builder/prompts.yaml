@@ -9,3 +9,13 @@ prompts:
   template_path: prompts/compare.v1.md
   input_variables: []
   output_schema_ref: kernel.schemas.compare_classify_output_v1
+- prompt_ref: acceptance_builder.detect_issues.v1
+  version: 1
+  template_path: prompts/detect_issues.v1.md
+  input_variables: []
+  output_schema_ref: kernel.schemas.issue_detection_output_v1
+- prompt_ref: acceptance_builder.generate_questions.v1
+  version: 1
+  template_path: prompts/generate_questions.v1.md
+  input_variables: []
+  output_schema_ref: kernel.schemas.generate_questions_output_v1

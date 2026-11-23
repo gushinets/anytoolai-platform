@@ -28,7 +28,7 @@ for (const [language, expected] of [["RU", "В брифе указаны все 
       fireEvent.click(screen.getByRole("button", { name: "Copy" }));
       await waitFor(() => expect(onCopy).toHaveBeenCalledWith(composeCopyText(result!)));
       const copy = onCopy.mock.calls[0]![0];
-      expect(copy).toContain(expected);
+      expect(copy).toContain(mode === "C" ? expected : WORDS[language.toLowerCase()]!.listsPresent);
       expect(copy).toContain('Ready to ship');
       expect(copy).not.toContain("UNTRUSTED");
       expect(screen.queryByText(/UNTRUSTED/)).toBeNull();
@@ -145,3 +145,11 @@ for (const [language, sentences] of [
     });
   }
 }
+
+it.each(Object.keys(WORDS))("supplies all Draft wording in %s", (language) => {
+  const words = WORDS[language]!;
+  expect(words.categories).toHaveLength(6);
+  for (const word of [words.risks, words.questions, words.noRisks, words.noQuestions, words.listsPresent, words.evidence, ...words.categories]) {
+    expect(word.trim()).not.toBe("");
+  }
+});

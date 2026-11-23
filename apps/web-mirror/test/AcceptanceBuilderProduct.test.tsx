@@ -15,7 +15,7 @@ import {
   LIST_FIELDS,
   VERDICTS,
   extractCheckResult,
-  extractDraftResult,
+  extractDraftResult, composeCopyText, ISSUE_CATEGORIES, LEVELS,
   hasCriteria,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
 import {
@@ -71,6 +71,8 @@ function schema<T>(name: string): T {
 type Suffix = "" | ".weak_input";
 const draftOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
+  issues: fixture("detect_issues", suffix).issues,
+  questions: suffix ? fixture("generate_questions", suffix).questions : [],
 });
 const checkOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
@@ -148,6 +150,38 @@ describe("Acceptance Builder result parsing", () => {
     expect(weak?.missingFields).toEqual(["acceptance_criteria", "assumptions"]);
     expect(weak?.comparison?.verdict).toBe("does_not_meet");
     expect(weak?.lists.acceptance_criteria).toBeUndefined();
+  });
+
+  it("pins risk enums and rejects invalid question references and shapes", () => {
+    type Fields = Record<"category" | "severity" | "priority", { enum: string[] }>;
+    const { properties } = schema<{ properties: Record<"issues" | "questions", { items: { properties: Fields } }> }>("draft_output.schema.json");
+    expect(ISSUE_CATEGORIES).toEqual(properties.issues.items.properties.category.enum);
+    expect(LEVELS).toEqual(properties.issues.items.properties.severity.enum);
+    expect(LEVELS).toEqual(properties.questions.items.properties.priority.enum);
+    const output = draftOutput(".weak_input");
+    const [q] = output.questions as Record<string, unknown>[];
+    for (const mutation of [
+      { questions: [{ ...q, source_issue_index: 2 }] }, { questions: Array(6).fill(q) },
+      { issues: [] }, { questions: [{ ...q, extra: true }] }, { issues: undefined },
+    ]) expect(extractDraftResult({ ...output, ...mutation })).toBeNull();
+    expect(extractCheckResult({ ...checkOutput(), issues: [] })).toBeNull();
+  });
+
+  it("restores legacy Draft lists without claiming risks were assessed", () => {
+    const old = extractDraftResult({ extracted: draftOutput().extracted });
+    expect(old?.lists.acceptance_criteria).toHaveLength(3);
+    expect(old?.document.sections.map((section) => section.title)).not.toContain("Risks and contradictions");
+  });
+
+  it("uses the Russian QA brief's evidence and numbered question in copy", () => {
+    const { cases } = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/draft_risks_questions.json"), "utf8"));
+    const { canonical } = cases.find((item: { id: string }) => item.id === "AB-894-C-RU");
+    const result = extractDraftResult(canonical)!;
+    const text = composeCopyText(result);
+    expect(text).toContain("Риски и противоречия");
+    expect(text).toContain("Из брифа: " + canonical.issues[0].evidence);
+    expect(text).toContain("15 000 рублей");
+    expect(text).toContain("1. " + canonical.questions[0].question);
   });
 
   it("requires a comparison for check and none for draft", () => {
@@ -284,7 +318,9 @@ describe("Acceptance Builder page", () => {
       "Acceptance criteria\n- A student who finishes a course automatically receives a PDF certificate\n- The certificate is issued for every existing course\n- The certificate uses the brand colors",
       "Assumptions\n- Course completion data already exists in the database",
       "Deliverables\n- Certificate template in brand colors\n- Automated PDF generation service\n- Email that delivers the certificate",
-      "Open gaps\nThe brief states all three lists.",
+      "Risks and contradictions\nNo risks or contradictions detected in the brief.",
+      "Questions for the client\nNo clarifying questions.",
+      "Open gaps\nEach of the three lists has at least one item in the brief.",
     ].join("\n\n");
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expected));
@@ -322,7 +358,7 @@ describe("Acceptance Builder page", () => {
     const result = extractDraftResult(draftOutput())!;
     render(<AcceptanceBuilderResultView result={result} onCopy={() => Promise.resolve(true)} />);
     expect(document.body.textContent).toContain("Acceptance criteria\n- A student");
-    expect(document.body.textContent).toContain("Open gaps\nThe brief states all three lists.");
+    expect(document.body.textContent).toContain("Open gaps\nEach of the three lists has at least one item in the brief.");
     expect(screen.getByText(/Récapitulatif/)).toBeTruthy();
   });
 

@@ -35,7 +35,7 @@ function copyBlocks(): Block[] {
         title: field("title"),
         whenAbsent: field("when_absent"),
         whenEmpty: field("when_empty"),
-        scenarios: field("scenarios"),
+        scenarios: /^ {8}scenarios:\n {10}- (.+)$/m.exec(entry)?.[1],
       };
     });
 }
@@ -46,18 +46,21 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
   const blocks = copyBlocks();
 
   it("has the blocks in the order the renderer composes them, with the same titles", () => {
-    expect(blocks.map((b) => b.id)).toEqual(["verdict", "acceptance_criteria", "assumptions", "deliverables", "open_gaps"]);
+    expect(blocks.map((b) => b.id)).toEqual(["verdict", "acceptance_criteria", "assumptions", "deliverables", "risks", "client_questions", "open_gaps"]);
     expect(blocks[0]!.title).toBe("Verdict");
     for (const field of LIST_FIELDS) {
       expect(blocks.find((b) => b.id === field)?.title).toBe(WORDS.en!.lists[LIST_FIELDS.indexOf(field)]);
     }
+    expect(blocks[4]!.title).toBe(WORDS.en!.risks);
+    expect(blocks[5]!.title).toBe(WORDS.en!.questions);
     expect(blocks.at(-1)!.title).toBe("Open gaps");
   });
 
   it("applies the verdict block to check_v1 only (the renderer composes it only when a comparison exists)", () => {
     expect(prose).toContain("scenarios: - acceptance_builder.check_v1");
     for (const block of blocks.slice(1)) {
-      expect(block.scenarios).toBeUndefined();
+      if (["risks", "client_questions"].includes(block.id)) expect(block.scenarios).toBe("acceptance_builder.draft_v1");
+      else expect(block.scenarios).toBeUndefined();
     }
   });
 
@@ -65,7 +68,7 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
     for (const field of LIST_FIELDS) {
       expect(blocks.find((b) => b.id === field)?.whenAbsent).toBe("analysis_language.missing");
     }
-    expect(blocks.find((b) => b.id === "open_gaps")?.whenEmpty).toBe("analysis_language.complete");
+    expect(blocks.find((b) => b.id === "open_gaps")?.whenEmpty).toBe("analysis_language.lists_present");
   });
 
   it("keeps copy_result as the next action the shared runtime records", () => {

@@ -7,3 +7,11 @@ action_configs:
   action_type: text.compare_and_classify
   prompt_ref: acceptance_builder.compare.v1
   provider_policy_ref: default_fake_provider_v1
+- action_config_id: acceptance_builder.detect_issues_v1
+  action_type: text.detect_issues_by_taxonomy
+  prompt_ref: acceptance_builder.detect_issues.v1
+  provider_policy_ref: default_fake_provider_v1
+- action_config_id: acceptance_builder.generate_questions_v1
+  action_type: text.generate_clarifying_questions
+  prompt_ref: acceptance_builder.generate_questions.v1
+  provider_policy_ref: default_fake_provider_v1

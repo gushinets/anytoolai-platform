@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "issues": []
+  },
+  "input_tokens": 60,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.detect_issues_v1"
+  }
+}
