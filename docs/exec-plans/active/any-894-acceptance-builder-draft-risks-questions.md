@@ -78,3 +78,21 @@ the Draft presenter. The product now stores its seven output-language dictionari
 `outputWording.json`. Each label is keyed by the corresponding schema enum or list field.
 The TypeScript presenter checks the catalog shape and selects wording from the analysis language.
 All 87 focused web tests and the web typecheck passed after migration.
+
+## Review fixes
+
+1. Select the original closed Draft output schema for stored workflow v1 results. Preserve the
+   public schema identity so the client can reopen them.
+2. Render detected missing information in Open gaps alongside missing lists. Keep the question
+   limit independent of which findings are shown.
+3. Verify the result endpoint with historical data and render the saved seven-issue result through
+   Recap and Copy.
+
+The API regression returned the stored v1 payload and schema identity verbatim and rejected
+the same payload under the current workflow version. The web regression used the captured
+English Draft with seven issues and five questions. It verified every missing-information
+description in the open recap and clipboard.
+
+Validation passed for 217 focused Python tests, 36 PostgreSQL Result API tests, 1,142 web tests,
+11 browser smoke tests, frontend typecheck and lint for the changed files, config and architecture
+validation, generated docs, and Acceptance Builder deployment profile generation.

@@ -11,3 +11,6 @@ schemas:
   - schema_ref: acceptance_builder.check_output_v1
     version: 1
     file_path: schemas/check_output.schema.json
+  - schema_ref: acceptance_builder.draft_legacy_output_v1
+    version: 1
+    file_path: schemas/draft_output_legacy.schema.json

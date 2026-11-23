@@ -1,8 +1,7 @@
 """ANY-228 quick-check-covered evidence for the acceptance_builder product bundle.
 
 1. The product loads through anytoolai_platform_api.bootstrap.build_runtime()'s real default
-   bundle set, with exact per-scenario action-type sequences (A01, A04 and conditional A05 for draft_v1,
-   A01 -> A11 for check_v1).
+   bundle set, with A01, A04 and conditional A05 for draft_v1 and A01 -> A11 for check_v1.
 2. Its input and composed-output schemas are non-permissive.
 3. A real scenario start + one worker pass runs every step against the fake provider and the
    composed artifact equals the deterministic fixtures -- happy path and weak input, per scenario
@@ -17,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -26,14 +26,16 @@ import jsonschema
 import pytest
 import sqlalchemy as sa
 from anytoolai_platform_api.bootstrap import build_runtime
+from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
+from anytoolai_platform_core.storage.db import event_log_table, jobs_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.errors import StructuredOutputSchemaMismatchError
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
 from anytoolai_platform_core.structured_output.validator import validate_structured_output_value
 from anytoolai_platform_core.workflows.models import JobStatus
+from anytoolai_platform_core.workflows.repository import JobRepository
 from anytoolai_platform_worker.composition import build_worker
 
 from tests.support.brief_language import CANONICAL, golden_cases, write_provider_fixtures
@@ -501,6 +503,64 @@ def test_draft_happy_path_composes_the_structured_result(
         "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
         "next_action_id": "copy_result",
     }
+
+
+def test_result_api_reopens_persisted_draft_v1_without_relaxing_current_validation(
+    app: Any, request_platform_api, session_factory: SessionFactory
+) -> None:
+    started, _ = _run_to_result(
+        app,
+        request_platform_api,
+        session_factory,
+        DRAFT,
+        {"brief_text": BRIEF_TEXT},
+        RecordingProviderAdapter(FIXTURE_ROOT),
+    )
+    evidence_path = (
+        REPO_ROOT / "tests/fixtures/acceptance_builder_eval/any-894-pre-fix.evidence.json"
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    legacy_output = evidence["runs"][0]["output"]
+    with transaction_boundary(session_factory) as session:
+        jobs = JobRepository(session)
+        job = jobs.get(started["job_id"])
+        assert job is not None and job.result_artifact_id is not None
+        artifacts = ArtifactRepository(session)
+        artifact = artifacts.get(job.result_artifact_id)
+        assert artifact is not None
+        artifacts.update(replace(artifact, content_json=legacy_output))
+
+    def fetch_result() -> httpx.Response:
+        return asyncio.run(
+            request_platform_api(
+                app, "GET", f"/v1/results/{artifact.id}", request_id="req_legacy_draft_result"
+            )
+        )
+
+    rejected = fetch_result()
+    assert rejected.status_code == HTTPStatus.NOT_FOUND
+    assert rejected.json()["error"]["code"] == "result_artifact_unavailable"
+
+    with transaction_boundary(session_factory) as session:
+        # Seed the old persisted version. The repository prevents changing a running job's contract.
+        session.execute(
+            sa.update(jobs_table).where(jobs_table.c.id == job.id).values(workflow_version=1)
+        )
+        ArtifactRepository(session).update(
+            replace(
+                artifact,
+                content_json=legacy_output,
+                metadata={**artifact.metadata, "workflow_version": 1},
+            )
+        )
+
+    response = fetch_result()
+    assert response.status_code == HTTPStatus.OK, response.text
+    result = response.json()
+    assert result["workflow_version"] == 1
+    assert result["schema_ref"] == OUTPUT_SCHEMA_REFS[DRAFT]
+    assert result["schema_version"] == 1
+    assert result["output"] == legacy_output
 
 
 def test_check_happy_path_composes_the_structured_result(

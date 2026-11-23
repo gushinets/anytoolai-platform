@@ -45,7 +45,7 @@ renderer_contract:
       description: Up to five clarifying questions in priority order.
     - part_id: open_gaps
       field: extracted.missing_fields
-      description: The lists the brief does not state, by name. Empty means each of the three lists has at least one item.
+      description: The lists absent from the brief, plus every missing-information finding for Draft.
     - part_id: analysis_language
       field: extracted.values.analysis_language
       description: Case-insensitive analysis language selected from original brief, including explicit
@@ -100,7 +100,9 @@ renderer_contract:
       - block_id: open_gaps
         title: Open gaps
         source: extracted.missing_fields
-        body: Localized name and confirmation request for each missing list; determined only by missing_fields.
+        body: Localized name and confirmation request for each missing list. Draft also includes each
+          missing_information issue description and evidence from issues, in issue order, regardless
+          of whether a question references it.
         when_empty: analysis_language.lists_present
         when_empty_check: analysis_language.complete
     language_source: extracted.values.analysis_language

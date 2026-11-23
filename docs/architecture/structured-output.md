@@ -136,3 +136,8 @@ workflow/schema versions, normalized output and recursive forbidden-field checks
 before publication and consumption commit together. Artifact persistence or provider success alone
 is insufficient; viewing/copying is unnecessary. Failed output releases capacity without publishing
 a final result. Action/debug artifact recovery does not grant result availability or consume quota.
+
+A workflow can declare `historical_output_schema_refs` when the shape behind its public result
+schema evolves. The keys are quoted earlier workflow versions. Canonical result validation selects
+the registered schema by the stored job version and still checks the artifact's public schema
+reference and version. New workflow executions validate against the current output schema.

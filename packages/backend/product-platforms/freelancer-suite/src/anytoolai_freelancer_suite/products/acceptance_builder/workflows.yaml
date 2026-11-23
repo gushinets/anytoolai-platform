@@ -3,6 +3,8 @@ workflows:
   version: 2
   input_schema_ref: acceptance_builder.draft_input_v1
   output_schema_ref: acceptance_builder.draft_output_v1
+  historical_output_schema_refs:
+    "1": acceptance_builder.draft_legacy_output_v1
   steps:
   - step_id: extract
     action_config_id: acceptance_builder.extract_v1

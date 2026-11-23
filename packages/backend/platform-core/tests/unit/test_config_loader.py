@@ -778,6 +778,32 @@ def test_loader_fails_on_missing_schema_reference(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("historical_refs", "expected_error"),
+    [
+        ({2: "kernel_demo.output_v1"}, InvalidConfigShapeError),
+        ({"2": "kernel_demo.output_v1"}, InvalidConfigShapeError),
+        ({"1": "kernel_demo.missing_schema_v1"}, BrokenReferenceError),
+    ],
+)
+def test_loader_checks_historical_output_schema_refs(
+    tmp_path: Path, historical_refs: dict, expected_error: type[Exception]
+) -> None:
+    config_root = _copy_config_tree(tmp_path)
+    path = config_root / "products" / "kernel_demo" / "workflows.yaml"
+    data = _load_yaml(path)
+    data["workflows"][0].update(version=2, historical_output_schema_refs=historical_refs)
+    _write_yaml(path, data)
+
+    with pytest.raises(RegistryLoadError) as exc_info:
+        ConfigLoader(config_root).load()
+
+    assert any(
+        isinstance(error, expected_error) and error.ref_type == "historical_output_schema_refs"
+        for error in exc_info.value.errors
+    )
+
+
 def test_loader_fails_on_malformed_json_schema(tmp_path: Path) -> None:
     config_root = _copy_config_tree(tmp_path)
     path = config_root / "schemas" / "extract_input.schema.json"

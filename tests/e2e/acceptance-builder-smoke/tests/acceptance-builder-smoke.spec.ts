@@ -113,9 +113,16 @@ function composeCopyText({ extracted, comparison, issues, questions }: Output): 
     blocks.push(`Risks and contradictions\n${risks.join("\n") || "No risks or contradictions detected in the brief."}`);
     blocks.push(`Questions for the client\n${questions.map((q, i) => `${i + 1}. ${q.question}`).join("\n") || "No clarifying questions."}`);
   }
-  const gaps = extracted.missing_fields.length
-    ? extracted.missing_fields.map((f) => `- ${f.replace("_", " ")}: the client should confirm it.`).join("\n")
-    : comparison ? "The brief states all three lists." : "Each of the three lists has at least one item in the brief.";
+  const gapLines = extracted.missing_fields.map((f) => `- ${f.replace("_", " ")}: the client should confirm it.`);
+  for (const issue of issues ?? []) {
+    if (issue.category === "missing_information") {
+      const evidence = issue.evidence ? `\n  From the brief: ${issue.evidence}` : "";
+      gapLines.push(`- Missing information: ${issue.description}${evidence}`);
+    }
+  }
+  const gaps = gapLines.join("\n") || (comparison
+    ? "The brief states all three lists."
+    : "Each of the three lists has at least one item in the brief.");
   blocks.push(`Open gaps\n${gaps}`);
   return blocks.join("\n\n");
 }

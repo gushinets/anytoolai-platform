@@ -80,7 +80,7 @@ type StructuredResult = Pick<AcceptanceBuilderResult, "lists" | "missingFields" 
 export function composeDocument(result: StructuredResult): AcceptanceBuilderResult["document"] {
   const words = WORDS[result.analysisLanguage.split("-")[0].toLowerCase()] ?? NEUTRAL;
   const sections: { title: string; content: string }[] = [];
-  let summary = words.complete;
+  let summary = "";
   if (result.comparison) {
     const { verdict, deltas, rationale } = result.comparison;
     summary = `${words.verdict}: ${words.verdicts[verdict]}.`;
@@ -95,24 +95,26 @@ export function composeDocument(result: StructuredResult): AcceptanceBuilderResu
       content: result.lists[field]?.map((item) => `- ${item}`).join("\n") ?? words.missing
     });
   }
-  const gaps = result.missingFields.map((field) =>
+  const gapLines = result.missingFields.map((field) =>
     `- ${words.lists[field].toLowerCase()}: ${words.confirm}.`
-  ).join("\n");
-  const gapText = gaps || (result.comparison ? words.complete : words.listsPresent);
-  if (!result.comparison) summary = gapText;
+  );
   if (result.issues && result.questions) {
-    const risks = result.issues.filter((issue) => issue.category !== "missing_information");
-    const lines = risks.map((issue) => {
+    const riskLines: string[] = [];
+    for (const issue of result.issues) {
       const label = words.categories[issue.category];
       const evidence = issue.evidence ? `\n  ${words.evidence}: ${issue.evidence}` : "";
-      return `- ${label}: ${issue.description}${evidence}`;
-    });
+      const line = `- ${label}: ${issue.description}${evidence}`;
+      const lines = issue.category === "missing_information" ? gapLines : riskLines;
+      lines.push(line);
+    }
     const questions = result.questions.map((item, index) => `${index + 1}. ${item.question}`);
-    sections.push({ title: words.risks, content: lines.join("\n") || words.noRisks });
+    sections.push({ title: words.risks, content: riskLines.join("\n") || words.noRisks });
     sections.push({ title: words.questions, content: questions.join("\n") || words.noQuestions });
-    if (risks.length) summary = `${words.risks}: ${risks.length}`;
+    if (riskLines.length) summary = `${words.risks}: ${riskLines.length}`;
     else if (questions.length) summary = `${words.questions}: ${questions.length}`;
   }
+  const gapText = gapLines.join("\n") || (result.comparison ? words.complete : words.listsPresent);
+  if (!summary) summary = gapText;
   sections.push({ title: words.gaps, content: gapText });
   return { summary, sections };
 }

@@ -131,6 +131,7 @@ def _freeze_workflow(definition: WorkflowDefinition) -> WorkflowDefinition:
     return replace(
         definition,
         steps=tuple(_freeze_workflow_step(step) for step in definition.steps),
+        historical_output_schema_refs=_freeze_value(definition.historical_output_schema_refs),
         metadata=_freeze_value(definition.metadata),
     )
 

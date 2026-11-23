@@ -343,6 +343,33 @@ describe("Acceptance Builder page", () => {
     await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
   });
 
+  it("shows every missing-information finding in recap and copy with the question limit reached", async () => {
+    type Issue = { category: string; description: string };
+    type Output = { issues: Issue[]; questions: { source_issue_index: number }[] };
+    const raw = readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/any-894-live-acceptance.evidence.json"), "utf8");
+    const { runs } = JSON.parse(raw) as { runs: { case_id: string; run: number; output: Output }[] };
+    const { output } = runs.find((entry) => entry.case_id === "AB-894-C-EN" && entry.run === 1)!;
+    const referenced = new Set(output.questions.map((question) => question.source_issue_index));
+    const missing = output.issues.filter((issue) => issue.category === "missing_information");
+    expect(output.questions).toHaveLength(5);
+    expect(output.issues.length).toBeGreaterThan(output.questions.length);
+    expect(output.issues.some((issue, index) => issue.category === "missing_information" && !referenced.has(index))).toBe(true);
+
+    await run("draft", output);
+    const recap = await screen.findByText("Structured recap");
+    fireEvent.click(recap);
+    const gaps = screen.getByText("Open gaps", { exact: true }).nextElementSibling;
+    expect(recap.closest("details")?.open).toBe(true);
+    for (const { description } of missing) expect(gaps?.textContent).toContain(description);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+    const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]?.[0];
+    const openGaps = copied?.split("\n\n").at(-1);
+    expect(openGaps).toMatch(/^Open gaps\n/);
+    for (const { description } of missing) expect(openGaps).toContain(description);
+  });
+
   it("check: leads with the verdict, states its scope and copies verdict lines from the deltas", async () => {
     await run("check", checkOutput());
     await waitFor(() => expect(screen.getAllByText(/judged on four general review criteria/i).length).toBeGreaterThan(0));
