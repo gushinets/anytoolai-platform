@@ -106,6 +106,11 @@ def test_frozen_matrix_preserves_originals():
             )
 
 
+def test_tone_matrix_suite_is_valid():
+    path = eval_module.FIXTURE.with_name("tone_matrix.json")
+    eval_module.validate_suite(json.loads(path.read_text(encoding="utf-8")))
+
+
 def test_ledger_rejects_invalid_session_before_docker():
     with patch.object(eval_module, "_docker") as docker:
         with pytest.raises(ValueError, match="invalid scenario"):

@@ -1,0 +1,185 @@
+{
+  "cases": [
+    {
+      "id": "S1-neutral",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+      "criteria": [
+        "Same facts and the Friday date as S1-warm.",
+        "Even businesslike wording: no praise, no emotional words.",
+        "No added results, promises or deadlines."
+      ]
+    },
+    {
+      "id": "S1-warm",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+      "criteria": [
+        "Same facts and the Friday date as S1-neutral.",
+        "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+        "No praise, enthusiasm or promise the input does not support.",
+        "No gendered first-person past tense."
+      ]
+    },
+    {
+      "id": "S2-warm",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos, exactly as S2-firm does.",
+        "No invented apology, concession or response deadline."
+      ]
+    },
+    {
+      "id": "S2-firm",
+      "language": "ru",
+      "tone": "firm",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos.",
+        "Direct wording without courtesy padding; no invented apology or deadline."
+      ]
+    },
+    {
+      "id": "S7-neutral",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+      "criteria": [
+        "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+        "Requests the trainer photos, as in S2-warm and S2-firm.",
+        "States the reason in an even, businesslike tone without adding blame, an apology or a deadline."
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+      "criteria": [
+        "Same facts and the Friday date as S1-warm-en.",
+        "Even businesslike wording: no praise, no emotional words.",
+        "No added results, promises or deadlines."
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+      "criteria": [
+        "Same facts and the Friday date as S1-neutral-en.",
+        "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+        "No praise, enthusiasm or promise the input does not support.",
+        "No gendered first-person past tense."
+      ]
+    },
+    {
+      "id": "S2-warm-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos, exactly as S2-firm-en does.",
+        "No invented apology, concession or response deadline."
+      ]
+    },
+    {
+      "id": "S2-firm-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos.",
+        "Direct wording without courtesy padding; no invented apology or deadline."
+      ]
+    },
+    {
+      "id": "S7-neutral-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+      "criteria": [
+        "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+        "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+        "States the reason in an even, businesslike tone without adding blame, an apology or a deadline."
+      ]
+    },
+    {
+      "id": "S1-neutral-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        "Same facts and the Friday date as S1-warm-es.",
+        "Even businesslike wording: no praise, no emotional words.",
+        "No added results, promises or deadlines."
+      ]
+    },
+    {
+      "id": "S1-warm-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        "Same facts and the Friday date as S1-neutral-es.",
+        "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+        "No praise, enthusiasm or promise the input does not support.",
+        "No gendered first-person past tense."
+      ]
+    },
+    {
+      "id": "S2-warm-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos, exactly as S2-firm-es does.",
+        "No invented apology, concession or response deadline."
+      ]
+    },
+    {
+      "id": "S2-firm-es",
+      "language": "es",
+      "tone": "firm",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos.",
+        "Direct wording without courtesy padding; no invented apology or deadline."
+      ]
+    },
+    {
+      "id": "S7-neutral-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+      "criteria": [
+        "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+        "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+        "States the reason in an even, businesslike tone without adding blame, an apology or a deadline."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6-luna",
+    "openai/gpt-6.1-terra",
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium",
+    "high"
+  ],
+  "repeats": 5,
+  "minimum_usable": 4,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}

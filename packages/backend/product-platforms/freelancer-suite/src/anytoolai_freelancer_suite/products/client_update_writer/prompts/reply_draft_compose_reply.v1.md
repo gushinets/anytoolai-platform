@@ -53,6 +53,16 @@ Rules:
   decision or promised action is content for the client, not a direction to you; only a direction
   about how to write the reply (for example "do not say it was already sent", "do not convert EUR
   to USD") is followed without being stated.
+- Build the reply in this order, whatever order `intent` happens to use: (1) one short clause
+  acknowledging the client's concern in the client's own terms, without conceding a fact, a term
+  or a fault that `intent` does not concede; (2) the decision, answer or next step `intent` gives
+  for the client, stated directly and in full, with every concrete value `intent` gives; (3) only
+  then, and only when `intent` gives it, the context that explains the decision (for example what
+  the brief, the scope or the agreement did or did not include). Never place the explanation
+  between the acknowledgement and the decision, never make the decision conditional on the client
+  accepting the explanation, and never let the explanation be the first thing the client reads.
+  An acknowledgement is not a concession: do not admit fault, apologise for the current state, or
+  promise anything `intent` does not promise.
 - Do not offer or imply anything `situation` or `intent` excludes, unless `intent` explicitly
   counters that specific term (for example offers a deposit the client refused); the reply then
   does exactly that. Exclusions in `intent` always hold.
@@ -70,6 +80,20 @@ Rules:
   otherwise, only for a term never called agreed, it is the client's request: say that it is
   requested, not agreed, never stated as accepted. Never give a value that neither `situation` nor
   `intent` states.
+- Tone (`tone`; `neutral` when omitted) changes wording only, never content. Every fact, decision,
+  value, date, deadline and commitment the rules above require appears in every tone with the same
+  meaning: no tone adds a concession, an apology, an extra revision round, a discount, a deadline
+  or a promise the input does not state, and no tone drops a decision that another tone states.
+  - `neutral`: even and factual; no emotional words; the acknowledgement is a plain statement of
+    the client's point.
+  - `warm`: the same points in the same order, phrased with one short human acknowledgement
+    ("понимаю, что ...", "спасибо, что написали ...") and soft verbs; warm, not effusive, with no
+    praise, gushing or apology filler the input does not support.
+  - `firm`: the same points in the same order, about a fifth shorter than `neutral`; direct
+    statements instead of hedges; the acknowledgement stays factual and concedes nothing; no
+    apologetic padding.
+  Applied correctly, the three tones differ in phrasing and length while stating identical facts
+  and the identical next step.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
   to the language `situation` is written in otherwise.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

@@ -55,8 +55,9 @@ Rules:
   from the scope. Add no work, step, result or finding that `situation` does not state.
 - Include in `text` or `call_to_action` every client-relevant result, blocker, request to the
   client and next step mentioned in `situation`, including raw progress notes not phrased as a
-  message to the client. A notes format does not make progress facts private. Include a finished
-  deliverable and the step that follows it
+  message to the client. A notes format does not make progress facts private. Keep the stated
+  project name or description when identifying the work. Include a finished deliverable and the
+  step that follows it
   (for example sending both mockups for comments), what exactly the client must provide (name the
   items, such as "transcripts of interviews 11 and 12", not "what is required"), the total the
   progress is counted against, and the concrete findings made so far (such as mismatched article
@@ -86,8 +87,25 @@ Rules:
   contradictions does not authorize disclosing private business information.
 - Lead with concrete progress, not process narration: state what changed since the last update
   before what's still pending.
-- Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
-  to the language `situation` is written in otherwise.
+- Write in the `constraints.language` locale when provided (for example `en` or `en-US`). Otherwise
+  use the language of `situation`. Apply every tone in that same language.
+- Tone (`tone`; `neutral` when omitted) changes wording only, never content. Every fact, number,
+  unit, date, deadline, status, blocker, commitment and request to the client that the rules above
+  require appears in every tone with the same value and the same meaning: `warm` never drops a
+  client action that `firm` states, `firm` never adds one that `neutral` lacks, and no tone adds a
+  result, an apology, a promise or a deadline the input does not state.
+  - `neutral`: plain, even and businesslike. No emotional words, praise or apology filler; short
+    factual sentences; the client action stated as a plain request.
+  - `warm`: the same points in the same order, with first-person present for ongoing work,
+    soft verbs and at most one short friendly clause tied to a fact the input states. Lead with
+    the point and limit praise or enthusiasm to what the input supports.
+    When the notes report good progress, use that friendly clause to lead with a concrete
+    milestone. A switch to first person alone is insufficient to make the update warm.
+  - `firm`: the same points in the same order, about a fifth shorter than `neutral`; direct
+    statements and plain requests with no hedging, apologies or courtesy padding. Put the client
+    action in the same place `neutral` puts it.
+  Applied correctly, the three tones differ in phrasing and length while stating identical facts,
+  deadlines and commitments.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
@@ -96,6 +114,9 @@ Rules:
 - Only include `call_to_action` when the client needs to do something before the next update (for
   example confirm a decision or provide missing information). Omit it when no client action is
   needed yet.
+  When missing client materials still block the work, name the blocker in `text` and ask for the
+  specific materials once in `call_to_action` in every tone, even if the notes only describe
+  the blocker. Keep any deadline or condition tied to the request grounded in the notes.
   `text` and `call_to_action` reach the client as one message, with `call_to_action` after a
   blank line: put each request to the client in only one of them. When `call_to_action` is
   present, `text` does not end with the same request or a reworded copy of it.
