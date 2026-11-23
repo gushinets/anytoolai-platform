@@ -39,6 +39,7 @@ COMPOSE_OVERRIDE_FILE = ROOT / "infra" / "compose" / "docker-compose.override.ym
 COMPOSE_PROD_FILE = ROOT / "infra" / "compose" / "docker-compose.prod.yml"
 COMPOSE_LIVE_FILE = ROOT / "infra" / "compose" / "docker-compose.live.yml"
 COMPOSE_IMAGES_FILE = ROOT / "infra" / "compose" / "docker-compose.images.yml"
+COMPOSE_RELEASE_CHECK_FILE = ROOT / "infra" / "compose" / "docker-compose.release-check.yml"
 COMPOSE_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.vps-135.yml"
 COMPOSE_ATOM_LAB_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.yml"
 COMPOSE_ATOM_LAB_VPS_135_FILE = ROOT / "infra" / "compose" / "docker-compose.atom-lab.vps-135.yml"
@@ -68,6 +69,7 @@ COMPOSE_QUERY_TIMEOUT_SECONDS = 60
 PROD_NON_ROOT_SERVICES = ("platform-worker", "web-mirror")
 COMPOSE_STACK_QUERY_TIMEOUT_SECONDS = 10
 COMPOSE_TEARDOWN_TIMEOUT_SECONDS = 180
+PROD_RELEASE_READY_TIMEOUT_SECONDS = 90
 # `doctor`'s tool probes are a one-off diagnostic, not a hot path, so this is generous on purpose:
 # a cold `windows-latest` CI runner has been observed timing out a bare `npm --version` at 10s
 # (round 55's stdin=DEVNULL fix closed the Node/Windows stdin-hang case, nodejs/node#10836, but a
@@ -2725,15 +2727,23 @@ def prod_up() -> int:
         return 1
 
 
-def _validate_image_inputs(env: dict[str, str]) -> None:
-    if os.name != "posix":
-        raise ValueError("image installation currently requires a Linux Docker host")
-    for name in ("ANYTOOLAI_API_IMAGE", "ANYTOOLAI_WORKER_IMAGE", "ANYTOOLAI_WEB_IMAGE"):
-        ref = env.get(name, "")
+def _reviewed_image_refs(env: dict[str, str]) -> dict[str, str]:
+    refs = {
+        name: env.get(name, "")
+        for name in ("ANYTOOLAI_API_IMAGE", "ANYTOOLAI_WORKER_IMAGE", "ANYTOOLAI_WEB_IMAGE")
+    }
+    for name, ref in refs.items():
         if not ref or (
             "@sha256:" not in ref and (":" not in ref.rsplit("/", 1)[-1] or ref.endswith(":latest"))
         ):
             raise ValueError(f"{name} must select a version tag or digest")
+    return refs
+
+
+def _validate_image_inputs(env: dict[str, str]) -> None:
+    if os.name != "posix":
+        raise ValueError("image installation currently requires a Linux Docker host")
+    _reviewed_image_refs(env)
     root = Path(env.get("ANYTOOLAI_PROFILE_ROOT", ""))
     if not root.is_absolute() or root.is_symlink() or not root.is_dir():
         raise ValueError(
@@ -3365,6 +3375,145 @@ def prod_smoke() -> int:
     return run([sys.executable, "scripts/agent/kernel_demo_smoke.py", api_url])
 
 
+def _release_loopback_endpoint(
+    compose: list[str], env: dict[str, str], service: str, port: int
+) -> str:
+    endpoint = subprocess.run(
+        [*compose, "port", service, str(port)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    ).stdout.strip()
+    host, _, published_port = endpoint.partition(":")
+    if host != "127.0.0.1" or not published_port.isdigit():
+        raise ValueError(f"{service} must publish exactly one loopback port")
+    return endpoint
+
+
+def _validate_release_api_rewrite(image: str, api_alias: str, env: dict[str, str]) -> None:
+    result = subprocess.run(
+        [
+            "docker", "run", "--rm", "--pull", "never", "--network", "none",
+            "--entrypoint", "node", image,
+            "-p", 'JSON.stringify(require("./.next/routes-manifest.json").rewrites)',
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=COMPOSE_QUERY_TIMEOUT_SECONDS,
+    )
+    rewrites = json.loads(result.stdout)
+    destinations = [
+        rule["destination"]
+        for rules in rewrites.values()
+        for rule in rules
+        if rule["source"] == "/v1/:path*"
+    ]
+    if destinations not in (
+        ["http://platform-api:8000/v1/:path*"],
+        [f"http://{api_alias}:8000/v1/:path*"],
+    ):
+        raise ValueError("the candidate web image must route /v1 to the isolated Platform API")
+
+
+def prod_release_check() -> int:
+    """Run the selected public release images on a disposable fake-provider stack."""
+    try:
+        config = _resolved_env_file(PROD_ENV_FILE)
+        products = _product_ids(
+            config.get("ANYTOOLAI_ENABLED_PRODUCT_IDS", ""), "ANYTOOLAI_ENABLED_PRODUCT_IDS"
+        )
+        images = _reviewed_image_refs(config)
+        project = f"anytoolai-release-check-{uuid.uuid4().hex[:12]}"
+        compose_env = {
+            key: value
+            for key, value in runner_env().items()
+            if not key.startswith(
+                ("ANYTOOLAI_", "COMPOSE_", "POSTGRES_", "OPENAI_", "LITELLM_", "NEXT_PUBLIC_")
+            )
+        }
+        api_alias = f"platform-api.{PROD_COMPOSE_PROJECT}_default"
+        compose_env.update(
+            images,
+            ANYTOOLAI_ENABLED_PRODUCT_IDS=",".join(products),
+            ANYTOOLAI_WEB_BASE_PATH=config.get("ANYTOOLAI_WEB_BASE_PATH", "").rstrip("/"),
+            ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT=config.get("ANYTOOLAI_PROD_WORKER_MEMORY_LIMIT")
+            or "512M",
+            ANYTOOLAI_POSTGRES_USER="release_smoke",
+            ANYTOOLAI_POSTGRES_PASSWORD=uuid.uuid4().hex,
+            ANYTOOLAI_POSTGRES_DB="release_smoke",
+            ANYTOOLAI_RELEASE_API_ALIAS=api_alias,
+            LITELLM_LOCAL_MODEL_COST_MAP="True",
+        )
+        _validate_release_api_rewrite(images["ANYTOOLAI_WEB_IMAGE"], api_alias, compose_env)
+        with tempfile.TemporaryDirectory(prefix="anytoolai-release-check-") as directory:
+            empty_env_file = Path(directory) / "empty.env"
+            empty_env_file.touch()
+            compose = _docker_compose_command(
+                project,
+                (COMPOSE_FILE, COMPOSE_PROD_FILE, COMPOSE_IMAGES_FILE, COMPOSE_RELEASE_CHECK_FILE),
+                env_file=empty_env_file,
+            )
+            return _run_release_smokes(compose, compose_env, products, report_dir=empty_env_file.parent)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        print(f"PROD011: public release check failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def _run_release_smokes(
+    compose: list[str],
+    compose_env: dict[str, str],
+    products: tuple[str, ...],
+    *,
+    report_dir: Path,
+) -> int:
+    try:
+        code = run_with_env([*compose, "up", "-d", "--no-build", "--pull", "never"], compose_env)
+        if code:
+            return code
+        web_url = "http://" + _release_loopback_endpoint(compose, compose_env, "web-mirror", 3000)
+        postgres = _release_loopback_endpoint(compose, compose_env, "postgres", 5432)
+        ready_url = f"{web_url}/v1/products/{quote(products[0], safe='')}/runtime-config"
+        if not _wait_for_http_ok(ready_url, timeout=PROD_RELEASE_READY_TIMEOUT_SECONDS):
+            raise ValueError(f"candidate did not become ready at {ready_url}")
+
+        browser_env = runner_env() | {
+            "WEB_MIRROR_BASE_URL": web_url,
+            "WEB_MIRROR_BASE_PATH": compose_env["ANYTOOLAI_WEB_BASE_PATH"],
+            "DATABASE_URL": f"postgresql://release_smoke:{compose_env['ANYTOOLAI_POSTGRES_PASSWORD']}"
+            f"@{postgres}/release_smoke",
+        }
+        for index, product in enumerate(products):
+            package = f"@anytoolai/{product.replace('_', '-')}-smoke"
+            report_path = report_dir / f"playwright-{index}.json"
+            code = run_with_env(
+                [
+                    "pnpm",
+                    "--fail-if-no-match", "--filter", package,
+                    "exec", "playwright", "test", "--forbid-only", "--grep", "@release-smoke",
+                ],
+                browser_env | {"PLAYWRIGHT_JSON_OUTPUT_FILE": str(report_path)},
+            )
+            if code:
+                print(f"PROD011: release browser smoke failed for {product}", file=sys.stderr)
+                return code
+            stats = json.loads(report_path.read_text(encoding="utf-8"))["stats"]
+            if not stats["expected"] or stats["skipped"]:
+                raise ValueError(f"release browser smoke did not run all cases for {product}")
+    finally:
+        cleanup_code = run_with_env(
+            [*compose, "down", "--volumes", "--remove-orphans"],
+            compose_env,
+            timeout=COMPOSE_TEARDOWN_TIMEOUT_SECONDS,
+        )
+    return cleanup_code
+
+
 def manifest_conformance(argv: Sequence[str] = ()) -> int:
     try:
         return run([quick_check_python(), "scripts/agent/manifest_conformance.py", *argv])
@@ -3408,6 +3557,7 @@ COMMANDS = {
     "atom-lab-down": atom_lab_down,
     "atom-lab-smoke": atom_lab_smoke,
     "prod-up": prod_up,
+    "prod-release-check": prod_release_check,
     "prod-web-up": prod_web_up,
     "prod-fake-up": prod_fake_up,
     "prod-fake-down": prod_fake_down,

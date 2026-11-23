@@ -2204,6 +2204,92 @@ def test_prod_ready_rejects_changed_canonical_source(monkeypatch) -> None:
     assert runner.prod_ready(inputs=inputs, manifest=manifest) == 1
 
 
+@pytest.mark.parametrize(("smoke_exit", "skipped"), [(0, 0), (4, 0), (0, 1)])
+def test_prod_release_check_runs_configured_products_and_cleans_up(
+    monkeypatch, smoke_exit, skipped
+) -> None:
+    runner = load_runner_module()
+    images = {
+        "ANYTOOLAI_API_IMAGE": "kernel-api:reviewed",
+        "ANYTOOLAI_WORKER_IMAGE": "kernel-worker:reviewed",
+        "ANYTOOLAI_WEB_IMAGE": "kernel-web:reviewed",
+    }
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: images | {
+            "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai, new_product",
+            "ANYTOOLAI_WEB_BASE_PATH": "/tools",
+        },
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "live-key")
+    monkeypatch.setenv("ANYTOOLAI_VPS_135_NETWORKS", "1")
+    monkeypatch.setenv("ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN", "live-token")
+    monkeypatch.setattr(runner, "_validate_release_api_rewrite", lambda *args: None)
+    monkeypatch.setattr(runner, "_release_loopback_endpoint", lambda *args: "127.0.0.1:32100")
+    monkeypatch.setattr(runner, "_wait_for_http_ok", lambda *args, **kwargs: True)
+    calls = []
+
+    def record(command, env, **kwargs):
+        calls.append((command, env))
+        if command[0] == "pnpm":
+            is_new_product = "@anytoolai/new-product-smoke" in command
+            Path(env["PLAYWRIGHT_JSON_OUTPUT_FILE"]).write_text(
+                json.dumps({"stats": {"expected": 1, "skipped": skipped if is_new_product else 0}}),
+                encoding="utf-8",
+            )
+            return smoke_exit if is_new_product else 0
+        return 0
+
+    monkeypatch.setattr(runner, "run_with_env", record)
+    assert runner.prod_release_check() == (1 if skipped else smoke_exit)
+
+    (startup, compose_env), (first, browser_env), (second, _), (teardown, _) = calls
+    project = startup[startup.index("--project-name") + 1]
+    assert project.startswith("anytoolai-release-check-")
+    assert startup[-5:] == ["up", "-d", "--no-build", "--pull", "never"]
+    assert teardown == startup[:-5] + ["down", "--volumes", "--remove-orphans"]
+    assert "OPENAI_API_KEY" not in compose_env
+    assert "ANYTOOLAI_VPS_135_NETWORKS" not in compose_env
+    assert "ANYTOOLAI_PORTAL_ACCESS_SERVICE_TOKEN" not in compose_env
+    assert compose_env["ANYTOOLAI_ENABLED_PRODUCT_IDS"] == "proposal_ai,new_product"
+    assert {name: compose_env[name] for name in images} == images
+    assert browser_env["WEB_MIRROR_BASE_PATH"] == "/tools"
+    assert browser_env["WEB_MIRROR_BASE_URL"] == "http://127.0.0.1:32100"
+    assert browser_env["DATABASE_URL"].endswith("@127.0.0.1:32100/release_smoke")
+    assert "--fail-if-no-match" in first and "--fail-if-no-match" in second
+    assert "--forbid-only" in first and "--forbid-only" in second
+    assert first[first.index("--filter") + 1] == "@anytoolai/proposal-ai-smoke"
+    assert second[second.index("--filter") + 1] == "@anytoolai/new-product-smoke"
+    assert first[-2:] == second[-2:] == ["--grep", "@release-smoke"]
+
+
+def test_prod_release_check_rejects_external_api_rewrite_before_compose(monkeypatch, capsys) -> None:
+    runner = load_runner_module()
+    monkeypatch.setattr(
+        runner,
+        "_resolved_env_file",
+        lambda path: {
+            "ANYTOOLAI_API_IMAGE": "kernel-api:reviewed",
+            "ANYTOOLAI_WORKER_IMAGE": "kernel-worker:reviewed",
+            "ANYTOOLAI_WEB_IMAGE": "kernel-web:reviewed",
+            "ANYTOOLAI_ENABLED_PRODUCT_IDS": "proposal_ai",
+        },
+    )
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps({
+            "afterFiles": [
+                {"source": "/v1/:path*", "destination": "https://production.example/v1/:path*"}
+            ],
+        })),
+    )
+    monkeypatch.setattr(runner, "run_with_env", lambda *args, **kwargs: pytest.fail("reached Compose"))
+    assert runner.prod_release_check() == 1
+    assert "isolated Platform API" in capsys.readouterr().err
+
+
 def test_prod_fake_up_calls_ready_after_successful_up(monkeypatch) -> None:
     runner = load_runner_module()
     monkeypatch.delenv("ANYTOOLAI_PROD_API_PORT", raising=False)

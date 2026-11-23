@@ -34,8 +34,9 @@ import {
  * served at WEB_MIRROR_BASE_URL, DATABASE_URL pointing at the dev-up Postgres.
  */
 const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost:3400";
-const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/acceptance_builder`;
-const BRIEF_DECODER_URL = `${WEB_MIRROR_BASE_URL}/products/brief_decoder`;
+const WEB_PAGES_BASE_URL = `${WEB_MIRROR_BASE_URL}${process.env.WEB_MIRROR_BASE_PATH ?? ""}`;
+const PRODUCT_URL = `${WEB_PAGES_BASE_URL}/products/acceptance_builder`;
+const BRIEF_DECODER_URL = `${WEB_PAGES_BASE_URL}/products/brief_decoder`;
 const FIXTURE_ROOT = join(import.meta.dirname, "../../../../tests/fixtures/provider/fake_provider_outputs");
 const PRODUCTS_ROOT = join(
   import.meta.dirname,
@@ -128,7 +129,7 @@ test.describe("Acceptance Builder web product", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   });
 
-  test("draft happy path: one action, artifact correlation, copy text from the structured fields, one result_viewed, one copy activation", async ({
+  test("draft happy path: one action, artifact correlation, copy text from the structured fields, one result_viewed, one copy activation", { tag: "@release-smoke" }, async ({
     page,
   }) => {
     const run = trackRun(page);

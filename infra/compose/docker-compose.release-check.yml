@@ -1,0 +1,16 @@
+# Private rehearsal only. The candidate web image may have the VPS API alias baked in.
+services:
+  postgres:
+    ports: !override
+      - target: 5432
+        host_ip: 127.0.0.1
+  platform-api:
+    ports: !override []
+    networks:
+      default:
+        aliases:
+          - ${ANYTOOLAI_RELEASE_API_ALIAS:?set the candidate API alias}
+  web-mirror:
+    ports: !override
+      - target: 3000
+        host_ip: 127.0.0.1

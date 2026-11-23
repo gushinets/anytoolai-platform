@@ -30,7 +30,8 @@ import {
  * at WEB_MIRROR_BASE_URL, DATABASE_URL pointing at the dev-up Postgres.
  */
 const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost:3300";
-const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/brief_decoder`;
+const WEB_PAGES_BASE_URL = `${WEB_MIRROR_BASE_URL}${process.env.WEB_MIRROR_BASE_PATH ?? ""}`;
+const PRODUCT_URL = `${WEB_PAGES_BASE_URL}/products/brief_decoder`;
 const FIXTURE_ROOT = join(import.meta.dirname, "../../../../tests/fixtures/provider/fake_provider_outputs");
 
 const START_ROUTE_PATTERN = /\/scenarios\/brief_decoder\.decode_v1\/start$/;
@@ -135,7 +136,7 @@ test.describe("Brief Decoder web product", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   });
 
-  test("happy path: four actions in order, artifact correlation, four-part render, one result_viewed, one copy activation", async ({
+  test("happy path: four actions in order, artifact correlation, four-part render, one result_viewed, one copy activation", { tag: "@release-smoke" }, async ({
     page,
   }) => {
     const run = trackRun(page, START_ROUTE_PATTERN);

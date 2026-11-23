@@ -29,7 +29,8 @@ import {
  *  - DATABASE_URL pointing at the same dev-up Postgres, for the backend-recorded-event assertion
  */
 const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost:3200";
-const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/client_update_writer`;
+const WEB_PAGES_BASE_URL = `${WEB_MIRROR_BASE_URL}${process.env.WEB_MIRROR_BASE_PATH ?? ""}`;
+const PRODUCT_URL = `${WEB_PAGES_BASE_URL}/products/client_update_writer`;
 
 const START_ROUTE_PATTERN = /\/scenarios\/[^/]+\/start$/;
 
@@ -59,7 +60,7 @@ test.describe("Client Update Writer web product (Update mode)", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   });
 
-  test("happy path: submit, poll to completion, render canonical result, single backend-recorded copy activation", async ({
+  test("happy path: submit, poll to completion, render canonical result, single backend-recorded copy activation", { tag: "@release-smoke" }, async ({
     page,
   }) => {
     await page.goto(PRODUCT_URL);

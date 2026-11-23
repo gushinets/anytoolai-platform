@@ -17,7 +17,8 @@ import {
 // The happy path uses the real worker and deterministic provider. Weak input substitutes only
 // the canonical response; backend bundle tests independently prove that fixture through A11+A02.
 const WEB_MIRROR_BASE_URL = process.env.WEB_MIRROR_BASE_URL ?? "http://localhost:3500";
-const PRODUCT_URL = `${WEB_MIRROR_BASE_URL}/products/task_finder`;
+const WEB_PAGES_BASE_URL = `${WEB_MIRROR_BASE_URL}${process.env.WEB_MIRROR_BASE_PATH ?? ""}`;
+const PRODUCT_URL = `${WEB_PAGES_BASE_URL}/products/task_finder`;
 const FIXTURE_ROOT = join(import.meta.dirname, "../../../../tests/fixtures/provider/fake_provider_outputs");
 const PRODUCTS_ROOT = join(import.meta.dirname, "../../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products");
 const GUEST_QUOTA_LIMIT = Number(/limit_count:\s*(\d+)/.exec(readFileSync(join(PRODUCTS_ROOT, "task_finder/quotas.yaml"), "utf8"))![1]);
@@ -59,7 +60,7 @@ async function submitFit(page: Page): Promise<void> {
 test.describe("Task Finder web product", () => {
   test.beforeEach(async ({ context }) => { await context.grantPermissions(["clipboard-read", "clipboard-write"]); });
 
-  test("happy path: config, canonical artifact, ordered actions, rendering and exactly-once activation", async ({ page }) => {
+  test("happy path: config, canonical artifact, ordered actions, rendering and exactly-once activation", { tag: "@release-smoke" }, async ({ page }) => {
     const run = trackRun(page);
     const config = await page.request.get(`${WEB_MIRROR_BASE_URL}/v1/products/task_finder/runtime-config`);
     expect(config.ok()).toBe(true);

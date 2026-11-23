@@ -23,25 +23,42 @@ the Payment Portal Caddy. Each project has its own API, worker, and PostgreSQL v
    If the system Python reports `ensurepip is not available`, initialize the environment with
    `uv venv --allow-existing --python "$(command -v python3)" .quick-check-venv` and rerun
    the bootstrap.
-4. For a product update, prepare `.env.prod` with the approved `ANYTOOLAI_PRIVACY_POLICY_URL`
-   and verify the page opens. This URL, the enabled product list, and the web base path are
-   build arguments. Use the same checkout, environment, and VPS build arguments for the
-   prebuild and `prod-up`. The live overlay adds runtime settings and mounts.
-   [Production settings](README.md#prod)
+4. For a public product release, build or obtain the reviewed API, worker and web images
+   before the window. Set `ANYTOOLAI_API_IMAGE`, `ANYTOOLAI_WORKER_IMAGE`,
+   `ANYTOOLAI_WEB_IMAGE` and `ANYTOOLAI_PROFILE_ROOT` in the selected production env file.
+   Verify the approved `ANYTOOLAI_PRIVACY_POLICY_URL` opens. Build the web image with the
+   selected product IDs, privacy URL and base path. On VPS 135 the web image uses
+   `http://platform-api.anytoolai-prod_default:8000` for its API rewrite.
+   [Production settings](README.md#prod) ·
+   [Reviewed images](README.md#reviewed-images-and-independent-updates-any-766-step-17)
 
    ```bash
-   COMPOSE_PARALLEL_LIMIT=1 docker compose --project-name anytoolai-release-prebuild \
-     --env-file infra/compose/.env.prod \
-     -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.prod.yml \
-     -f infra/compose/docker-compose.vps-135.yml \
-     build migrate platform-api platform-worker web-mirror &&
-   docker run --rm --pull never --network none --entrypoint node \
-     anytoolai-release-prebuild-web-mirror node_modules/next/dist/bin/next --version
+   pnpm install --frozen-lockfile &&
+     pnpm --filter @anytoolai/smoke-support exec playwright install chromium &&
+     .quick-check-venv/bin/python scripts/agent/runner.py prod-release-check
    ```
 
-   For `MODULE_NOT_FOUND`, correct the checkout permissions and repeat the build and probe.
-   If Next.js stalls while fetching fonts, check access to `fonts.googleapis.com` and
-   `fonts.gstatic.com` from the Docker build network and retry before closing ingress.
+   Run the check on the Linux deployment host or an equivalent Docker host with the same
+   images, Chromium system dependencies and a local `postgres:18` image. Use the candidate
+   checkout and the production env selection, including `ANYTOOLAI_PROD_ENV_FILE` if set.
+   Enter maintenance only after the command succeeds. The command starts the selected images
+   with a disposable database and bundled fake provider on a separate Compose network.
+   It runs the browser happy paths for `ANYTOOLAI_ENABLED_PRODUCT_IDS` and tears down the
+   temporary stack. Use the same image digests or unchanged local version tags for `prod-up`.
+   In a scripted cutover, chain the maintenance step after a successful `prod-release-check`.
+   The rehearsal covers the browser/API request and result flow. During cutover verify the
+   real provider and production database separately.
+
+   If an enabled product lacks a release test, add or tag its happy path with
+   `@release-smoke` in the matching `@anytoolai/<product-id-with-hyphens>-smoke` workspace.
+   The test should submit the product's public form and verify a rendered result. Use
+   `WEB_MIRROR_BASE_PATH` for product pages and the origin alone for `/v1/*`. A missing
+   workspace, missing test or skipped test blocks the check. Adding a product does not
+   require editing the runner.
+
+   For `MODULE_NOT_FOUND`, correct checkout permissions and rebuild before retrying the
+   check. If Next.js stalls while fetching fonts, check access to `fonts.googleapis.com`
+   and `fonts.gstatic.com` from the Docker build network while public ingress is still open.
 
 ## Reload or restore Caddy on VPS 135
 
@@ -91,9 +108,10 @@ The host file is `/opt/payments-portal/deploy/caddy/Caddyfile.prod`. The contain
    counts, and checksums for the preserved data.
    [Migration rehearsal and database rollback](execution-metering-cutover.md)
 2. Run `prod-quiesce` to drain the product queue, then `prod-down` from the running checkout
-   after backup and any migration rehearsal. Run `prod-up` and `prod-ready` from the
-   candidate. Keep the named volume. Check the enabled product pages and runtime-config
-   endpoints, then run one known scenario per enabled product. Reopen and verify product
+   after backup and any migration rehearsal. Run `prod-up` with the images that passed
+   `prod-release-check`, then run `prod-ready` from the candidate. Keep the named volume.
+   Check the enabled product pages and runtime-config endpoints, then run one known live
+   scenario per enabled product through the current web forms. Reopen and verify product
    ingress before switching Lab.
 3. Update Lab using `atom-lab-quiesce`, its [backup procedure](README.md#backup-recovery-and-rollback),
    and `atom-lab-down` from the running checkout. Use `atom-lab-up` and `atom-lab-ready`
