@@ -5,8 +5,8 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-20
-- Last updated: 2026-11-20
-- Review date: 2026-11-20
+- Last updated: 2026-11-23
+- Review date: 2026-11-23
 - Next action: repeat the live regression series once the provider credential is renewed.
 - Blocker: the configured provider credential has expired (HTTP 401).
 
@@ -96,3 +96,29 @@ Compose subprocess tests and the activation marker test requiring passwordless s
 The full frontend-check passed on retry, including lint, typecheck, workspace tests,
 generated API types and production builds. Its first run timed out in the ce-kit ESLint
 configuration test during the Docker build.
+
+
+### Review corrections and live verification, 2026-11-23
+
+The tested commit was `4a7ca8d971795f5d806eb8f67e9a06aaa3b44229` with a clean checkout.
+Both the API and worker passed deployment fingerprint verification. The worker used
+`openai/gpt-6.1-sol` with medium reasoning effort. The collector scheduled all 63 runs.
+On the first Russian W1 input the provider reported an expired credential (HTTP 401).
+Both physical extraction attempts failed with zero estimated cost. Comparison never ran.
+The evaluator report returned exit code 1 with 0 PASS, 1 FAIL and 62 PENDING.
+There was no output to assess against the revised criteria. AC5 remains open.
+
+[Per-run statuses, build fingerprints and failed-call ledger](any-893-acceptance-unconfirmed-vs-unmet.evidence-20261123.json)
+
+All 176 targeted Python tests and 85 focused web tests passed. The Python checks cover
+suite selection and the canonical schema. The web checks cover each ordinary verdict with
+empty lists, including a visible and counted process violation. SonarCloud marked issue
+`AaIHNfZINZCHnXHFWfnm` CLOSED/FIXED and passed the quality gate for the tested commit.
+
+Doctor, config, architecture, documentation and generated-doc checks passed. Full-check
+again stopped at the Compose environment probe in
+`test_prod_stack_running_reflects_compose_ps_output` (313 passed, one failed).
+The local frontend gate passed lint and typecheck, then timed out in the ce-kit ESLint
+configuration test, including on retry. That test passed in isolation with its original
+timeout. All 1,139 web-mirror tests, generated API type verification and workspace builds
+passed independently.
