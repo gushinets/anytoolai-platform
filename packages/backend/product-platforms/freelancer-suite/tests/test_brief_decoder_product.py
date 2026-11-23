@@ -14,13 +14,25 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import jsonschema
 import pytest
 import yaml
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
+
+from tests.support.brief_language import (
+    BRIEF_DETAIL_FIELDS,
+    CANONICAL,
+    EMPTY_BRIEF_DETAILS,
+    DocumentLanguage,
+    assert_brief_overview,
+    assert_summary_matches_sources,
+    assert_summary_readiness,
+    labeled_brief_value,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 KERNEL_DIR = REPO_ROOT / "configs" / "kernel"
@@ -100,6 +112,14 @@ def _literal(value: str) -> Any:
 
 def _fixture_response(stem: str) -> dict[str, Any]:
     return json.loads((FIXTURE_ROOT / f"{stem}.json").read_text(encoding="utf-8"))["response_json"]
+
+
+def _override_fixture_responses(monkeypatch, responses):
+    original = _fixture_response
+    monkeypatch.setitem(
+        globals(), "_fixture_response",
+        lambda name: responses[name] if name in responses else original(name),
+    )
 
 
 def test_product_directory_contains_no_python_or_forbidden_provider_references() -> None:
@@ -284,7 +304,6 @@ _GAPS_KEYWORD = {
     "target_audience": "audience",
     "constraints": "constraint",
 }
-DocumentLanguage = Literal["en", "ru", "es"]
 _GAPS_KEYWORDS_BY_LANGUAGE: dict[DocumentLanguage, dict[str, str]] = {
     "en": _GAPS_KEYWORD,
     "ru": {
@@ -581,14 +600,85 @@ def test_summary_prompt_names_gaps_in_words_not_field_keys() -> None:
     assert "no code formatting" not in prompt
 
 
+def test_summary_prompt_copies_lists_verbatim() -> None:
+    """ANY-617: paraphrased lists changed who acts, what rights cover and times. Only `summary`
+    is free text; lists, issues and questions are copied verbatim, one marker per item."""
+    prompt = " ".join(
+        (PRODUCT_DIR / "prompts" / "generate_summary.v1.md").read_text(encoding="utf-8").split()
+    )
+    for phrase in (
+        'start each item on a new line with one "- " marker',
+        "Preserve embedded line breaks and continuation lines exactly",
+        "Do not merge, split, shorten, reword, reorder, summarize or drop items.",
+        "keeps who performs each action",
+        "what a right or license covers",
+        "a time stays a time and never becomes a date range",
+        "Only `summary` is written freely.",
+        "Copy verbatim fields unchanged even when their language differs "
+        "from the analysis language.",
+        "Check the analysis language only for prose you authored.",
+        "every `constraints` item verbatim. List all of them, including exclusions",
+        "every `data.issues` `description` verbatim",
+        "every `data.questions` `question` verbatim",
+        "`summary` is the only free text",
+    ):
+        assert phrase in prompt, phrase
+    assert "Translate authored explanations" not in prompt
+    assert "an item written in another language is translated" not in prompt
+    assert "in plain sentences" not in prompt
+    assert "The questions and their rationales must also use that language" not in prompt
+
+
+def test_summary_prompt_requires_a_standalone_current_verdict() -> None:
+    prompt = (PRODUCT_DIR / "prompts" / "generate_summary.v1.md").read_text(encoding="utf-8")
+    instructions = " ".join(prompt.split())
+    assert (
+        "a standalone first sentence stating whether the brief is ready to start work now"
+        in instructions
+    )
+    assert "in your own words in the same paragraph" in instructions
+    assert "if clarification is needed, say what to resolve first" in instructions
+
+
 # Words a section may use that carry no project fact. Deliberately per-section: `overview` is
 # only allowed to state present facts (generate_summary.v1.md: "do not mention absent ones
 # here"), so it gets no words for talking about the brief or missing details -- allowing them
 # there once masked an "the brief gives no further detail" violation. `key-details` may label
 # fields and say that none were found.
 _NON_FACT_WORDS = {
-    "overview": {"lets", "that", "wants", "clien"},
-    "key-details": {"deliv", "deadl", "budge", "const", "rathe", "than", "brief", "found", "were"},
+    # ANY-617: overview may label the verbatim target audience in the document language.
+    "overview": {
+        "lets",
+        "that",
+        "wants",
+        "clien",
+        "targe",
+        "audie",
+        "целев",
+        "аудит",
+        "públi",
+        "objet",
+    },
+    "key-details": {
+        "deliv",
+        "deadl",
+        "budge",
+        "const",
+        "rathe",
+        "than",
+        "brief",
+        "found",
+        "were",
+        # ANY-617: localized group labels (ru, es).
+        "резул",
+        "срок",
+        "бюдже",
+        "огран",
+        "entre",
+        "plazo",
+        "presu",
+        "restr",
+    },
 }
 # A10 suffix -> (A01 suffix, expected document language).
 _SUMMARY_FIXTURES: dict[str, tuple[str, DocumentLanguage]] = {
@@ -634,19 +724,41 @@ def test_summary_fixtures_obey_the_a10_prompt(
         for value in brief["values"].values()
         for item in ([value] if isinstance(value, str) else value)
     )
+    # Labels are part of the copied assertion only in the section that owns the field.
+    section_facts = {
+        where: tuple(
+            labeled_brief_value(field, brief["values"][field], language)
+            for field in fields if field in brief["values"]
+        )
+        for where, fields in (
+            ("overview.content", ("target_audience",)),
+            ("key-details.content", ("deadline", "budget")),
+        )
+    }
+    issues, questions = _summary_issue_and_question_sources(summary_suffix)
+    section_facts["gaps.content"] = tuple(f"- {issue['description']}" for issue in issues)
+    section_facts["next-steps.content"] = tuple(f"- {q['question']}" for q in questions)
     texts = [
         (f"{section['id']}.{field}", section[field])
         for section in document["sections"]
         for field in ("title", "content")
     ]
     for where, text in [*texts, ("summary", document["summary"])]:
-        leaks = _field_key_leaks(text, source_facts=source_facts, language=language)
+        facts = source_facts + section_facts.get(where, ())
+        leaks = _field_key_leaks(text, source_facts=facts, language=language)
         assert not leaks, f"{where}: field key leaks {leaks}"
 
+    values = brief["values"]
     for section_id, allowed in _NON_FACT_WORDS.items():
+        if section_id == "overview" and {"project_goal", "target_audience"}.isdisjoint(values):
+            assert_brief_overview(sections[section_id], values, language)
+            continue
+        if section_id == "key-details" and values.keys().isdisjoint(BRIEF_DETAIL_FIELDS):
+            assert sections[section_id] == EMPTY_BRIEF_DETAILS[language], section_id
+            continue
         ungrounded = (
             _stems(sections[section_id])
-            - _stems(json.dumps(brief["values"], ensure_ascii=False))
+            - _stems("\n".join(source_facts))
             - allowed
         )
         assert not ungrounded, (section_id, sorted(ungrounded))
@@ -656,6 +768,29 @@ def test_summary_fixtures_obey_the_a10_prompt(
     schema = _load_schema("brief_decoder.decode_output_v1")
     document_schema = {"$defs": schema["$defs"], **schema["properties"]["document"]}
     jsonschema.validators.validator_for(schema)(document_schema).validate(document)
+
+
+@pytest.mark.parametrize("language", ["en", "ru", "es"])
+def test_product_guard_accepts_only_canonical_empty_sections(monkeypatch, language):
+    case = CANONICAL[f"ANY761-BD-{language.upper()}-weak"]
+    document = deepcopy(case["document"])
+    assert_summary_matches_sources(
+        document, case["brief"], case["issues"], case["questions"], language
+    )
+    suffix = ".weak_input"
+    _override_fixture_responses(monkeypatch, {
+        "brief_decoder.extract_brief_v1" + suffix: case["brief"],
+        "brief_decoder.detect_issues_v1" + suffix: {"issues": case["issues"]},
+        "brief_decoder.generate_questions_v1" + suffix: {"questions": case["questions"]},
+        "brief_decoder.generate_summary_v1" + suffix: document,
+    })
+    test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+    for section in document["sections"][:2]:
+        fallback = section["content"]
+        section["content"] = f"{fallback} {fallback}"
+        with pytest.raises(AssertionError, match=section["id"]):
+            test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+        section["content"] = fallback
 
 
 @pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
@@ -673,6 +808,772 @@ def test_summary_fixture_rejects_changed_fixed_titles(
     )
     with pytest.raises(jsonschema.ValidationError, match="was expected"):
         test_summary_fixtures_obey_the_a10_prompt(suffix, *_SUMMARY_FIXTURES[suffix])
+
+
+@pytest.mark.parametrize(
+    ("language", "goal", "audience", "audience_line", "wrong_label"),
+    [
+        ("ru", "Создать сайт.", "Местные семьи", "Целевая аудитория: Местные семьи", "Срок"),
+        (
+            "es",
+            "Crear un sitio.",
+            "Familias locales",
+            "Público objetivo: Familias locales",
+            "Plazo",
+        ),
+    ],
+)
+def test_localized_overview_with_audience(
+    language: DocumentLanguage, goal: str, audience: str, audience_line: str, wrong_label: str
+) -> None:
+    values = {"project_goal": goal, "target_audience": audience}
+    assert_brief_overview(f"{goal}\n{audience_line}", values, language)
+    with pytest.raises(AssertionError):
+        assert_brief_overview(f"{goal}\n{wrong_label}: {audience}", values, language)
+
+
+def _summary_issue_and_question_sources(
+    summary_suffix: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    issues = _fixture_response("brief_decoder.detect_issues_v1" + summary_suffix)["issues"]
+    questions = (
+        []
+        if not issues
+        else _fixture_response("brief_decoder.generate_questions_v1" + summary_suffix)["questions"]
+    )
+    return issues, questions
+
+
+@pytest.mark.parametrize("summary_suffix", _SUMMARY_FIXTURES)
+def test_summary_fixtures_copy_lists_verbatim(summary_suffix: str) -> None:
+    """ANY-617: deliverables, every constraint, issue descriptions and questions appear
+    verbatim, one marker per item, in source order; only `summary` is free text."""
+    extract_suffix, language = _SUMMARY_FIXTURES[summary_suffix]
+    brief = _fixture_response("brief_decoder.extract_brief_v1" + extract_suffix)
+    issues, questions = _summary_issue_and_question_sources(summary_suffix)
+    document = _fixture_response("brief_decoder.generate_summary_v1" + summary_suffix)
+
+    assert_summary_matches_sources(document, brief, issues, questions, language)
+
+
+@pytest.fixture
+def mixed_language_summary() -> dict[str, Any]:
+    path = REPO_ROOT / "tests/fixtures/brief_decoder_eval/russian_analysis_english_sources.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_russian_analysis_preserves_english_sources(mixed_language_summary: dict[str, Any]) -> None:
+    case = mixed_language_summary
+    jsonschema.validate(case, _load_schema("brief_decoder.decode_output_v1"))
+    assert_summary_matches_sources(
+        case["document"], case["brief"], case["issues"], case["questions"], "ru"
+    )
+
+
+@pytest.mark.parametrize(
+    ("section_id", "source", "translation"),
+    [
+        ("overview", "Record an audio guide.", "Записать аудиогид."),
+        ("key-details", "One audio recording.", "Одна аудиозапись."),
+        ("gaps", "The audio rights are not specified.", "Права на аудио не указаны."),
+        ("next-steps", "Who holds the audio rights?", "Кому принадлежат права на аудио?"),
+    ],
+)
+def test_russian_analysis_rejects_translated_source(
+    mixed_language_summary: dict[str, Any], section_id: str, source: str, translation: str
+) -> None:
+    case = mixed_language_summary
+    section = next(s for s in case["document"]["sections"] if s["id"] == section_id)
+    assert source in section["content"]
+    section["content"] = section["content"].replace(source, translation)
+    with pytest.raises(AssertionError):
+        assert_summary_matches_sources(
+            case["document"], case["brief"], case["issues"], case["questions"], "ru"
+        )
+
+
+@pytest.mark.parametrize(
+    "continuation", [" Exact closing words: No fees.", "\n- Exact closing words: No fees."]
+)
+def test_multiline_item_rejects_folded_or_rebulleted_text(mixed_language_summary, continuation):
+    case = mixed_language_summary
+    details = case["document"]["sections"][1]
+    original = "\n  Exact closing words: No fees."
+    assert original in details["content"]
+    details["content"] = details["content"].replace(original, continuation)
+    with pytest.raises(AssertionError, match="key-details"):
+        assert_summary_matches_sources(
+            case["document"], case["brief"], case["issues"], case["questions"], "ru"
+        )
+
+
+@pytest.mark.parametrize(
+    ("language", "positive", "negative"),
+    [
+        (
+            "en",
+            "The brief is ready to start work. Book the kickoff.",
+            "The brief is not ready to start work. Confirm the launch date.",
+        ),
+        (
+            "en",
+            "The request is ready to start work.",
+            "The request is not ready to start work. Confirm who approves it.",
+        ),
+        ("ru", "Запрос готов к работе.", "Запрос пока не готов к работе."),
+        (
+            "es",
+            "La solicitud está lista para empezar.",
+            "La solicitud todavía no está lista para empezar. Falta confirmar el plazo.",
+        ),
+        (
+            "ru",
+            "Бриф готов к работе. Можно назначить встречу.",
+            "Бриф пока не готов к работе. Уточните срок.",
+        ),
+        (
+            "es",
+            "El encargo está listo para empezar. Se puede programar la reunión.",
+            "El encargo no está listo para empezar. Falta confirmar el plazo.",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("issues", "missing_fields", "questions", "expected_ready"),
+    [
+        pytest.param([], [], [], True, id="complete"),
+        pytest.param([{"description": "Unclear scope"}], [], [], False, id="issue-only"),
+        pytest.param([], ["budget"], [], False, id="missing-budget-without-questions"),
+        pytest.param([], [], [{"question": "When?"}], False, id="question-only"),
+    ],
+)
+def test_summary_readiness_depends_on_each_input(
+    language: DocumentLanguage,
+    positive: str,
+    negative: str,
+    issues: list[dict[str, Any]],
+    missing_fields: list[str],
+    questions: list[dict[str, Any]],
+    expected_ready: bool,
+) -> None:
+    correct, incorrect = (positive, negative) if expected_ready else (negative, positive)
+    assert_summary_readiness(
+        correct, language, issues=issues, missing_fields=missing_fields, questions=questions
+    )
+    with pytest.raises(AssertionError, match="readiness"):
+        assert_summary_readiness(
+            incorrect, language, issues=issues, missing_fields=missing_fields, questions=questions
+        )
+
+
+@pytest.mark.parametrize(
+    ("language", "ready", "opening", "opposite", "other_object"),
+    [
+        (
+            "en",
+            False,
+            "The brief is not ready to start work.",
+            "It is ready to start work now.",
+            "The artwork is ready to start work now.",
+        ),
+        (
+            "en",
+            True,
+            "The request is ready to start work.",
+            "The request is not ready to start work today.",
+            "The printer is not ready to start work today.",
+        ),
+        (
+            "ru",
+            False,
+            "Бриф не готов к работе.",
+            "Бриф готов к работе уже сегодня.",
+            "Макет готов к работе уже сегодня.",
+        ),
+        (
+            "ru",
+            True,
+            "Запрос готов к работе.",
+            "Запрос пока не готов к работе сегодня.",
+            "Принтер пока не готов к работе сегодня.",
+        ),
+        (
+            "es",
+            False,
+            "La solicitud no está lista para empezar.",
+            "La solicitud está lista para empezar ahora.",
+            "La maqueta está lista para empezar ahora.",
+        ),
+        (
+            "es",
+            True,
+            "El encargo está listo para empezar.",
+            "El encargo no está listo para empezar hoy.",
+            "El equipo no está listo para empezar hoy.",
+        ),
+    ],
+)
+def test_readiness_with_time_qualifier_keeps_its_subject(
+    language: DocumentLanguage, ready: bool, opening: str, opposite: str, other_object: str
+) -> None:
+    missing = [] if ready else ["budget"]
+    signals = {"issues": [], "missing_fields": missing, "questions": []}
+    prefixes = {
+        "en": ("In fact ", "After all, "),
+        "ru": ("На самом деле ", "В конце концов, "),
+        "es": ("De hecho ", "Después de todo, "),
+    }
+    for prefix in ("", *prefixes[language]):
+        assert_summary_readiness(
+            f"{opening} {prefix}{other_object}", language, **signals
+        )
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(
+                f"{opening} {prefix}{opposite}", language, **signals
+            )
+
+
+@pytest.mark.parametrize(
+    ("language", "subject", "other", "condition", "positive", "negative"),
+    [
+        ("en", "the brief", "the artwork", "if funding changes",
+         "is still ready to start work", "is still not ready to start work"),
+        ("en", "the request", "the printer", "once the client signs",
+         "still is ready to start", "still isn’t ready to start"),
+        ("en", "the brief", "the artwork", "if funding changes",
+         "is still ready to start", "is not still ready to start"),
+        ("ru", "бриф", "макет", "если бюджет изменится",
+         "всё ещё готов к работе", "всё ещё не готов к работе"),
+        ("ru", "запрос", "принтер", "когда клиент подпишет договор",
+         "по-прежнему готов к работе", "по-прежнему не готов к работе"),
+        ("ru", "бриф", "макет", "если бюджет изменится",
+         "до сих пор готов к работе", "все еще не готов к работе"),
+        ("es", "el encargo", "el equipo", "si cambia el presupuesto",
+         "todavía está listo para empezar", "todavía no está listo para empezar"),
+        ("es", "la solicitud", "la maqueta", "cuando firme el cliente",
+         "está aún lista para empezar", "no está aún lista para empezar"),
+        ("es", "la solicitud", "la maqueta", "si cambia el presupuesto",
+         "sigue estando lista para empezar", "sigue sin estar lista para empezar"),
+    ],
+    ids=["en-still", "en-before-copula", "en-after-negation",
+         "ru-eshchyo", "ru-po-prezhnemu", "ru-do-sikh-por",
+         "es-todavia", "es-aun", "es-seguir"],
+)
+@pytest.mark.parametrize("ready", [False, True], ids=["not-ready", "ready"])
+def test_continuing_readiness_preserves_polarity_and_scope(
+    language, subject, other, condition, positive, negative, ready
+):
+    matching, opposite = (positive, negative) if ready else (negative, positive)
+    opening = f"{subject} {matching}."
+    contrary = f"{subject} {opposite}"
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    assert_summary_readiness(f"{opening} {subject} {matching}.", language, **signals)
+    assert_summary_readiness(f"{opening} {other} {opposite}.", language, **signals)
+    assert_summary_readiness(f"{opening} {condition}, {contrary}.", language, **signals)
+    assert_summary_readiness(f"{opening} {contrary} {condition}.", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{opening} {contrary}.", language, **signals)
+
+
+@pytest.mark.parametrize(
+    ("language", "opening", "explanation"),
+    [
+        ("en", "The brief is not ready to start.", "Confirm whether the brief is ready to start."),
+        ("ru", "Бриф не готов к работе.", "Вернитесь, когда бриф готов к работе."),
+        (
+            "es", "El encargo no está listo para empezar.",
+            "Confirme si el encargo está listo para empezar.",
+        ),
+    ],
+)
+def test_conditional_readiness_in_explanation_is_not_a_verdict(language, opening, explanation):
+    assert_summary_readiness(
+        f"{opening} {explanation}", language, issues=[], missing_fields=["budget"], questions=[]
+    )
+
+
+@pytest.mark.parametrize(
+    ("language", "opening", "condition", "claim", "intro", "contrast"),
+    [
+        ("en", "The brief is not ready to start.", "Once the budget is confirmed",
+         "the brief is ready to start work", "In fact", "but"),
+        ("en", "The brief is not ready to start.", "If the budget is approved",
+         "the brief is ready to start work", "In fact", "but"),
+        ("en", "The brief is not ready to start.", "When all questions are answered",
+         "the brief is ready to start work", "In fact", "but"),
+        ("ru", "Бриф не готов к работе.", "Если бюджет утвердят",
+         "бриф готов к работе", "На самом деле", "но"),
+        ("es", "El encargo no está listo para empezar.", "Cuando se confirme el presupuesto",
+         "el encargo está listo para empezar", "De hecho", "pero"),
+    ],
+)
+def test_conditional_consequence_and_independent_readiness(
+    language, opening, condition, claim, intro, contrast
+):
+    signals = {
+        "issues": [{"description": "Budget unapproved"}], "missing_fields": [], "questions": []
+    }
+    hypothetical = f"{opening} {condition}, {claim}"
+    assert_summary_readiness(hypothetical + ".", language, **signals)
+    for separator in (" ", ", "):
+        trailing = f"{opening} {claim}{separator}{condition.lower()}"
+        assert_summary_readiness(trailing + ".", language, **signals)
+        for independent in (f". {claim}", f", {intro} {claim}"):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(trailing + independent + ".", language, **signals)
+    for summary in (
+        f"{opening} {intro}, {claim}.",
+        f"{hypothetical}. {claim}.",
+        f"{hypothetical}; {claim}.",
+        f"{hypothetical}, {contrast} {claim}.",
+    ):
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(summary, language, **signals)
+
+
+def test_conditional_loss_of_readiness_preserves_the_positive_verdict():
+    signals = {"issues": [], "missing_fields": [], "questions": []}
+    opening = "The brief is ready to start"
+    opposite = "the brief is not ready to start."
+    assert_summary_readiness(f"{opening}. If funding is withdrawn, {opposite}", "en", **signals)
+    for intro in ("once again", "if anything", "and if anything", "whether funding changes or not"):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{opening}, {intro}, {opposite}", "en", **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{opening}. {intro}, {opposite}", "en", **signals)
+
+
+@pytest.mark.parametrize(
+    ("language", "positive", "negative", "condition", "additional_conditions", "contrast", "other"),
+    [
+        ("en", "the brief is ready to start", "the brief is not ready to start",
+         "if funding changes", ("and if the client signs", "or when the grant arrives"),
+         "however", "the artwork"),
+        ("ru", "бриф готов к работе", "бриф не готов к работе",
+         "если бюджет изменится", ("и если клиент подпишет договор", "или когда поступит грант"),
+         "однако", "макет"),
+        ("es", "el encargo está listo para empezar", "el encargo no está listo para empezar",
+         "si cambia el presupuesto", ("y si el cliente firma", "o cuando llegue la subvención"),
+         "sin embargo", "el equipo"),
+    ],
+)
+@pytest.mark.parametrize("ready", [False, True], ids=["not-ready", "ready"])
+def test_independent_verdict_after_conditional_consequence(
+    language, positive, negative, condition, additional_conditions, contrast, other, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    subject = {"en": "the brief", "ru": "бриф", "es": "el encargo"}[language]
+    unrelated = opposite.replace(subject, other)
+    trailing = f"{opening}. {opposite} {condition}"
+    assert_summary_readiness(trailing + ".", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{trailing}, {contrast} {opposite}.", language, **signals)
+    extended = f"{trailing}, {additional_conditions[0]}"
+    assert_summary_readiness(extended + ".", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{extended}, {contrast} {opposite}.", language, **signals)
+    prerequisites = []
+    for clause in (condition, *additional_conditions):
+        prerequisites.append(clause)
+        hypothetical = f"{opening}. {', '.join(prerequisites)}, {opposite}"
+        assert_summary_readiness(hypothetical + ".", language, **signals)
+        assert_summary_readiness(f"{hypothetical}, {condition}, {opposite}.", language, **signals)
+        assert_summary_readiness(f"{hypothetical}, {contrast} {unrelated}.", language, **signals)
+        for independent in (opposite, f"{contrast} {opposite}", f"{contrast}, {opposite}"):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(f"{hypothetical}, {independent}.", language, **signals)
+
+
+@pytest.mark.parametrize(
+    ("language", "positive", "negative", "condition", "modifier", "action", "intro"),
+    [
+        ("en", "the brief is ready to start", "the brief is not ready to start",
+         "if anything changes", "when necessary", "we will revisit the scope", "and in any case"),
+        ("ru", "бриф готов к работе", "бриф не готов к работе",
+         "если планы изменятся", "когда потребуется", "мы пересмотрим объём работ",
+         "и в любом случае"),
+        ("es", "el encargo está listo para empezar", "el encargo no está listo para empezar",
+         "si algo cambia", "cuando sea necesario", "revisaremos el alcance", "y en cualquier caso"),
+    ],
+    ids=["en", "ru", "es"],
+)
+@pytest.mark.parametrize("ready", [False, True], ids=["not-ready", "ready"])
+def test_condition_inside_consequence_does_not_hide_next_verdict(
+    language, positive, negative, condition, modifier, action, intro, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    _, _, unjoined_intro = intro.partition(" ")
+    for consequence in (f"{modifier} {action}", f"{modifier}, {action}", f"{action} {modifier}"):
+        explanation = f"{opening}. {condition}, {consequence}"
+        assert_summary_readiness(explanation + ".", language, **signals)
+        assert_summary_readiness(f"{explanation}, {intro} {opening}.", language, **signals)
+        for separator in (". ", "; ", f", {intro} ", f", {unjoined_intro} "):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                summary = f"{explanation}{separator}{opposite}."
+                assert_summary_readiness(summary, language, **signals)
+
+    # Asyndetic prerequisites still govern a bare verdict. If the intervening
+    # clause already supplies the readiness consequence, the next verdict is independent.
+    prerequisites = f"{opening}. {condition}, {modifier}"
+    assert_summary_readiness(f"{prerequisites}, {opposite}.", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{prerequisites} {opposite}, {opposite}.", language, **signals)
+
+
+_readiness_scope_cases = pytest.mark.parametrize(
+    ("language", "positive", "negative", "condition", "alternative", "action"),
+    [
+        ("en", "The brief is ready to start", "The brief is not ready to start",
+         "if funding is withdrawn", "or", "postpone kickoff"),
+        ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+         "если финансирование отзовут", "или", "перенесите старт"),
+        ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+         "si se retira la financiación", "o", "pospongan el inicio"),
+    ],
+    ids=["en", "ru", "es"],
+)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_opening_requires_current_readiness(
+    language, positive, negative, condition, alternative, action, ready
+):
+    opening = positive if ready else negative
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    only = {"en": "only", "ru": "только", "es": "solo"}[language]
+    for qualifier in (condition, f"{only} {condition}"):
+        for separator in (", ", " ", ": ", " — "):
+            with pytest.raises(AssertionError, match="opening readiness"):
+                assert_summary_readiness(f"{opening}{separator}{qualifier}.", language, **signals)
+    with pytest.raises(AssertionError, match="opening readiness"):
+        summary = f"{opening}, {condition}, {alternative} {condition}."
+        assert_summary_readiness(summary, language, **signals)
+    for ending in ("", "?"):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(opening + ending, language, **signals)
+    for ending in (".", "!"):
+        assert_summary_readiness(opening + ending, language, **signals)
+    assert_summary_readiness(f"{opening}. {condition}, {action}.", language, **signals)
+    for separator in (": ", " — ", "; ", ", "):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{opening}{separator}{action}.", language, **signals)
+
+
+@pytest.mark.parametrize(("language", "positive", "negative", "restriction", "instruction"), [
+    ("en", "The brief is ready to start work", "The brief is not ready to start work",
+     "only after the client signs off, which is still pending", "Send the signed copy to finance"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "только после согласования, которого мы ещё ждём", "Отправьте копию бухгалтеру"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "solo después de la aprobación, que sigue pendiente", "Envíe la copia a contabilidad"),
+])
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_relative_clause_cannot_complete_an_opening_verdict(
+    language, positive, negative, restriction, instruction, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    for separator in (": ", ", ", " — ", " – ", "; ", " "):
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{opening}{separator}{restriction}.", language, **signals)
+    explanation = f"{instruction} {restriction}."
+    assert_summary_readiness(f"{opening}. {explanation}", language, **signals)
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{opening}. {explanation} {opposite}.", language, **signals)
+
+
+@pytest.mark.parametrize(("language", "positive", "negative", "condition", "action"), [
+    ("en", "The brief is ready to start", "The brief is not ready to start",
+     "after 10:00", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "после 10:00", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "después de las 10:00", "avise al cliente"),
+    ("en", "The brief is ready to start", "The brief is not ready to start",
+     "after the 10:00–12:00 review", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "после встречи в 10:00 — 12:00", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "después de la reunión de 10:00–12:00", "avise al cliente"),
+    ("en", "The brief is ready to start work", "The brief is not ready to start work",
+     "if the client approves $750.50", "notify the client"),
+    ("en", "The brief is ready to start work", "The brief is not ready to start work",
+     "if the client approves $3,000", "notify the client"),
+    ("en", "The brief is ready to start work", "The brief is not ready to start work",
+     "if the client approves $3,000.50", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "если клиент согласует 3 000,50 ₽", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "si el cliente aprueba 3.000,50 €", "avise al cliente"),
+    ("en", "The brief is ready to start", "The brief is not ready to start",
+     "only after the client signs off, which is still pending", "notify the client"),
+    ("ru", "Бриф готов к работе", "Бриф не готов к работе",
+     "только после согласования, которого мы ещё ждём", "уведомите клиента"),
+    ("es", "El encargo está listo para empezar", "El encargo no está listo para empezar",
+     "solo después de la aprobación, que sigue pendiente", "avise al cliente"),
+], ids=["en-time", "ru-time", "es-time", "en-range", "ru-range", "es-range",
+        "en-decimal-amount", "en-grouped-amount", "en-mixed-amount", "ru-amount", "es-amount",
+        "en-relative", "ru-relative", "es-relative"])
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_explanation_keeps_condition_intact(language, positive, negative, condition, action, ready):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    however = {"en": "however", "ru": "однако", "es": "sin embargo"}[language]
+    for explanation in (f"{condition}, {opposite}", f"{condition}: {opposite}",
+                        f"{opposite} — {condition}", f"{condition}, {action}"):
+        summary = f"{opening}. {explanation}"
+        assert_summary_readiness(summary + ".", language, **signals)
+        for separator in (". ", f", {however} "):
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(f"{summary}{separator}{opposite}.", language, **signals)
+    # The action owns the condition here, so the preceding contrary assertion counts.
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        summary = f"{opening}. {opposite} — {condition}, {action}."
+        assert_summary_readiness(summary, language, **signals)
+    aside = {"en": "which is surprising", "ru": "что удивительно", "es": "lo que sorprende"}
+    with pytest.raises(AssertionError, match="Conflicting readiness"):
+        assert_summary_readiness(f"{opening}. {opposite}, {aside[language]}.", language, **signals)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+@pytest.mark.parametrize(
+    "separator", [", ", ": ", " — ", " – "], ids=["comma", "colon", "em-dash", "en-dash"]
+)
+def test_qualification_attaches_to_opening_verdict(
+    language, positive, negative, condition, alternative, action, ready, separator
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    qualifiers = {
+        "en": ("subject to final approval",),
+        "ru": ("при условии окончательного согласования", "при условии, что бюджет утвердят"),
+        "es": ("a condición de que se dé la aprobación final",),
+    }[language]
+    for qualifier in qualifiers:
+        summary = f"{opening}{separator}{qualifier}"
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(summary + ".", language, **signals)
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(f"{summary}, {action}.", language, **signals)
+        alternatives = f"{summary}, {alternative} {condition}"
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(alternatives + ".", language, **signals)
+        explanation = f"{opening}. {qualifier}, {alternative} {condition}, {action}"
+        assert_summary_readiness(explanation + ".", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{explanation}, {opposite.lower()}.", language, **signals)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+def test_alternatives_share_their_condition_and_consequence(
+    language, positive, negative, condition, alternative, action, ready
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    for separator in (", ", " "):
+        choices = f"{condition}{separator}{alternative} {opposite.lower()}"
+        for consequence in (action, opposite.lower()):
+            explanation = f"{opening}. {choices}, {consequence}"
+            assert_summary_readiness(explanation + ".", language, **signals)
+            with pytest.raises(AssertionError, match="Conflicting readiness"):
+                assert_summary_readiness(f"{explanation}, {opposite.lower()}.", language, **signals)
+
+
+@_readiness_scope_cases
+@pytest.mark.parametrize("ready", [True, False], ids=["ready", "not-ready"])
+@pytest.mark.parametrize(
+    "separator", [", ", ": ", " — ", " – "], ids=["comma", "colon", "em-dash", "en-dash"]
+)
+def test_time_restriction_on_verdict_or_instruction(
+    language, positive, negative, condition, alternative, action, ready, separator
+):
+    opening, opposite = (positive, negative) if ready else (negative, positive)
+    signals = {"issues": [], "missing_fields": [] if ready else ["budget"], "questions": []}
+    timings = {
+        "en": ("after approval", "only after approval",
+               "only after the client approves the budget"),
+        "ru": ("после согласования", "только после согласования", "лишь после согласования",
+               "только после того, как клиент утвердит бюджет"),
+        "es": ("solo después de la aprobación", "sólo tras la aprobación",
+               "solamente después de que el cliente apruebe el presupuesto",
+               "únicamente tras la aprobación"),
+    }[language]
+    contrast = {"en": "but", "ru": "но", "es": "pero"}[language]
+    for timing in timings:
+        restricted = f"{opening}{separator}{timing}"
+        with pytest.raises(AssertionError, match="opening readiness"):
+            assert_summary_readiness(restricted + ".", language, **signals)
+        with pytest.raises(AssertionError, match="opening readiness"):
+            summary = f"{opening}{separator}{contrast} {timing}."
+            assert_summary_readiness(summary, language, **signals)
+        with pytest.raises(AssertionError, match="opening readiness"):
+            summary = f"{restricted}, {alternative} {condition}."
+            assert_summary_readiness(summary, language, **signals)
+
+        instruction = f"{opening}. {timing}, {action}"
+        assert_summary_readiness(instruction + ".", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{instruction}, {opposite.lower()}.", language, **signals)
+        assert_summary_readiness(f"{opening}. {action} {timing}.", language, **signals)
+        assert_summary_readiness(f"{opening}. {timing} {action}.", language, **signals)
+        hypothetical = f"{opening}. {opposite}{separator}{timing}"
+        assert_summary_readiness(hypothetical + ".", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{hypothetical}. {opposite}.", language, **signals)
+        with pytest.raises(AssertionError, match="Conflicting readiness"):
+            assert_summary_readiness(f"{hypothetical}, {action}.", language, **signals)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "wrong_summary"),
+    [
+        (".weak_input", "The brief is ready to start work."),
+        (".no_issues", "The brief is not ready to start work."),
+        (".no_issues", "The brief is ready to start work: only after the client signs off, "
+         "which is still pending."),
+        (".weak_input", "Confirm the budget first."),
+        (".weak_input", "The brief is not ready to start. The brief is ready to start."),
+        (".ru", "Бриф готов к работе."),
+        (".es", "El resumen todavía no está listo para empezar."),
+        (".es", "El encargo no está lista para empezar."),
+        (".es", "La solicitud no está listo para empezar."),
+        (".es", "El resumen no está listo para empezar. La solicitud no está lista para empezar."),
+        (
+            ".es",
+            "La solicitud no está lista para empezar, pero el encargo está listo para empezar.",
+        ),
+        (".es", "La solicitud no está lista para empezar; está lista para empezar."),
+        (".weak_input", "The brief is not ready to start. It is ready to start."),
+        (".weak_input", "The brief is not ready to start work. It is ready to start work now."),
+        (".ru", "Запрос не готов к работе, но готов к работе."),
+        (".ru", "Отчёт пока не готов к работе."),
+        (".weak_input", "The summary is workable but not ready to start."),
+        (".no_issues", "The summary has been checked; it is ready to start work."),
+        (".es", "El encargo está listo para empezar."),
+    ],
+)
+def test_summary_fixture_rejects_wrong_readiness(
+    monkeypatch: pytest.MonkeyPatch, suffix: str, wrong_summary: str
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = {**original(stem), "summary": wrong_summary}
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError, match="readiness"):
+        test_summary_fixtures_copy_lists_verbatim(suffix)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "section_id", "replacements"),
+    [
+        ("", "key-details", {"should look modern": "the look should be modern"}),
+        (
+            ".no_issues",
+            "key-details",
+            {
+                "- checkout goes through a third-party payment processor, "
+                "not a custom payment system\n": ""
+            },
+        ),
+        (
+            "",
+            "next-steps",
+            {"the exact date the website needs to be live": "the exact launch date"},
+        ),
+        ("", "next-steps", {"live?\n- Could": "live? Could"}),
+        ("", "key-details", {"- menu page\n- order form": "- order form\n- menu page"}),
+        (".no_issues", "key-details", {"2026-11-02": "2026-11-01 – 2026-11-02"}),
+        pytest.param(
+            ".no_issues",
+            "overview",
+            {"Target audience:": "Deadline:"},
+            id="wrong-audience-label",
+        ),
+        pytest.param(
+            ".es",
+            "overview",
+            {"panadería.": "panadería.\nCrear un sitio web."},
+            id="extra-overview-line",
+        ),
+        pytest.param(
+            "",
+            "next-steps",
+            {"yourself?": "yourself?\nRationale: Ask this first."},
+            id="appended-question-rationale",
+        ),
+        pytest.param(
+            ".no_issues",
+            "next-steps",
+            {"this brief.": "this brief. Work can start."},
+            id="altered-empty-questions",
+        ),
+        pytest.param(
+            ".ru",
+            "gaps",
+            {"ограничения.": "ограничения.\nБюджет согласован."},
+            id="appended-gap-claim",
+        ),
+        pytest.param(
+            ".es",
+            "gaps",
+            {"El cliente debe": "Presupuesto aprobado. El cliente debe"},
+            id="extra-claim-on-confirmation-line",
+        ),
+        pytest.param(
+            ".no_issues",
+            "gaps",
+            {"is missing.": "is missing. Payment is approved."},
+            id="altered-empty-gaps",
+        ),
+        pytest.param(
+            ".no_issues",
+            "key-details",
+            {"Deliverables:": "Constraints:", "Constraints:": "Deliverables:"},
+            id="swapped-list-headings",
+        ),
+        pytest.param(
+            ".no_issues",
+            "key-details",
+            {"Deadline:": "Budget:", "Budget:": "Deadline:"},
+            id="swapped-scalar-labels",
+        ),
+        pytest.param(
+            ".no_issues",
+            "key-details",
+            {"- menu page": "menu page\n- menu page"},
+            id="unexpected-non-bullet-line",
+        ),
+    ],
+)
+def test_summary_fixture_rejects_changed_source_items(
+    monkeypatch: pytest.MonkeyPatch,
+    suffix: str,
+    section_id: str,
+    replacements: dict[str, str],
+) -> None:
+    original = _fixture_response
+    stem = "brief_decoder.generate_summary_v1" + suffix
+    document = original(stem)
+    section = next(s for s in document["sections"] if s["id"] == section_id)
+    assert all(section["content"].count(text) == 1 for text in replacements)
+    # Replace simultaneously so swapping labels cannot undo the first substitution.
+    section["content"] = re.sub(
+        "|".join(map(re.escape, replacements)),
+        lambda match: replacements[match[0]],
+        section["content"],
+    )
+    monkeypatch.setitem(
+        globals(), "_fixture_response", lambda name: document if name == stem else original(name)
+    )
+    with pytest.raises(AssertionError):
+        test_summary_fixtures_copy_lists_verbatim(suffix)
 
 
 @pytest.mark.parametrize("suffix", _SUMMARY_FIXTURES)
@@ -715,6 +1616,60 @@ def test_summary_fixture_guard_preserves_identifiers_from_extracted_values(
 
     monkeypatch.setitem(globals(), "_fixture_response", fixture_response)
     test_summary_fixtures_obey_the_a10_prompt("", "", "en")
+
+
+@pytest.mark.parametrize("language", ["en", "ru", "es"])
+@pytest.mark.parametrize(
+    ("field", "section"), [("target_audience", 0), ("deadline", 1), ("budget", 1)]
+)
+def test_labeled_identifiers_preserve_only_the_copied_value(monkeypatch, language, field, section):
+    suffix = ".no_issues" if language == "en" else "." + language
+    original = _fixture_response
+    brief = original("brief_decoder.extract_brief_v1" + suffix)
+    document = original("brief_decoder.generate_summary_v1" + suffix)
+    source = "After the `target_audience` migration."
+    old = brief["values"].get(field)
+    brief["values"][field] = source
+    content = document["sections"][section]["content"]
+    line = labeled_brief_value(field, source, language)
+    if old is None:
+        content += "\n" + line
+    else:
+        content = content.replace(labeled_brief_value(field, old, language), line)
+    document["sections"][section]["content"] = content
+    responses = {
+        "brief_decoder.extract_brief_v1" + suffix: brief,
+        "brief_decoder.generate_summary_v1" + suffix: document,
+    }
+    _override_fixture_responses(monkeypatch, responses)
+    test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+    document["sections"][section]["content"] += " Missing field: target_audience."
+    with pytest.raises(AssertionError, match="field key leaks"):
+        test_summary_fixtures_obey_the_a10_prompt(suffix, suffix, language)
+
+
+@pytest.mark.parametrize(
+    ("stem", "collection", "key", "section"),
+    [
+        ("brief_decoder.detect_issues_v1", "issues", "description", 2),
+        ("brief_decoder.generate_questions_v1", "questions", "question", 3),
+    ],
+)
+def test_multiline_issue_and_question_keep_source_identifiers(
+    monkeypatch, stem, collection, key, section
+):
+    response = _fixture_response(stem)
+    document = _fixture_response("brief_decoder.generate_summary_v1")
+    original = response[collection][0][key]
+    source = original + "\n  Preserve `target_audience`."
+    response[collection][0][key] = source
+    content = document["sections"][section]["content"]
+    document["sections"][section]["content"] = content.replace(original, source)
+    _override_fixture_responses(
+        monkeypatch, {stem: response, "brief_decoder.generate_summary_v1": document}
+    )
+    test_summary_fixtures_obey_the_a10_prompt("", "", "en")
+    test_summary_fixtures_copy_lists_verbatim("")
 
 
 @pytest.mark.parametrize("source", _CLIENT_FACTS_WITH_COLLIDING_IDENTIFIERS)
@@ -914,7 +1869,7 @@ def test_summary_fixture_distinguishes_technical_label_phrases_from_client_facts
     brief["values"]["project_goal"] = source
     document["sections"][0]["content"] = source
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
 
     document["sections"][2]["content"] += f" Missing {label}: {key}."
@@ -978,7 +1933,7 @@ def test_summary_fixture_reviews_technical_assertions_independently_of_linking_w
     brief["values"]["project_goal"] = source
     document["sections"][0]["content"] = source
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
 
     # A different assertion about the same key cannot inherit the source fact's exemption.
@@ -1044,7 +1999,7 @@ def test_localized_fixtures_reject_untranslated_keys_but_preserve_client_facts(
     brief["values"]["deliverables"].append(source)
     document["sections"][1]["content"] += "\n- " + source
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
 
     target = document if section_index is None else document["sections"][section_index]
@@ -1092,9 +2047,10 @@ def test_localized_audience_gap_cannot_cover_a_missing_project_goal(
     del brief["values"]["project_goal"]
     del brief["confidence"]["project_goal"]
     brief["missing_fields"].append("project_goal")
-    document["sections"][0]["content"] = brief["values"]["deliverables"][0]
+    weak = CANONICAL[f"ANY761-BD-{language.upper()}-weak"]
+    document["sections"][0]["content"] = weak["document"]["sections"][0]["content"]
     responses = {extract_stem: brief, summary_stem: document}
-    monkeypatch.setitem(globals(), "_fixture_response", responses.__getitem__)
+    _override_fixture_responses(monkeypatch, responses)
     with pytest.raises(AssertionError, match="project_goal"):
         test_summary_fixtures_obey_the_a10_prompt(suffix, extract_suffix, language)
     document["sections"][2]["content"] += " " + goal_gap
@@ -1228,8 +2184,7 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     # Code review finding (me #2): the `clarifying_questions` part used to describe an empty
     # `questions` list as "no clarification needed" -- a readiness claim that contradicts
     # generate_summary.v1.md's own rule (empty `questions` alone never implies the brief is
-    # ready) and the deterministic `.no_issues` fixture, which pairs empty `questions` with a
-    # not-ready summary.
+    # ready). The complete-brief fixture is ready because all three inputs are empty.
     (questions_part,) = (
         part for part in contract["parts"] if part["part_id"] == "clarifying_questions"
     )

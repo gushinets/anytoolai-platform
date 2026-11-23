@@ -1202,7 +1202,9 @@ describe.each(MODE_SCENARIOS)("Client Update Writer $mode draft recovery", (scen
       await expectRestoredFields();
       expect(first.calls.filter((call) => call.key.endsWith("/start"))).toHaveLength(1);
       expect(second.calls.some((call) => call.key.endsWith("/start"))).toBe(false);
-      expect(events).toContainEqual({ type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true });
+      await waitFor(() => expect(events).toContainEqual({
+        type: "scenario_completed", scenarioSessionId: "session_1", guestId: undefined, resultViewed: true,
+      }));
     } finally {
       first.resolveCall(r.SESSION, 0, sessionResponse());
       second.resolveCall(r.SESSION, 0, sessionResponse());

@@ -40,7 +40,11 @@ from anytoolai_platform_core.structured_output.schemas import normalize_schema_m
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_worker.composition import build_worker
 
-from tests.support.brief_language import golden_cases, write_provider_fixtures
+from tests.support.brief_language import (
+    assert_summary_matches_sources,
+    golden_cases,
+    write_provider_fixtures,
+)
 from tests.support.fake_provider_recording import RecordingProviderAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -492,11 +496,10 @@ def test_no_issues_skips_question_generation_and_still_produces_a_consistent_doc
     no_issues_document_text = json.dumps(output["document"])
     assert no_issues_document_text != happy_document_text
 
-    # A brief with no issues and nothing missing is the one case generate_summary.v1.md's
-    # readiness rule actually allows to claim the brief is ready.
-    summary = output["document"]["summary"].lower()
-    assert "ready" in summary
-    assert "not ready" not in summary and "not fully ready" not in summary
+    data = adapter.input_payload(-1)["data"]
+    assert_summary_matches_sources(
+        output["document"], data["brief"], data["issues"], data.get("questions", []), "en"
+    )
 
 
 @pytest.mark.parametrize("brief_text", ["", "   ", " padded "], ids=["empty", "blank", "untrimmed"])
@@ -590,3 +593,10 @@ def test_multilingual_canonical_output_and_original_language_source(
     data = adapter.input_payload(-1)["data"]
     assert data == {"source_brief": source, "brief": output["brief"],
                     "issues": output["issues"], "questions": output["questions"]}
+    assert_summary_matches_sources(
+        output["document"],
+        data["brief"],
+        data["issues"],
+        data["questions"],
+        case["expected_language"],
+    )

@@ -1,0 +1,33 @@
+{
+  "brief_text": "Запишите аудиогид. Нужна одна аудиозапись. Завершите запись точной фразой «No fees.». Разбор напишите по-русски.",
+  "brief": {
+    "values": {
+      "project_goal": "Record an audio guide.",
+      "deliverables": ["One audio recording.\n  Exact closing words: No fees."]
+    },
+    "confidence": {"project_goal": 0.9, "deliverables": 0.9},
+    "missing_fields": ["deadline", "budget", "target_audience", "constraints"]
+  },
+  "issues": [{
+    "category": "ambiguity",
+    "description": "The audio rights are not specified.",
+    "severity": "medium",
+    "evidence": "Нужна одна аудиозапись."
+  }],
+  "questions": [{
+    "question": "Who holds the audio rights?",
+    "rationale": "Rights must be clarified before recording.",
+    "priority": "medium",
+    "category": "ambiguity",
+    "source_issue_index": 0
+  }],
+  "document": {
+    "sections": [
+      {"id": "overview", "title": "Project overview", "content": "Record an audio guide."},
+      {"id": "key-details", "title": "Key details", "content": "Результаты:\n- One audio recording.\n  Exact closing words: No fees.", "metadata": {"kind": "list"}},
+      {"id": "gaps", "title": "Gaps and risks", "content": "- The audio rights are not specified.\nКлиенту нужно уточнить срок, бюджет, целевую аудиторию и ограничения."},
+      {"id": "next-steps", "title": "Questions to ask", "content": "- Who holds the audio rights?", "metadata": {"kind": "list"}}
+    ],
+    "summary": "Бриф пока не готов к работе. Сначала уточните, кому принадлежат права на аудио."
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "timeline_risk",
+        "description": "No se indica el plazo de entrega del sitio.",
+        "severity": "high",
+        "evidence": "Crear un sitio web para una panadería."
+      },
+      {
+        "category": "ambiguity",
+        "description": "No se indica para quién es el sitio.",
+        "severity": "medium",
+        "evidence": "Crear un sitio web para una panadería."
+      }
+    ]
+  },
+  "input_tokens": 230,
+  "output_tokens": 120,
+  "latency_ms": 16,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.detect_issues_v1.es"
+  }
+}

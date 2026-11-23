@@ -4,12 +4,12 @@
       {
         "id": "overview",
         "title": "Project overview",
-        "content": "A bakery wants a new website that lets customers order cakes online."
+        "content": "Build a new website for our small bakery that lets customers order cakes online"
       },
       {
         "id": "key-details",
         "title": "Key details",
-        "content": "Deliverables: menu page, order form, contact page. Deadline: before the holiday season. Budget: around $3,000. Constraint: the look should be modern but also traditional.",
+        "content": "Deliverables:\n- menu page\n- order form\n- contact page\nDeadline: before the holiday season\nBudget: around $3,000\nConstraints:\n- should look modern but also traditional",
         "metadata": {
           "kind": "list"
         }
@@ -17,18 +17,18 @@
       {
         "id": "gaps",
         "title": "Gaps and risks",
-        "content": "The launch date is not concrete, the desired style is ambiguous, and online ordering may imply payment handling that the brief does not cover. The target audience is not stated."
+        "content": "- \"Modern but also traditional\" can be read several ways and gives no usable design direction.\n- \"Before the holiday season\" gives no concrete launch date.\n- Online cake ordering may imply payment processing and order management, which the brief does not mention.\nThe target audience is not stated; the client should confirm it."
       },
       {
         "id": "next-steps",
         "title": "Questions to ask",
-        "content": "What is the exact launch date? Which example websites show the desired look? Should customers pay online or only send orders?",
+        "content": "- What is the exact date the website needs to be live?\n- Could you share one or two websites whose look you like, and say what feels modern and what feels traditional about them?\n- Should customers pay on the website, or only send an order that you confirm and charge yourself?",
         "metadata": {
           "kind": "list"
         }
       }
     ],
-    "summary": "The brief is workable but not ready to start: confirm the exact launch date first, then the style direction and whether payments are online."
+    "summary": "The brief is not ready to start. Confirm the exact launch date first."
   },
   "input_tokens": 300,
   "output_tokens": 160,
