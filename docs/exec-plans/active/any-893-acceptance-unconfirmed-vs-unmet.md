@@ -7,8 +7,8 @@
 - Created: 2026-11-20
 - Last updated: 2026-11-23
 - Review date: 2026-11-23
-- Next action: repeat the live regression series once the provider credential is renewed.
-- Blocker: the configured provider credential has expired (HTTP 401).
+- Next action: owner acceptance of the verified ticket cases.
+- Blocker: none for the Linear acceptance criteria.
 
 ## Goal and boundaries
 
@@ -106,7 +106,9 @@ Both the API and worker passed deployment fingerprint verification. The worker u
 On the first Russian W1 input the provider reported an expired credential (HTTP 401).
 Both physical extraction attempts failed with zero estimated cost. Comparison never ran.
 The evaluator report returned exit code 1 with 0 PASS, 1 FAIL and 62 PENDING.
-There was no output to assess against the revised criteria. AC5 remains open.
+The report documents an authentication failure before comparison. AC5 already has regression
+coverage and a build identifier. At that point the remaining evidence was a repeat series with assessable
+outcomes. Linear specifies neither a live provider nor the 63-run multilingual matrix.
 
 [Per-run statuses, build fingerprints and failed-call ledger](any-893-acceptance-unconfirmed-vs-unmet.evidence-20261123.json)
 
@@ -122,3 +124,23 @@ The local frontend gate passed lint and typecheck, then timed out in the ce-kit 
 configuration test, including on retry. That test passed in isolation with its original
 timeout. All 1,139 web-mirror tests, generated API type verification and workspace builds
 passed independently.
+
+### Acceptance against the Linear criteria, 2026-11-23
+
+All nine planned Russian ticket runs passed the evaluator report. The local API and worker
+verified the deployment profile on commit `7f06f6a1013a4f291cd33bb73226b702da24522c`.
+Only this execution plan had tracked edits during collection. The worker used the Sol policy.
+Each completed live session was then opened by session ID in the Russian web client.
+
+| AC | Observed result |
+| --- | --- |
+| 1 | A + W1 returned `partially_meets` three times. Each answer credited the sections, responsive layout, email form, client domain, Figma and revisions. Each accepted December 3 against December 10 and expressly identified the start-relative duration and personal approval as unconfirmed. |
+| 2 | All three W1 answers rated clarity `match` from the description of completed work. |
+| 3 | Both the greeting and junk yielded `insufficient_brief` with four partial deltas. In Chromium both sessions showed the Russian requirements hint at the invalid brief field, with no verdict or Copy button. |
+| 4 | Missing reviews, withheld Figma sources and the unrelated café logo each yielded `does_not_meet` with the specific violation visible in the web client. FULL yielded `meets_expectations` with four matches. |
+| 5 | The regression tests are recorded above. The repeat series records the SHA, deployment and worker fingerprints, nine session and result IDs, complete model outputs, semantic reviews and browser observations. The ledger recorded 18 successful provider calls with an estimated total cost of USD 0.1060338. |
+
+The earlier 63-run authentication failure is retained as a separate historical attempt.
+The nine-run series covers the Linear ticket examples on this build.
+
+[Inputs, reviewed outputs, browser checks and provider call ledger](any-893-acceptance-unconfirmed-vs-unmet.ru-live-20261123.json)
