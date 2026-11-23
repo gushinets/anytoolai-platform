@@ -57,17 +57,17 @@
       }
     ],
     "document": {
-      "summary": "Бриф пока не готов к началу работы: сначала согласуйте бюджет и дату сдачи.",
+      "summary": "Бриф пока не готов к началу работы. Сначала согласуйте бюджет.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "Подготовить читателя к планированию ремонта кухни и разговору с мастером. Владельцы квартир без строительного опыта."
+          "content": "Подготовить читателя к планированию ремонта кухни и разговору с мастером\nЦелевая аудитория: Владельцы квартир без строительного опыта"
         },
         {
           "id": "key-details",
           "title": "Key details",
-          "content": "- Статья о ремонте кухни в старом доме\n- Список вопросов к мастеру\n- Объём 6–8 тысяч знаков\n- Понятные подзаголовки\n- Без расчёта несущих конструкций, юридических советов и обещания фиксированной цены ремонта\n- Оригинальный текст без скрытой рекламы\n- Ссылки на источники технических фактов",
+          "content": "Результаты:\n- Статья о ремонте кухни в старом доме\n- Список вопросов к мастеру\nОграничения:\n- Объём 6–8 тысяч знаков\n- Понятные подзаголовки\n- Без расчёта несущих конструкций, юридических советов и обещания фиксированной цены ремонта\n- Оригинальный текст без скрытой рекламы\n- Ссылки на источники технических фактов",
           "metadata": {
             "kind": "list"
           }
@@ -75,7 +75,7 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "Бюджет не согласован, поэтому оплату необходимо уточнить до начала работы. Дата сдачи не согласована, поэтому срок выполнения необходимо уточнить."
+          "content": "- Бюджет не согласован, поэтому оплату необходимо уточнить до начала работы.\n- Дата сдачи не согласована, поэтому срок выполнения необходимо уточнить.\nКлиенту нужно уточнить срок и бюджет."
         },
         {
           "id": "next-steps",
@@ -223,17 +223,17 @@
       }
     ],
     "document": {
-      "summary": "The brief is not ready to start work: agree the budget and delivery date first.",
+      "summary": "The brief is not ready to start work. Agree the budget first.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "Prepare readers to plan a kitchen renovation and talk to a contractor. Apartment owners without construction experience."
+          "content": "Prepare readers to plan a kitchen renovation and talk to a contractor\nTarget audience: Apartment owners without construction experience"
         },
         {
           "id": "key-details",
           "title": "Key details",
-          "content": "- Article about renovating a kitchen in an old house\n- List of questions for the contractor\n- Length: 6–8 thousand characters\n- Clear subheadings\n- No load-bearing calculations, legal advice or promises of a fixed renovation price\n- Original text without hidden advertising\n- Links to sources for technical facts",
+          "content": "Deliverables:\n- Article about renovating a kitchen in an old house\n- List of questions for the contractor\nConstraints:\n- Length: 6–8 thousand characters\n- Clear subheadings\n- No load-bearing calculations, legal advice or promises of a fixed renovation price\n- Original text without hidden advertising\n- Links to sources for technical facts",
           "metadata": {
             "kind": "list"
           }
@@ -241,7 +241,7 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "The budget has not been agreed, so compensation must be clarified before work starts. The delivery date has not been agreed, so the deadline must be clarified."
+          "content": "- The budget has not been agreed, so compensation must be clarified before work starts.\n- The delivery date has not been agreed, so the deadline must be clarified.\nDeadline and budget are missing; the client should confirm them."
         },
         {
           "id": "next-steps",
@@ -389,17 +389,17 @@
       }
     ],
     "document": {
-      "summary": "El encargo aún no está listo para empezar: primero hay que acordar el presupuesto y la fecha de entrega.",
+      "summary": "El encargo aún no está listo para empezar. Primero hay que acordar el presupuesto.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "Preparar al lector para planificar la reforma de la cocina y hablar con el contratista. Propietarios de pisos sin experiencia en construcción."
+          "content": "Preparar al lector para planificar la reforma de la cocina y hablar con el contratista\nPúblico objetivo: Propietarios de pisos sin experiencia en construcción"
         },
         {
           "id": "key-details",
           "title": "Key details",
-          "content": "- Artículo sobre la reforma de una cocina en una casa antigua\n- Lista de preguntas para el contratista\n- Extensión: 6–8 mil caracteres\n- Subtítulos claros\n- Sin cálculos de estructuras portantes, asesoramiento jurídico ni promesas de precio fijo\n- Texto original sin publicidad encubierta\n- Enlaces a las fuentes de datos técnicos",
+          "content": "Entregables:\n- Artículo sobre la reforma de una cocina en una casa antigua\n- Lista de preguntas para el contratista\nRestricciones:\n- Extensión: 6–8 mil caracteres\n- Subtítulos claros\n- Sin cálculos de estructuras portantes, asesoramiento jurídico ni promesas de precio fijo\n- Texto original sin publicidad encubierta\n- Enlaces a las fuentes de datos técnicos",
           "metadata": {
             "kind": "list"
           }
@@ -407,7 +407,7 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "El presupuesto no se ha acordado, por lo que hay que aclarar la remuneración antes de empezar. La fecha de entrega no se ha acordado, por lo que hay que aclarar el plazo."
+          "content": "- El presupuesto no se ha acordado, por lo que hay que aclarar la remuneración antes de empezar.\n- La fecha de entrega no se ha acordado, por lo que hay que aclarar el plazo.\nEl cliente debe confirmar el plazo y el presupuesto."
         },
         {
           "id": "next-steps",
@@ -528,12 +528,12 @@
       }
     ],
     "document": {
-      "summary": "Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения. Какую задачу нужно решить и какой результат вы хотите получить?",
+      "summary": "Запрос пока не готов к работе. Сначала уточните, какой результат нужен клиенту.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "Цель проекта и целевая аудитория не указаны."
+          "content": "В брифе не указано, что хочет получить клиент."
         },
         {
           "id": "key-details",
@@ -546,12 +546,12 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения."
+          "content": "- Не указаны цель проекта, результаты работы, срок, бюджет, целевая аудитория и ограничения.\nКлиенту нужно уточнить цель проекта, результаты работы, срок, бюджет, целевую аудиторию и ограничения."
         },
         {
           "id": "next-steps",
           "title": "Questions to ask",
-          "content": "Какую задачу нужно решить и какой результат вы хотите получить?",
+          "content": "- Какую задачу нужно решить и какой результат вы хотите получить?",
           "metadata": {
             "kind": "list"
           }
@@ -643,17 +643,17 @@
       }
     ],
     "document": {
-      "summary": "The project goal, deliverables, deadline, budget, target audience and constraints are not specified. What problem should be solved and what result do you want?",
+      "summary": "The request is not ready to start work. First clarify the outcome the client wants.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "The project goal and target audience are not specified."
+          "content": "The brief does not state what the client wants."
         },
         {
           "id": "key-details",
           "title": "Key details",
-          "content": "Concrete deliverables, deadline, budget and constraints are not specified.",
+          "content": "No deliverables, deadline, budget or constraints were found in the brief.",
           "metadata": {
             "kind": "list"
           }
@@ -661,12 +661,12 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "The project goal, deliverables, deadline, budget, target audience and constraints are not specified."
+          "content": "- The project goal, deliverables, deadline, budget, target audience and constraints are not specified.\nProject goal, deliverables, deadline, budget, target audience and constraints are missing; the client should confirm them."
         },
         {
           "id": "next-steps",
           "title": "Questions to ask",
-          "content": "What problem should be solved and what result do you want?",
+          "content": "- What problem should be solved and what result do you want?",
           "metadata": {
             "kind": "list"
           }
@@ -758,12 +758,12 @@
       }
     ],
     "document": {
-      "summary": "No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones. ¿Qué problema hay que resolver y qué resultado desea obtener?",
+      "summary": "La solicitud todavía no está lista para empezar. Primero hay que aclarar qué resultado espera el cliente.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "No se indican el objetivo del proyecto ni el público destinatario."
+          "content": "La solicitud no indica qué quiere obtener el cliente."
         },
         {
           "id": "key-details",
@@ -776,12 +776,12 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones."
+          "content": "- No se indican el objetivo, los entregables, el plazo, el presupuesto, el público destinatario ni las restricciones.\nEl cliente debe confirmar el objetivo del proyecto, los entregables, el plazo, el presupuesto, el público objetivo y las restricciones."
         },
         {
           "id": "next-steps",
           "title": "Questions to ask",
-          "content": "¿Qué problema hay que resolver y qué resultado desea obtener?",
+          "content": "- ¿Qué problema hay que resolver y qué resultado desea obtener?",
           "metadata": {
             "kind": "list"
           }
@@ -876,17 +876,17 @@
       }
     ],
     "document": {
-      "summary": "Бриф пока не готов к работе: сначала нужно уточнить количество свёклы, капусты и говядины, а также что именно означает время в два часа.",
+      "summary": "Бриф пока не готов к работе. Сначала нужно уточнить количество свёклы, капусты и говядины.",
       "sections": [
         {
           "id": "overview",
           "title": "Project overview",
-          "content": "Клиент хочет приготовить борщ."
+          "content": "Приготовить борщ."
         },
         {
           "id": "key-details",
           "title": "Key details",
-          "content": "• Нужно использовать свёклу, капусту и говядину.\n• Варить два часа.",
+          "content": "Ограничения:\n- Использовать свёклу, капусту и говядину.\n- Варить два часа.",
           "metadata": {
             "kind": "list"
           }
@@ -894,12 +894,12 @@
         {
           "id": "gaps",
           "title": "Gaps and risks",
-          "content": "Не указаны количества свёклы, капусты и говядины, поэтому пропорции рецепта придётся определять самостоятельно. Неясно, означает ли «Варить два часа» общее время приготовления или время варки конкретных ингредиентов. Также не указаны состав результата, срок выполнения, бюджет и целевая аудитория."
+          "content": "- Не указаны количества свёклы, капусты и говядины, поэтому пропорции рецепта придётся определять самостоятельно.\n- Неясно, означает ли «Варить два часа» общее время приготовления или время варки конкретных ингредиентов.\nКлиенту нужно уточнить результаты работы, срок, бюджет и целевую аудиторию."
         },
         {
           "id": "next-steps",
           "title": "Questions to ask",
-          "content": "• Сколько свёклы, капусты и говядины использовать? Количество ингредиентов нужно, чтобы точно определить пропорции рецепта.\n• Два часа — это общее время приготовления борща или время варки конкретных ингредиентов? Уточнение поможет правильно указать время приготовления и порядок действий.",
+          "content": "- Сколько свёклы, капусты и говядины использовать?\n- Два часа — это общее время приготовления борща или время варки конкретных ингредиентов?",
           "metadata": {
             "kind": "list"
           }

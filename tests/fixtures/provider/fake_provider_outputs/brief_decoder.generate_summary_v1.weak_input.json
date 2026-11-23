@@ -4,7 +4,7 @@
       {
         "id": "overview",
         "title": "Project overview",
-        "content": "The client wants a website."
+        "content": "A website"
       },
       {
         "id": "key-details",
@@ -17,18 +17,18 @@
       {
         "id": "gaps",
         "title": "Gaps and risks",
-        "content": "Deliverables, deadline, budget, target audience and constraints are all missing, and the style request is ambiguous."
+        "content": "- The brief names no deliverables and no audience, so the work cannot be sized.\n- \"Make it nice\" gives no usable design direction.\n- No deadline or timeline is given.\n- No budget is given.\nDeliverables, deadline, budget, target audience and constraints are missing; the client should confirm them."
       },
       {
         "id": "next-steps",
         "title": "Questions to ask",
-        "content": "What should the site do? When is it needed? What is the budget? What does \"nice\" mean?",
+        "content": "- What should the website do, and which pages or features do you need?\n- When do you need the website to be ready?\n- What budget do you have in mind for this project?\n- What does \"nice\" mean to you -- can you share an example of a website you like?",
         "metadata": {
           "kind": "list"
         }
       }
     ],
-    "summary": "The brief is not ready to start work: ask for the scope, deadline and budget before anything else."
+    "summary": "The brief is not ready to start work. First clarify what the website needs to do."
   },
   "input_tokens": 90,
   "output_tokens": 100,
