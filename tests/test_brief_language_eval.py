@@ -354,7 +354,7 @@ def test_run_rejects_all_unsafe_case_ids_before_any_collection(monkeypatch, tmp_
     out = tmp_path / "results"
     docker = Mock(side_effect=AssertionError("must reject before Docker access"))
     collect = Mock(side_effect=AssertionError("must reject before provider access"))
-    monkeypatch.setattr(evaluation, "SUITE", suite)
+    monkeypatch.setitem(evaluation.SUITE_PATHS, evaluation.DEFAULT_SUITE, suite)
     monkeypatch.setattr(evaluation, "_docker", docker)
     monkeypatch.setattr(evaluation, "collect", collect)
     monkeypatch.setattr(sys, "argv", cli_args("run", out))
@@ -389,12 +389,15 @@ def test_cli_run_and_review_report_round_trip_preserves_json_data(monkeypatch, t
     snapshot = {"source_sha256": {}}
     out = tmp_path / "results"
     run = {**record(), "case": case, "attempt": 1, "snapshot": snapshot, "evidence_error": None}
+    monkeypatch.setitem(evaluation.SUITE_PATHS, evaluation.VERDICT_SUITE, suite)
     collector = Mock(return_value=run)
     monkeypatch.setattr(evaluation, "_docker", Mock(return_value=json.dumps(snapshot)))
     monkeypatch.setattr(evaluation, "_git_state", lambda: {})
     monkeypatch.setattr(evaluation, "collect", collector)
     monkeypatch.setattr(
-        sys, "argv", cli_args("run", out) + ["--suite", str(suite), "--family", "verdict"]
+        sys,
+        "argv",
+        cli_args("run", out) + ["--suite", evaluation.VERDICT_SUITE, "--family", "verdict"],
     )
 
     assert evaluation.main() == 0
@@ -465,6 +468,15 @@ def test_verdict_suite_covers_the_ticket_in_three_languages():
         assert case["criteria"] and all(
             case["input"][key] for key in ("brief_text", "deliverable_text")
         )
+
+
+def test_unknown_suite_is_rejected_during_argument_parsing(monkeypatch, tmp_path, capsys):
+    out = tmp_path / "results"
+    monkeypatch.setattr(sys, "argv", cli_args("run", out) + ["--suite", "unknown.json"])
+    with pytest.raises(SystemExit):
+        evaluation.main()
+    assert "invalid choice" in capsys.readouterr().err
+    assert not out.exists()
 
 
 def test_empty_suite_selection_stops_before_accessing_worker(monkeypatch, tmp_path, capsys):

@@ -21,6 +21,8 @@ A check requires at least one identifiable client condition. Drafting criteria r
 2. Align the product prompt, comparison categories, schema, and fixtures.
 3. Validate the outcome in the web parser and reuse field-level validation.
 4. Exercise new runs, corrections and restored sessions. Record live and deterministic evidence.
+5. After review, preserve every ordinary A11 verdict when A01 omits its lists. Strengthen the
+   multilingual controls, restrict suite selection, then repeat the live series on a clean commit.
 
 ## Scope
 
@@ -37,8 +39,8 @@ The former prompt classified missing detail as mismatch, and clarity required li
 Keep the kernel A11 status enum. Match requires confirmation, partial covers unconfirmed or partial
 delivery, and mismatch requires affirmative evidence of a violation. A clear list satisfies clarity.
 For meaningful briefs, any mismatch fails, any remaining partial gives partial agreement, and all
-matches pass. An insufficient brief requires four partial deltas. An explicit insufficient brief
-or all three missing extraction lists returns the user to the brief field without copy or activation.
+matches pass. An insufficient brief requires four partial deltas. Only an explicit insufficient brief
+returns the user to the brief field without copy or activation.
 Keep prompt v1, quota charging on completed runs, existing dependencies and the two provider calls.
 The model still judges dates and evidence from prose.
 
@@ -46,7 +48,7 @@ The model still judges dates and evidence from prose.
 
 The Python matrix covers confirmed, unconfirmed and contradicted requirements and every
 allowed insufficient-brief status. The workflow integration test exercises the product
-category through A11 and the stored result. Web tests cover the extraction backstop, localized
+category through A11 and the stored result. Web tests cover ordinary verdicts with empty extracted lists, localized
 inline hint, focused field, suppression of copy and activation, restored attachments, fresh
 idempotency on correction, and visible evidence for an explicit omission.
 

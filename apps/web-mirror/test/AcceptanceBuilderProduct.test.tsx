@@ -78,6 +78,8 @@ const checkOutput = (suffix: Suffix = "") => ({
   comparison: fixture("compare", suffix),
 });
 
+const emptyExtraction = { values: { analysis_language: "en" }, missing_fields: [...LIST_FIELDS], confidence: {} };
+
 afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
@@ -170,7 +172,7 @@ describe("Acceptance Builder result parsing", () => {
     expect(extractCheckResult({ ...check, comparison: { ...comparison, verdict: "great" } })).toBeNull();
   });
 
-  it("requires partial deltas for an insufficient brief and recognizes an empty extraction", () => {
+  it("requires partial deltas for an insufficient brief", () => {
     const normal = checkOutput();
     const comparison = fixture("compare", ".insufficient_brief");
     expect(extractCheckResult({ ...normal, comparison })?.insufficientBrief).toBe(true);
@@ -180,10 +182,19 @@ describe("Acceptance Builder result parsing", () => {
       }));
       expect(extractCheckResult({ ...normal, comparison: { ...comparison, deltas } })).toBeNull();
     }
-    const extracted = { values: { analysis_language: "en" }, missing_fields: [...LIST_FIELDS] };
-    expect(extractCheckResult({ ...normal, extracted })?.insufficientBrief).toBe(true);
-    expect(extractDraftResult({ extracted })?.insufficientBrief).toBeUndefined();
-    expect(extractCheckResult(normal)?.insufficientBrief).toBeUndefined();
+  });
+
+  it.each([
+    ["meets_expectations", "match"],
+    ["partially_meets", "partial"],
+    ["does_not_meet", "mismatch"],
+  ])("preserves %s when the extraction omits all lists", (verdict, status) => {
+    const comparison = { ...fixture("compare", ""), verdict, deltas: DELTA_CRITERIA.map(
+      (criterion_id) => ({ criterion_id, status, evidence: "Delivery evidence." })
+    ) };
+    const result = extractCheckResult({ extracted: emptyExtraction, comparison });
+    expect(result?.comparison?.verdict).toBe(verdict);
+    expect(result?.insufficientBrief).toBeUndefined();
   });
 
   it("counts a draft as viewed only when it lists criteria", () => {
@@ -369,6 +380,25 @@ describe("Acceptance Builder page", () => {
     await screen.findByRole("button", { name: "Copy" });
     expect(resultText()).toContain("Verdict: does not meet expectations.");
     expect(resultText()).toContain("Scope coverage: not met. Required Figma sources were explicitly withheld.");
+  });
+
+  it("shows and counts an approval violation even if extraction finds no lists", async () => {
+    const evidence = "The freelancer started without requesting the required approval.";
+    const output = {
+      extracted: emptyExtraction,
+      comparison: {
+        verdict: "does_not_meet", rationale: evidence, confidence: 1,
+        deltas: DELTA_CRITERIA.map((criterion_id) => ({
+          criterion_id, status: criterion_id === "requirement_fit" ? "mismatch" : "partial", evidence,
+        })),
+      },
+    };
+    const events: ProductRunEvent[] = [];
+    await run("check", output, events);
+    await screen.findByRole("button", { name: "Copy" });
+    expect(resultText()).toContain("Verdict: does not meet expectations.");
+    expect(resultText()).toContain(evidence);
+    await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
   });
 
   it("weak input: renders the documented gaps instead of an error, and does not count a draft as viewed", async () => {

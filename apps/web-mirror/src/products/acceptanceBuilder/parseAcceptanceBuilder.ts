@@ -113,7 +113,7 @@ function extract(output: Record<string, unknown>, requireComparison: boolean): A
   const comparison = toComparison(output.comparison);
   if (!comparison) return null;
   const data = { lists, missingFields: missing, comparison, analysisLanguage: language };
-  if (comparison.verdict === "insufficient_brief" || missing.length === LIST_FIELDS.length) {
+  if (comparison.verdict === "insufficient_brief") {
     return { ...data, insufficientBrief: true, document: { sections: [], summary: "" } };
   }
   return { ...data, document: composeDocument(data) };

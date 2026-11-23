@@ -18,7 +18,9 @@ from urllib.parse import urlsplit
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
 
 ROOT = Path(__file__).resolve().parents[2]
-SUITE = ROOT / "tests/fixtures/brief_language_eval/cases.json"
+DEFAULT_SUITE = "tests/fixtures/brief_language_eval/cases.json"
+VERDICT_SUITE = "tests/fixtures/acceptance_verdict_eval/cases.json"
+SUITE_PATHS = {name: ROOT / name for name in (DEFAULT_SUITE, VERDICT_SUITE)}
 WORKER_PYTHON = "/app/apps/platform-worker/.venv/bin/python"
 SCENARIOS = (
     "brief_decoder.decode_v1",
@@ -307,7 +309,7 @@ def main() -> int:
     run.add_argument("--api-url", required=True)
     run.add_argument("--project", required=True, type=_parse_compose_project)
     run.add_argument("--scenario", choices=SCENARIOS, required=True)
-    run.add_argument("--suite", type=Path, default=SUITE)
+    run.add_argument("--suite", choices=SUITE_PATHS, default=DEFAULT_SUITE)
     run.add_argument("--family", choices=("basic", "weak", "mixed", "override", "verdict"))
     run.add_argument("--repeats", type=int, default=3)
     run.add_argument("--timeout", type=int, default=240)
@@ -355,7 +357,7 @@ def main() -> int:
     args.api_url = args.api_url.rstrip("/")
     cases = [
         case
-        for case in json.loads(args.suite.read_text(encoding="utf-8"))["cases"]
+        for case in json.loads(SUITE_PATHS[args.suite].read_text(encoding="utf-8"))["cases"]
         if case["scenario_id"] == args.scenario
         and (args.family is None or case["family"] == args.family)
     ]
