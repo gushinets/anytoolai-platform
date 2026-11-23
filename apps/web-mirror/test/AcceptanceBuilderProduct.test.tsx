@@ -173,16 +173,27 @@ describe("Acceptance Builder result parsing", () => {
     expect(old?.document.sections.map((section) => section.title)).not.toContain("Risks and contradictions");
   });
 
-  it("uses the Russian QA brief's evidence and numbered question in copy", () => {
-    type DraftCase = { id: string; canonical: { issues: { evidence: string }[]; questions: { question: string }[] } };
+  it("renders the two Russian QA briefs from their structured outputs", () => {
+    type DraftCase = {
+      id: string;
+      canonical: { issues: { evidence?: string }[]; questions: { question: string }[] };
+    };
     const { cases } = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/draft_risks_questions.json"), "utf8")) as { cases: DraftCase[] };
-    const { canonical } = cases.find((item) => item.id === "AB-894-C-RU")!;
-    const result = extractDraftResult(canonical)!;
-    const text = composeCopyText(result);
-    expect(text).toContain("Риски и противоречия");
-    expect(text).toContain("Из брифа: " + canonical.issues[0]!.evidence);
+    const vague = cases.find((item) => item.id === "AB-894-B-RU")!.canonical;
+    const vagueResult = extractDraftResult(vague)!;
+    const vagueText = composeCopyText(vagueResult);
+    expect(vagueResult.document.summary).toBe("Вопросы клиенту: 2");
+    expect(vagueText).toContain("Рисков и противоречий в брифе не обнаружено.");
+    expect(vagueText).toContain("2. " + vague.questions[1]!.question);
+    expect(vagueText).toContain("критерии приёмки: клиенту следует подтвердить");
+
+    const risky = cases.find((item) => item.id === "AB-894-C-RU")!.canonical;
+    const riskyResult = extractDraftResult(risky)!;
+    const text = composeCopyText(riskyResult);
+    expect(riskyResult.document.summary).toBe("Риски и противоречия: 2");
+    expect(text).toContain("Из брифа: " + risky.issues[0]!.evidence);
     expect(text).toContain("15 000 рублей");
-    expect(text).toContain("1. " + canonical.questions[0]!.question);
+    expect(text).toContain("1. " + risky.questions[0]!.question);
   });
 
   it("requires a comparison for check and none for draft", () => {

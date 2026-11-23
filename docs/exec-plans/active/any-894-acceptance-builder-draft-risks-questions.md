@@ -8,8 +8,8 @@
 - Created: 2026-11-23
 - Last updated: 2026-11-23
 - Review date: 2026-11-30
-- Next action: Verify the Draft output and review live evidence.
-- Blocker: none identified.
+- Next action: Product-owner review of the completed Draft iteration.
+- Blocker: local repository-wide backend gates have unrelated environment failures detailed below.
 
 ## Goal
 
@@ -32,3 +32,41 @@ instruction in its A01 field description. This keeps a single extraction prompt.
 ## Validation
 
 The managed Python 3.12 environment passed doctor.
+
+- Both QA briefs returned `analysis_language: ru` on the original implementation at
+  `4fa80b28`. Its output lacked risk and question fields. For B it also treated the
+  visual preference as a criterion. Both raw outputs are in
+  `tests/fixtures/acceptance_builder_eval/any-894-pre-fix.evidence.json`.
+- The existing extraction prompt requires checkable conditions. The more specific
+  subjective-wish rule belongs to ANY-763. Draft now distinguishes stated assumptions
+  from wishes in its input field descriptions.
+- The fake certificate control executes extraction and detection, persists A05 as
+  skipped and makes two provider calls. A05's happy fixture exists for atom schema
+  coverage. The weak fixture executes all three actions.
+- Stored v1 Draft results can be reopened through the session URL. The presenter
+  displays their original lists and omits the risk assessment. A partially populated
+  v2 result is rejected. Check retains its original copy in all seven languages.
+- The focused Python product, prompt and evaluation tests passed (203), as did all
+  API/worker bundle tests (58), focused web tests (87) and browser smoke tests (11).
+  Smoke covered quota, clipboard, mobile layout and handoff replay on PostgreSQL.
+- Config, architecture, docs and generated-doc drift checks passed with Python 3.12.
+- The first live series surfaced a design-approval gap. The questions asked for style
+  examples without asking how the client would approve the design. The revised A04
+  and A05 prompts make the approval decision explicit. The three Russian combined-risk
+  runs in the initial series passed. One initial B session exhausted transport retries.
+- Final live series at `b1ff4c12` passed **18/18** across six briefs, three independent
+  sessions each. B asked about both required pages/functions and design approval. The C
+  translations in Russian, English and Spanish kept the launch figures grounded. All three
+  contradiction runs retained the form criterion and both conflicting quotations. All three
+  complete-control runs had empty issue and question lists. The tests revalidate the raw
+  results in `tests/fixtures/acceptance_builder_eval/any-894-live-acceptance.evidence.json`.
+- The original checkout's full-check stopped in the production stack detection tests.
+  Its local production environment file introduces an additional Compose call. Both related
+  tests passed in a clean checkout. The activation-marker permission test still failed there
+  because the host requires interactive sudo to switch to nobody. The first quick-check also
+  collected five stale language-eval expectations before they were updated. All 93 language
+  evaluation tests passed after the update.
+- The full freelancer product suite passed (1,667 tests), including wheel packaging and the captured live regression.
+- Repository-wide frontend-check passed with one workspace and Vitest worker at a time,
+  including lint, typecheck, the generated API contract check, 1,141 web-mirror tests
+  and the production build. Earlier concurrent runs timed out in the CE-kit ESLint test.

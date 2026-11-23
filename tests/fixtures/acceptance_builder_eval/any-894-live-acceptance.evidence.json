@@ -1,0 +1,1477 @@
+{
+  "commit": "b1ff4c1212d8ba33d44f224a15395afd6eb2b6bb",
+  "date": "2026-11-23",
+  "runs": [
+    {
+      "case_id": "AB-894-B-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795429498745207315_0000000008_2fa7bbe1afaa4b49a2bbd2b078dccd52",
+      "output": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "evidence": "Нужен сайт для моего бизнеса.",
+            "severity": "high",
+            "description": "Не определены назначение сайта, обязательные страницы и функции, поэтому нельзя согласовать объём работ и проверить полноту результата."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "Хочется красиво и современно",
+            "severity": "medium",
+            "description": "Пожелание «красиво и современно» не задаёт конкретных ориентиров и порядка утверждения дизайна, поэтому непонятно, какой вариант будет принят."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "чтобы клиенты шли",
+            "severity": "medium",
+            "description": "Пожелание «чтобы клиенты шли» не уточняет, какое действие посетителя считается результатом и входит ли привлечение клиентов в обязанности исполнителя."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса заказчика."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "questions": [
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие страницы и функции обязательно должны быть на сайте, чтобы вы считали его готовым?",
+            "rationale": "Это позволит согласовать объём работ и проверить полноту готового сайта.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Как вы хотите утверждать дизайн сайта, чтобы можно было переходить к его реализации?",
+            "rationale": "Согласованный порядок утверждения поможет определить, какой дизайн вы приняли.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Какое основное действие посетителя на сайте вы будете считать результатом: звонок, заявку, покупку или что-то другое?",
+            "rationale": "От этого зависит, к какому действию должны вести содержание и функции сайта.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Должно ли в мои задачи входить привлечение посетителей на сайт или только создание самого сайта?",
+            "rationale": "Это позволит определить, входят ли работы по привлечению потенциальных клиентов в объём заказа.",
+            "source_issue_index": 2
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795429498741037451_0000000007_f21fb7b2bf5943fb8427663314799fd3",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "«интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С»; «Сдача завтра, потому что в пятницу запуск рекламы»; «Бюджет 15 000 рублей».",
+            "severity": "high",
+            "description": "Нужно согласовать реализуемый объём работ: интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С при сдаче «завтра», запуске рекламы «в пятницу» и бюджете 15 000 рублей создаёт высокий риск несоответствия объёма сроку и стоимости."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "«Правок будет немного, но по ходу всё может поменяться».",
+            "severity": "high",
+            "description": "Возможность менять требования по ходу работы без согласованных границ правок и порядка пересмотра стоимости и срока оставляет объём работ открытым."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "«Нужен интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой».",
+            "severity": "high",
+            "description": "Не определены состав страниц магазина, необходимые действия в личном кабинете и сценарий оформления и оплаты заказа, поэтому стороны могут по-разному понимать функциональный объём сдачи."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "«интеграцией с 1С».",
+            "severity": "high",
+            "description": "Для интеграции с 1С не указаны используемая конфигурация, состав и направление обмена данными и доступность подключения, без чего нельзя согласовать объём интеграции и проверку её результата."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "«Дизайн придумайте сами, мне нравится как у больших сайтов».",
+            "severity": "medium",
+            "description": "Пожелание сделать дизайн «как у больших сайтов» не задаёт конкретных ориентиров и порядка утверждения макетов, поэтому неясно, по каким признакам заказчик примет дизайн."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "«интернет-магазин на 500 товаров».",
+            "severity": "medium",
+            "description": "Не определено, кто предоставляет и загружает данные и изображения для 500 товаров и должны ли все карточки быть заполнены к сдаче."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Запуск рекламы запланирован на пятницу.",
+              "Предполагается небольшое количество правок.",
+              "По ходу работы требования могут измениться."
+            ],
+            "deliverables": [
+              "Интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Интернет-магазин рассчитан на 500 товаров.",
+              "В интернет-магазине есть личный кабинет.",
+              "В интернет-магазине доступна онлайн-оплата.",
+              "Интернет-магазин интегрирован с 1С.",
+              "Сдача работы — завтра.",
+              "Бюджет проекта — 15 000 рублей.",
+              "Дизайн разработан исполнителем самостоятельно."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Какие из перечисленных возможностей магазина для вас приоритетны к запуску, если весь объём нельзя выполнить к завтрашней сдаче в рамках 15 000 рублей?",
+            "rationale": "Ответ позволит согласовать первоочередной объём работ с учётом указанного срока и бюджета.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Какой порядок согласования правок и изменений требований, включая их влияние на стоимость и срок, вы готовы утвердить до начала работы?",
+            "rationale": "Согласованный порядок позволит отличать правки в рамках принятого объёма от дополнительных работ.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие страницы и действия покупателя, включая возможности личного кабинета, оформление и оплату заказа, должны обязательно работать при сдаче магазина?",
+            "rationale": "Ответ определит обязательный состав магазина, по которому можно проверить готовность работы.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие данные должны передаваться между магазином и 1С и в какую сторону, чтобы вы считали интеграцию готовой?",
+            "rationale": "Ответ задаст объём обмена данными и ожидаемый результат проверки интеграции.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Как вы будете утверждать дизайн до начала его реализации?",
+            "rationale": "Согласованный способ утверждения позволит подтвердить, что предложенный дизайн соответствует вашим ожиданиям.",
+            "source_issue_index": 4
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-EN",
+      "run": 1,
+      "session_id": "scenario_session_01795429498735041297_0000000006_f26accb33670482cb1342479931608dd",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "\"online shop with 500 products, customer accounts, online payment and 1C integration\"; \"Delivery tomorrow because advertising starts on Friday\"; \"Budget: 15 000 rubles.\"",
+            "severity": "high",
+            "description": "The combined scope of an online shop with 500 products, customer accounts, online payment and 1C integration, delivery tomorrow because advertising starts on Friday, and a budget of 15 000 rubles creates a feasibility risk that requires agreement on delivery scope and dependencies."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "There will be few revisions, but everything may change along the way.",
+            "severity": "high",
+            "description": "The expectation of few revisions does not bound the work because everything may change along the way, leaving the limits of revisions and the treatment of changed requirements undefined."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "Come up with the design yourselves; I like what big sites do.",
+            "severity": "medium",
+            "description": "The brief does not define how the client will approve the proposed design or what observable conditions will establish design acceptance."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "1C integration",
+            "severity": "high",
+            "description": "The required 1C integration lacks an identified target system, data to exchange, synchronization direction and acceptance checks, leaving a major delivery dependency unresolved."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "online payment",
+            "severity": "high",
+            "description": "The brief does not identify the payment provider, responsibility for supplying an activated merchant account, or the payment scenarios that must pass acceptance."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "an online shop with 500 products, customer accounts",
+            "severity": "medium",
+            "description": "The required customer-account capabilities and shop pages or purchase flows are not defined, leaving the functional acceptance scope unclear."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "500 products",
+            "severity": "medium",
+            "description": "Responsibility for supplying and loading the 500 products, including their descriptions, images and prices, is not assigned, leaving the catalog deliverable unclear."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Advertising starts on Friday.",
+              "Few revisions are anticipated.",
+              "Requirements may change during the project."
+            ],
+            "deliverables": [
+              "An online shop.",
+              "A design for the online shop."
+            ],
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The online shop contains 500 products.",
+              "The online shop supports customer accounts.",
+              "The online shop supports online payment.",
+              "The online shop integrates with 1C.",
+              "Delivery is due tomorrow.",
+              "The project budget is 15 000 rubles.",
+              "The freelancer develops the design."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Which parts of the shop should take priority for launch tomorrow within the budget of 15 000 rubles?",
+            "rationale": "An agreed launch scope is needed to assess what can be delivered within the stated time and budget.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "What limits should we agree on for included revisions, with changes beyond those limits requiring separate approval?",
+            "rationale": "Clear revision limits prevent changing requirements from making the agreed work open-ended.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "What information must the shop exchange with 1C, and in which direction, for you to consider the integration complete?",
+            "rationale": "Defining the required exchange makes the integration scope clear and provides a basis for checking completion.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Which payment provider should the shop use at launch?",
+            "rationale": "The selected provider determines the setup requirements and dependencies for accepting online payments.",
+            "source_issue_index": 4
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "How would you like to review and approve the proposed design before we build the shop?",
+            "rationale": "An agreed approval process establishes when the design is accepted and ready to build.",
+            "source_issue_index": 2
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-ES",
+      "run": 1,
+      "session_id": "scenario_session_01795429555376171171_0000000017_9215e615b3b14953b272ed6353ef6dd4",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "\"tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C\"; \"Entrega mañana porque la publicidad empieza el viernes\"; \"Presupuesto: 15 000 rublos\".",
+            "severity": "high",
+            "description": "Es necesario validar si una tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C puede acordarse con entrega mañana, publicidad que empieza el viernes y un presupuesto de 15 000 rublos."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha.",
+            "severity": "high",
+            "description": "La posibilidad de cambiar todo sobre la marcha deja el alcance y las revisiones sin límites acordados, por lo que debe definirse cómo se aprobarán los cambios y sus efectos sobre el precio y el plazo."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "cuentas de cliente, pago en línea e integración con 1C",
+            "severity": "high",
+            "description": "Falta concretar qué funciones tendrán las cuentas de cliente, qué proveedor y operaciones cubrirá el pago en línea y qué datos y flujos abarcará la integración con 1C para poder comprobar su aceptación."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "Proponed el diseño; me gustan los sitios grandes.",
+            "severity": "medium",
+            "description": "La referencia a «sitios grandes» no define una dirección visual verificable ni cómo se aprobará el diseño propuesto antes de desarrollar la tienda."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "No se indica quién proporcionará y cargará los datos e imágenes de los 500 productos ni si esos materiales estarán disponibles para cumplir la entrega solicitada."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "La publicidad empieza el viernes.",
+              "Se prevén pocos cambios, aunque todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Una tienda en línea.",
+              "Una propuesta de diseño para la tienda."
+            ],
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "La tienda en línea incluye 500 productos.",
+              "La tienda permite crear cuentas de cliente.",
+              "La tienda permite realizar pagos en línea.",
+              "La tienda incluye integración con 1C.",
+              "La entrega se realiza mañana.",
+              "El trabajo se ajusta a un presupuesto de 15 000 rublos."
+            ]
+          },
+          "confidence": {
+            "assumptions": 0.97,
+            "deliverables": 0.99,
+            "analysis_language": 1,
+            "acceptance_criteria": 0.98
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Con la entrega mañana y el presupuesto de 15 000 rublos, ¿qué partes de la tienda tienen prioridad para el lanzamiento si no fuera posible incluir todo lo solicitado?",
+            "rationale": "Definir las prioridades permite acordar qué debe estar listo para el lanzamiento dentro del plazo y el presupuesto indicados.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "¿Cómo acordaremos la aprobación de los cambios que surjan durante el trabajo, incluidos sus posibles efectos sobre el precio y la fecha de entrega?",
+            "rationale": "Un procedimiento de aprobación permite controlar los cambios sin asumir que cualquier modificación queda incluida en el acuerdo inicial.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "¿Qué acciones deberán poder realizar los clientes desde sus cuentas y con los pagos en línea, y qué información deberá intercambiar la tienda con 1C?",
+            "rationale": "Concretar las funciones requeridas permite delimitar el trabajo y comprobar que la tienda cumple lo acordado.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "¿Cómo nos confirmaréis que el diseño propuesto está aprobado para empezar a desarrollar la tienda?",
+            "rationale": "Una aprobación explícita permite validar el diseño antes de desarrollar la tienda y evita depender de interpretaciones de «sitios grandes».",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "¿Quién se responsabilizará de proporcionar y cargar los datos e imágenes de los 500 productos para que estén disponibles en la tienda mañana?",
+            "rationale": "Asignar la preparación y carga del catálogo permite delimitar responsabilidades y comprobar si la entrega solicitada es viable.",
+            "source_issue_index": 4
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795429597721837795_0000000022_4dbb2205a61c44a19e3ed807139c63f2",
+      "output": {
+        "issues": [
+          {
+            "category": "contradiction",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия.",
+            "severity": "high",
+            "description": "Одновременно требуется страница только на русском языке и полная английская версия, поэтому до начала работы необходимо согласовать языковой состав лендинга."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не определены обязательные разделы и содержание лендинга курса, поэтому неясно, какая комплектация страницы будет считаться полной."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не установлен порядок утверждения дизайна лендинга и не определено, какое согласование будет означать его приёмку."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Для формы заявки не определены состав обязательных полей, адрес получателя и проверяемый результат успешной отправки, что не позволяет однозначно согласовать её приёмку."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Лендинг для курса.",
+              "Форма заявки с отправкой на почту."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Лендинг предназначен для курса.",
+              "На странице есть форма заявки с отправкой на почту.",
+              "Срок выполнения — 10 рабочих дней.",
+              "Бюджет — 40 000 рублей."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "questions": [
+          {
+            "category": "contradiction",
+            "priority": "high",
+            "question": "На каких языках должен быть лендинг: только на русском или на русском и английском?",
+            "rationale": "Ответ устранит противоречие и позволит определить объём языковых версий страницы.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Какие разделы и материалы обязательно должны быть на лендинге, чтобы вы считали страницу полной?",
+            "rationale": "Это позволит согласовать состав страницы и границы работы над её содержанием.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Как вы будете утверждать дизайн лендинга и каким способом подтвердите его окончательное согласование?",
+            "rationale": "Это позволит определить момент, когда дизайн считается принятым и можно переходить к реализации.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Какие поля формы заявки посетитель должен обязательно заполнить?",
+            "rationale": "Ответ определит, какие данные должна собирать форма и без каких данных заявку нельзя отправить.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "На какой адрес электронной почты должны приходить заявки с лендинга?",
+            "rationale": "Адрес получателя необходим для настройки отправки и проверки доставки заявок.",
+            "source_issue_index": 3
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795429621859167387_0000000027_4d5dcdf324ec44bbb6fea7dc57c2a8cb",
+      "output": {
+        "issues": [],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Тексты и фото предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Лендинг для онлайн-школы с формой заявки."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Лендинг содержит 5 блоков: оффер, программа, преподаватель, тарифы и форма заявки.",
+              "Все блоки свёрстаны по согласованному макету.",
+              "Форма доставляет тестовую заявку на почту info@school.example.",
+              "Лендинг адаптирован под мобильные устройства.",
+              "Срок выполнения — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены 2 раунда правок."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": []
+      }
+    },
+    {
+      "case_id": "AB-894-B-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795429664187660299_0000000032_01e3abfcd47f43ec944cb7d21a093247",
+      "output": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "evidence": "Нужен сайт для моего бизнеса.",
+            "severity": "high",
+            "description": "Не определены назначение сайта, состав страниц и необходимые функции, поэтому нельзя согласовать объём работ и проверить полноту результата."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "Хочется красиво и современно",
+            "severity": "medium",
+            "description": "Пожелание сделать сайт красивым и современным не определяет, по каким признакам и каким способом заказчик будет утверждать дизайн."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "чтобы клиенты шли",
+            "severity": "high",
+            "description": "Фраза «чтобы клиенты шли» не уточняет, требуется ли от исполнителя только сайт или также привлечение клиентов и по какому результату будет приниматься работа."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса заказчика."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "questions": [
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие страницы и функции должны быть на сайте, чтобы вы считали его готовым?",
+            "rationale": "Это позволит согласовать объём работ и проверить полноту готового сайта.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "ambiguity",
+            "priority": "high",
+            "question": "Вы ожидаете от исполнителя только создание сайта или также работу по привлечению клиентов?",
+            "rationale": "От этого зависит, какие работы нужно включить в заказ и за какой результат будет отвечать исполнитель.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Как вы будете утверждать дизайн сайта: что нужно показать вам и по каким признакам вы решите, что он подходит?",
+            "rationale": "Это поможет согласовать порядок утверждения дизайна и сделать пожелание «красиво и современно» проверяемым.",
+            "source_issue_index": 1
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795429694478725708_0000000037_1e8f70905a684e63b529f219a1877df4",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "«интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С»; «Сдача завтра, потому что в пятницу запуск рекламы»; «Бюджет 15 000 рублей»; «Дизайн придумайте сами»",
+            "severity": "high",
+            "description": "Нужно согласовать реализуемый объём работ: интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С при самостоятельной разработке дизайна, сдаче «завтра» перед запуском рекламы «в пятницу» и бюджете 15 000 рублей создаёт высокий риск несоответствия объёма, срока и стоимости."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "«Правок будет немного, но по ходу всё может поменяться»",
+            "severity": "high",
+            "description": "Возможность менять требования по ходу работы не ограничена, а количество и объём включённых правок и порядок пересмотра срока и стоимости не согласованы."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "«с личным кабинетом, онлайн-оплатой и интеграцией с 1С»",
+            "severity": "high",
+            "description": "Не определены проверяемые границы функций магазина: состав личного кабинета, сценарий оформления и оплаты заказа, а также данные и направления обмена с 1С."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "«Дизайн придумайте сами, мне нравится как у больших сайтов»",
+            "severity": "medium",
+            "description": "Не определено, какие страницы и состояния интерфейса нужно согласовать и каким образом клиент утвердит дизайн до реализации, а ссылка на большие сайты не задаёт проверяемых условий приёмки."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Запуск рекламы запланирован на пятницу.",
+              "Заказчик ожидает, что правок будет немного.",
+              "По ходу работы всё может поменяться."
+            ],
+            "deliverables": [
+              "Интернет-магазин.",
+              "Дизайн интернет-магазина."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Интернет-магазин рассчитан на 500 товаров.",
+              "В интернет-магазине есть личный кабинет.",
+              "В интернет-магазине доступна онлайн-оплата.",
+              "Интернет-магазин интегрирован с 1С.",
+              "Сдача интернет-магазина — завтра.",
+              "Бюджет — 15 000 рублей.",
+              "Дизайн разработан исполнителем самостоятельно."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Какие работы для вас приоритетны к сдаче завтра в рамках бюджета 15 000 рублей, если выполнить весь заявленный объём к этому сроку не получится?",
+            "rationale": "Ответ позволит согласовать приоритетный объём запуска с учётом срока и бюджета.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Какой объём правок вы хотите согласовать как включённый в стоимость работ?",
+            "rationale": "Согласованный объём правок позволит отличать включённые изменения от дополнительных работ.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Можете перечислить обязательные возможности магазина: что покупатель должен делать в личном кабинете, как оформлять и оплачивать заказ и какие данные должны передаваться между магазином и 1С в каждую сторону?",
+            "rationale": "Этот перечень определит проверяемые границы работ по личному кабинету, заказам, оплате и обмену с 1С.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Как вы будете утверждать дизайн перед реализацией, чтобы было понятно, что можно переходить к созданию магазина?",
+            "rationale": "Согласованный способ утверждения позволит проверить, что предложенный дизайн принят вами до начала его реализации.",
+            "source_issue_index": 3
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-EN",
+      "run": 2,
+      "session_id": "scenario_session_01795429700430826713_0000000042_54259f7fa97e40089f5bcc70fb29227e",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "We need an online shop with 500 products, customer accounts, online payment and 1C integration. Delivery tomorrow because advertising starts on Friday. Budget: 15 000 rubles.",
+            "severity": "high",
+            "description": "The combined scope of an online shop with 500 products, customer accounts, online payment and 1C integration needs a feasibility agreement against delivery tomorrow, advertising starting on Friday and a budget of 15 000 rubles."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "There will be few revisions, but everything may change along the way.",
+            "severity": "high",
+            "description": "Allowing everything to change along the way leaves revisions and requirements unbounded, without an agreed process for changes to scope, cost or delivery."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "Come up with the design yourselves; I like what big sites do.",
+            "severity": "medium",
+            "description": "The brief does not establish how the client will approve the proposed design or which visual decisions must be approved before implementation."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "1C integration",
+            "severity": "high",
+            "description": "The 1C integration lacks an agreed target configuration, data exchange scope and observable conditions for accepting the integration."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "online payment",
+            "severity": "medium",
+            "description": "The online payment requirement does not identify the payment provider or the payment outcomes that must be demonstrated for acceptance."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "500 products",
+            "severity": "medium",
+            "description": "The brief does not specify who supplies and loads the 500 products or what product information must be present for the catalogue to be accepted."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Advertising starts on Friday.",
+              "Few revisions are expected.",
+              "Everything may change during the project."
+            ],
+            "deliverables": [
+              "An online shop with 500 products, customer accounts, online payment and 1C integration.",
+              "A design developed by the freelancer."
+            ],
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The online shop includes 500 products.",
+              "The online shop supports customer accounts.",
+              "The online shop supports online payment.",
+              "The online shop integrates with 1C.",
+              "The shop is delivered tomorrow.",
+              "The work fits the budget of 15 000 rubles.",
+              "The freelancer develops the design independently."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Which parts of the shop should take priority for launch tomorrow within the budget of 15 000 rubles if the full scope cannot be completed within those limits?",
+            "rationale": "An agreed launch scope is needed to assess feasibility and focus work within the stated deadline and budget.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "How should we agree on changes requested during the work before proceeding, including any effects on the price or delivery date?",
+            "rationale": "An agreed change approval process prevents revisions from expanding the work without agreement on their consequences.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "What information must pass between the shop and 1C, and in which direction, for you to consider the integration complete?",
+            "rationale": "Defining the required information exchange makes the integration scope clear and its completion verifiable.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "How would you like to review and approve the proposed design before we build it?",
+            "rationale": "An agreed design approval step establishes when the visual direction is accepted and implementation can begin.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Which payment provider should the shop use for online payments?",
+            "rationale": "The selected provider determines the payment setup and testing required for launch.",
+            "source_issue_index": 4
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-ES",
+      "run": 2,
+      "session_id": "scenario_session_01795429724720146559_0000000047_4e36411dff5344d4b32e5f2593585620",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "“500 productos, cuentas de cliente, pago en línea e integración con 1C” / “Entrega mañana porque la publicidad empieza el viernes” / “Presupuesto: 15 000 rublos.”",
+            "severity": "high",
+            "description": "Es necesario acordar la viabilidad conjunta de una tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C, con entrega mañana porque la publicidad empieza el viernes y un presupuesto de 15 000 rublos."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha.",
+            "severity": "high",
+            "description": "La posibilidad de cambiar todo sobre la marcha deja abierto el alcance sin establecer cómo se aprobarán los cambios y sus efectos en el precio, el plazo y la aceptación."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "Proponed el diseño; me gustan los sitios grandes.",
+            "severity": "medium",
+            "description": "No se define cómo se aprobará el diseño propuesto ni qué características concretas de los sitios grandes servirán para aceptarlo."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "integración con 1C",
+            "severity": "high",
+            "description": "No se especifican la versión y configuración de 1C, los datos que se intercambiarán ni la dirección de sincronización, por lo que no queda delimitada la integración que debe aceptarse."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "pago en línea",
+            "severity": "high",
+            "description": "No se identifica la pasarela de pago ni el flujo de cobro que deberá funcionar para aceptar el pago en línea."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "una tienda en línea con 500 productos",
+            "severity": "high",
+            "description": "No se indica quién proporcionará y cargará los datos e imágenes de los 500 productos ni si esos materiales están disponibles para cumplir la entrega."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "La publicidad empieza el viernes.",
+              "Se prevén pocos cambios, aunque todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Una tienda en línea.",
+              "Una propuesta de diseño para la tienda."
+            ],
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "La tienda en línea incluye 500 productos.",
+              "La tienda permite crear cuentas de cliente.",
+              "La tienda permite realizar pagos en línea.",
+              "La tienda está integrada con 1C.",
+              "La entrega se realiza mañana.",
+              "El presupuesto es de 15 000 rublos.",
+              "El diseño es propuesto por el profesional."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "¿Qué partes de la tienda deben tener prioridad para el lanzamiento de mañana dentro del presupuesto de 15 000 rublos?",
+            "rationale": "La respuesta permitirá acordar qué alcance es viable para el lanzamiento con el plazo y el presupuesto indicados.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "¿Cómo se aprobarán los cambios y sus posibles efectos en el precio, el plazo y lo que debe entregarse?",
+            "rationale": "Acordar este procedimiento evitará que los cambios alteren lo pactado sin una aprobación expresa.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "¿Qué información debe intercambiar la tienda con 1C y en qué sentido debe hacerlo?",
+            "rationale": "Definir el intercambio permitirá delimitar qué debe funcionar para dar por aceptada la integración con 1C.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "¿Qué servicio de pago debe utilizarse para que los clientes puedan completar sus compras en línea?",
+            "rationale": "La elección del servicio determinará la conexión necesaria para que el cobro funcione en la tienda.",
+            "source_issue_index": 4
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "¿Quién se encargará de dejar cargados los datos y las imágenes de los 500 productos antes de la entrega?",
+            "rationale": "Asignar esta responsabilidad permitirá delimitar el trabajo de preparación del catálogo necesario para entregar la tienda.",
+            "source_issue_index": 5
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795429765046560365_0000000052_00cbb2348326425bb370d9c1f6b7d1d5",
+      "output": {
+        "issues": [
+          {
+            "category": "contradiction",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия.",
+            "severity": "high",
+            "description": "Требование сделать страницу только на русском языке противоречит требованию полной английской версии, поэтому до начала работ нужно согласовать языковой состав лендинга."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не определены обязательные разделы и содержание лендинга курса, поэтому не согласован состав страницы, по которому будет приниматься работа."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не определено, как заказчик будет согласовывать дизайн лендинга и на основании чего оформление будет считаться принятым."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Для формы заявки не определены состав обязательных полей и адрес электронной почты получателя, необходимые для реализации и проверки отправки."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Лендинг для курса.",
+              "Форма заявки с отправкой на почту."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Лендинг посвящён курсу.",
+              "На странице есть форма заявки с отправкой на почту.",
+              "Срок выполнения — 10 рабочих дней.",
+              "Бюджет — 40 000 рублей."
+            ]
+          },
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1,
+            "acceptance_criteria": 0.99
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "questions": [
+          {
+            "category": "contradiction",
+            "priority": "high",
+            "question": "Уточните, пожалуйста: лендинг должен быть только на русском языке или нужны русская и полная английская версии?",
+            "rationale": "Ответ устранит противоречие и позволит согласовать языковой состав лендинга до начала работ.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Какие разделы обязательно должны быть на лендинге курса?",
+            "rationale": "Согласованный перечень разделов определит состав страницы для разработки и приёмки.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Как вы будете согласовывать дизайн лендинга и подтверждать, что он принят?",
+            "rationale": "Ответ позволит определить порядок утверждения оформления до реализации страницы.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Какие поля должны быть в форме заявки и какие из них посетителю обязательно заполнять?",
+            "rationale": "Ответ определит состав формы и правила проверки заполнения перед отправкой заявки.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "На какой адрес электронной почты нужно отправлять заявки с лендинга?",
+            "rationale": "Адрес получателя необходим для настройки и проверки доставки заявок.",
+            "source_issue_index": 3
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795429809279101636_0000000057_c4cef86f14b046509b65aa3ad33fec04",
+      "output": {
+        "issues": [],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Тексты и фотографии предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Лендинг для онлайн-школы."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Лендинг содержит 5 блоков: оффер, программа, преподаватель, тарифы и форма заявки.",
+              "Все блоки свёрстаны по согласованному макету.",
+              "Форма отправляет заявки на почту info@school.example.",
+              "При приёмке форма доставляет тестовую заявку.",
+              "Лендинг адаптирован для мобильных устройств.",
+              "Срок выполнения — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены 2 раунда правок."
+            ]
+          },
+          "confidence": {
+            "assumptions": 1,
+            "deliverables": 1,
+            "analysis_language": 1,
+            "acceptance_criteria": 1
+          },
+          "missing_fields": []
+        },
+        "questions": []
+      }
+    },
+    {
+      "case_id": "AB-894-B-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795429851585052125_0000000062_86758cda87394d8fbf7fc812ce95bd81",
+      "output": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "Не определены назначение сайта, необходимые страницы и функции, поэтому невозможно согласовать объём работ и проверить полноту результата."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "Хочется красиво и современно",
+            "severity": "medium",
+            "description": "Пожелание «красиво и современно» не задаёт проверяемых требований к оформлению, а порядок утверждения дизайна не определён."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "чтобы клиенты шли",
+            "severity": "medium",
+            "description": "Пожелание «чтобы клиенты шли» не уточняет, ожидается ли от исполнителя привлечение клиентов или только создание сайта, и как будет оцениваться достижение этой цели."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса клиента."
+            ],
+            "analysis_language": "ru"
+          },
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "questions": [
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие страницы и функции должны быть на сайте к моменту сдачи?",
+            "rationale": "Это позволит согласовать объём работ и проверить полноту готового сайта.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Как вы хотите утверждать дизайн сайта перед началом его сборки?",
+            "rationale": "Согласованный порядок утверждения позволит определить, какое оформление вы считаете подходящим.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Должно ли привлечение клиентов входить в работу исполнителя или задача ограничивается созданием сайта?",
+            "rationale": "Ответ поможет разграничить ответственность за создание сайта и за привлечение клиентов.",
+            "source_issue_index": 2
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795429885876111432_0000000067_4bf25ed1fc904e9cbc0a5bc6b8b9b3b0",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "«интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С»; «Сдача завтра, потому что в пятницу запуск рекламы»; «Бюджет 15 000 рублей».",
+            "severity": "high",
+            "description": "Нужно согласовать реализуемость интернет-магазина на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С при бюджете 15 000 рублей и сроке сдачи «завтра» перед запуском рекламы «в пятницу», поскольку сочетание объёма, срока и бюджета создаёт высокий риск невыполнения согласованных обязательств."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "«Правок будет немного, но по ходу всё может поменяться».",
+            "severity": "high",
+            "description": "Возможность менять требования по ходу работы без согласованных границ правок и порядка пересмотра объёма, стоимости и срока делает объём обязательств неограниченным."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "«с личным кабинетом, онлайн-оплатой и интеграцией с 1С».",
+            "severity": "high",
+            "description": "Не определены обязательные страницы и функциональные сценарии магазина, включая возможности личного кабинета, способы и условия онлайн-оплаты, а также состав и направление обмена данными с 1С, поэтому границы функциональной приёмки не установлены."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "«Дизайн придумайте сами, мне нравится как у больших сайтов».",
+            "severity": "medium",
+            "description": "Пожелание сделать дизайн как у больших сайтов не задаёт конкретных ориентиров и порядка утверждения, поэтому нужно согласовать, на основании какого макета или иных проверяемых решений клиент примет дизайн."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Запуск рекламы запланирован на пятницу.",
+              "Клиент ожидает небольшое количество правок.",
+              "По ходу работы всё может поменяться."
+            ],
+            "deliverables": [
+              "Интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С.",
+              "Дизайн интернет-магазина."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Интернет-магазин рассчитан на 500 товаров.",
+              "В интернет-магазине есть личный кабинет.",
+              "В интернет-магазине доступна онлайн-оплата.",
+              "Интернет-магазин интегрирован с 1С.",
+              "Работа сдана завтра.",
+              "Бюджет — 15 000 рублей.",
+              "Дизайн разработан исполнителем самостоятельно."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Какие работы для запуска магазина вы считаете приоритетными при сдаче завтра и бюджете 15 000 рублей, если весь заявленный объём не удастся выполнить в этих рамках?",
+            "rationale": "Это позволит согласовать приоритетный объём запуска с учётом ограничений по сроку и бюджету.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Какой порядок согласования правок и изменений требований вы готовы утвердить, чтобы перед их выполнением определять, входят ли они в согласованный объём или требуют пересмотра стоимости и срока?",
+            "rationale": "Согласованный порядок позволит ограничить объём обязательств и избежать споров при изменении требований.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие страницы и возможности магазина должны обязательно работать при сдаче, включая действия покупателя в личном кабинете, способы оплаты и данные для обмена с 1С?",
+            "rationale": "Этот перечень задаст конкретные границы работ и позволит проверить готовность магазина при приёмке.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "ambiguity",
+            "priority": "medium",
+            "question": "Как вы будете утверждать дизайн перед сборкой магазина: по представленным макетам или другим согласованным материалам?",
+            "rationale": "Согласованный способ утверждения позволит подтвердить, что внешний вид магазина соответствует вашим ожиданиям, до его реализации.",
+            "source_issue_index": 3
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-EN",
+      "run": 3,
+      "session_id": "scenario_session_01795429895844900198_0000000072_4100b3c3e9cb4bb79b9b2bb42aac5545",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "“online shop with 500 products, customer accounts, online payment and 1C integration” / “Delivery tomorrow because advertising starts on Friday” / “Budget: 15 000 rubles.”",
+            "severity": "high",
+            "description": "The combined scope of an online shop with 500 products, customer accounts, online payment and 1C integration, delivery tomorrow because advertising starts on Friday, and a budget of 15 000 rubles presents a feasibility risk that needs agreement before work starts."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "“There will be few revisions, but everything may change along the way.”",
+            "severity": "high",
+            "description": "The statement that everything may change leaves requirements and revision limits unbounded despite the expectation of few revisions."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "“an online shop with 500 products, customer accounts”",
+            "severity": "medium",
+            "description": "The required shop pages and customer account functions are not defined, leaving their acceptance scope unclear."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "“online payment”",
+            "severity": "high",
+            "description": "The payment provider and required payment flows are unspecified, so the parties cannot yet agree how online payment will be tested and accepted."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "“1C integration”",
+            "severity": "high",
+            "description": "The 1C version, data to exchange, exchange direction and access arrangements are unspecified, leaving the integration scope and acceptance tests undefined."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "“500 products”",
+            "severity": "high",
+            "description": "Responsibility for supplying and uploading the 500 products, including their descriptions, prices and images, is not assigned."
+          },
+          {
+            "category": "ambiguity",
+            "evidence": "“Come up with the design yourselves; I like what big sites do.”",
+            "severity": "medium",
+            "description": "The design direction does not identify which sites or characteristics the client likes or establish how the proposed design will be approved."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Advertising starts on Friday.",
+              "Few revisions are expected.",
+              "Requirements may change during the project."
+            ],
+            "deliverables": [
+              "An online shop.",
+              "A design for the online shop."
+            ],
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The online shop contains 500 products.",
+              "The online shop supports customer accounts.",
+              "The online shop supports online payment.",
+              "The online shop integrates with 1C.",
+              "The online shop is delivered tomorrow.",
+              "The work stays within a budget of 15 000 rubles.",
+              "The freelancer develops the design independently."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Which parts of the shop should take priority for launch tomorrow within the budget of 15 000 rubles if the full scope cannot be completed within those limits?",
+            "rationale": "Agreeing on launch priorities establishes what must be delivered within the stated time and budget.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "What limit should we agree on for included revisions before further changes are treated as additional work?",
+            "rationale": "A clear revision limit prevents changing requirements from creating an open-ended commitment.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Which payment provider and payment methods must the shop support at launch?",
+            "rationale": "This determines the payment setup required and which payment methods must be tested before acceptance.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "What information must pass between 1C and the shop at launch, and in which direction?",
+            "rationale": "Defining the required information exchange establishes the integration scope and what must be checked for acceptance.",
+            "source_issue_index": 4
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "How should responsibility for supplying and uploading the descriptions, prices and images for all 500 products be divided between you and me?",
+            "rationale": "Assigning these responsibilities clarifies the work included and the materials needed to prepare the catalogue for launch.",
+            "source_issue_index": 5
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-C-ES",
+      "run": 3,
+      "session_id": "scenario_session_01795429918104981706_0000000077_aa10ac0975f842619b248edddd573c22",
+      "output": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "evidence": "“500 productos, cuentas de cliente, pago en línea e integración con 1C” / “Entrega mañana porque la publicidad empieza el viernes” / “Presupuesto: 15 000 rublos”",
+            "severity": "high",
+            "description": "Es necesario acordar la viabilidad conjunta de una tienda con 500 productos, cuentas de cliente, pago en línea e integración con 1C, con entrega mañana, inicio de la publicidad el viernes y un presupuesto de 15 000 rublos, porque esa combinación puede requerir ajustes de alcance, plazo o presupuesto."
+          },
+          {
+            "category": "scope_risk",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha.",
+            "severity": "high",
+            "description": "La posibilidad de cambiar todo sobre la marcha deja el alcance y las revisiones sin límites ni un procedimiento para acordar su impacto en el precio y la entrega."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "integración con 1C",
+            "severity": "high",
+            "description": "No se define qué datos y operaciones debe intercambiar la tienda con 1C ni cómo se comprobará que la integración funciona correctamente."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "pago en línea",
+            "severity": "medium",
+            "description": "No se especifican el proveedor de pago en línea ni las operaciones que deberán probarse para aceptar esa función."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "Proponed el diseño; me gustan los sitios grandes.",
+            "severity": "medium",
+            "description": "Falta acordar cómo se aprobará el diseño propuesto y con qué criterios se considerará aceptado, ya que la preferencia por sitios grandes no establece una referencia verificable."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "La publicidad empieza el viernes.",
+              "Se prevén pocos cambios, aunque todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Tienda en línea.",
+              "Propuesta de diseño para la tienda."
+            ],
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "La tienda en línea incluye 500 productos.",
+              "La tienda permite crear cuentas de cliente.",
+              "La tienda permite realizar pagos en línea.",
+              "La tienda está integrada con 1C.",
+              "La entrega se realiza mañana.",
+              "El trabajo se ajusta al presupuesto de 15 000 rublos."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": [
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "¿Qué funciones y contenidos debemos priorizar para el lanzamiento de mañana dentro del presupuesto de 15 000 rublos?",
+            "rationale": "La respuesta permitirá acordar un alcance prioritario y evaluar su viabilidad con el plazo y el presupuesto indicados.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "¿Cómo acordaremos y aprobaremos los cambios y su posible efecto en el precio y la fecha de entrega antes de realizarlos?",
+            "rationale": "Un procedimiento de aprobación evitará que los cambios amplíen el trabajo sin un acuerdo sobre sus consecuencias.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "high",
+            "question": "¿Qué información debe intercambiar la tienda con 1C y en qué sentido para considerar aceptada la integración?",
+            "rationale": "Definir los intercambios necesarios permitirá delimitar la integración y comprobar que cumple lo acordado.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "¿Qué proveedor debemos utilizar para el pago en línea?",
+            "rationale": "El proveedor elegido determina los requisitos de conexión y las pruebas que habrá que preparar.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "¿Cómo se aprobará la propuesta de diseño y qué condiciones deberá cumplir para considerarla aceptada?",
+            "rationale": "Acordar la forma de aprobación y sus criterios permitirá comprobar que el diseño responde a las expectativas.",
+            "source_issue_index": 4
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795430108568443196_0000000084_c2a978f6ae1a47cda98242ed089e6644",
+      "output": {
+        "issues": [
+          {
+            "category": "contradiction",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия.",
+            "severity": "high",
+            "description": "Требование сделать страницу только на русском языке противоречит требованию разместить на ней полную английскую версию, поэтому необходимо согласовать языковые версии лендинга."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "Нужен лендинг для курса.",
+            "severity": "medium",
+            "description": "Не определены обязательные разделы и содержание лендинга курса, по которым можно будет проверить полноту страницы."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не определено, как заказчик будет согласовывать дизайн лендинга и по каким условиям он будет считаться утверждённым."
+          },
+          {
+            "category": "missing_information",
+            "evidence": "Нужна форма заявки с отправкой на почту.",
+            "severity": "medium",
+            "description": "Для формы заявки не указаны состав полей и адрес получателя, поэтому не согласовано, какие данные она должна собирать и куда отправлять."
+          }
+        ],
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Лендинг для курса.",
+              "Форма заявки с отправкой на почту."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Лендинг предназначен для курса.",
+              "Срок выполнения — 10 рабочих дней.",
+              "Бюджет — 40 000 рублей.",
+              "На странице есть форма заявки с отправкой на почту."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "questions": [
+          {
+            "category": "contradiction",
+            "priority": "high",
+            "question": "Подскажите, лендинг должен быть только на русском языке или иметь также полную английскую версию?",
+            "rationale": "Это определит состав языковых версий и устранит противоречие в требованиях.",
+            "source_issue_index": 0
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Какие разделы с информацией о курсе обязательно должны быть на лендинге?",
+            "rationale": "Согласованный список разделов позволит проверить полноту готовой страницы.",
+            "source_issue_index": 1
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Как вы будете согласовывать дизайн лендинга и подтверждать, что он утверждён?",
+            "rationale": "Это позволит определить момент, когда дизайн согласован и можно переходить к реализации страницы.",
+            "source_issue_index": 2
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Какие поля нужно включить в форму заявки?",
+            "rationale": "Это определит, какие данные посетитель сможет передать через форму.",
+            "source_issue_index": 3
+          },
+          {
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "На какой адрес электронной почты должны приходить заявки с лендинга?",
+            "rationale": "Адрес получателя необходим для настройки и проверки отправки заявок.",
+            "source_issue_index": 3
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795430108569518296_0000000085_63ee9e4db7c14d528078c28f09286074",
+      "output": {
+        "issues": [],
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Тексты и фото предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Адаптивный лендинг для онлайн-школы с 5 блоками и формой отправки заявки на почту."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Лендинг содержит 5 блоков: оффер, программа, преподаватель, тарифы, форма заявки.",
+              "Все блоки свёрстаны по согласованному макету.",
+              "Форма отправляет заявки на почту info@school.example.",
+              "При проверке форма доставляет тестовую заявку.",
+              "Лендинг адаптирован для мобильных устройств.",
+              "Срок выполнения — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены 2 раунда правок."
+            ]
+          },
+          "missing_fields": []
+        },
+        "questions": []
+      }
+    }
+  ]
+}
