@@ -1,9 +1,22 @@
-"""Evidence for the combined-feasibility decision in the Draft risk evaluation suite."""
+"""Evidence for decisions linked to an issue in the Draft risk evaluation suite."""
 
 import re
 
+DECISION_FIELDS = {"feasibility": "scope_question", "contradiction": "language_question"}
 
-def scope_questions(output: dict, language: str) -> list[dict]:
+
+def decision_questions(output: dict, family: str, language: str) -> list[dict]:
+    if family == "feasibility":
+        return _scope_questions(output, language)
+    if family == "contradiction":
+        conflicts = {
+            i for i, issue in enumerate(output["issues"]) if issue["category"] == "contradiction"
+        }
+        return [q for q in output["questions"] if q["source_issue_index"] in conflicts]
+    raise ValueError(f"No decision rubric for {family}")
+
+
+def _scope_questions(output: dict, language: str) -> list[dict]:
     """Only a question linked to the joint scope, time and budget finding qualifies."""
     deadline = {"ru": "завтра", "en": "tomorrow", "es": "mañana"}[language]
     indexes = set()

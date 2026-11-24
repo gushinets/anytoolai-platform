@@ -226,3 +226,43 @@ without local environment files. The activation-marker test requires non-interac
 to run as nobody, which this host does not provide.
 The complete frontend-check passed, including lint, type checking, 1,145 web-mirror tests,
 the generated API contract check and the production builds.
+
+### Fifth review
+
+Restore historical A04/A05 read constraints and use the publication schema when an atom or
+workflow produces a new result. Pin the authored-text boundary across schema, action and
+browser validation, including Draft and Brief Decoder activation and formatted A07/A10 output.
+Exercise saved results through the Result API, semantic retries, final publication, and web
+presentation. Bind the contradiction control to a reviewed delivery-language choice and
+verify manifest reads with an explicit UTF-8 encoding.
+
+The root schemas for A04 and A05 match the historical v1 definitions. API tests reopen
+saved artifacts across the seven registered workflows that publish these schemas. Empty
+strings and malformed historical objects still fail the read contract. For new outputs,
+the action retry loop, finalizer, and workflow publication use the write constraints.
+A Draft containing only invisible acceptance criteria opens as incomplete and does not emit
+a viewed activation. Brief Decoder checks the question text for activation. The Atom Lab
+form now evaluates schema patterns in Unicode mode, including supplementary-plane characters.
+
+The pinned character set comes from Unicode 17.0 White_Space, Cc, Cf and
+Default_Ignorable_Code_Point. Tests compare Python and browser behavior with the published
+Draft schema over every code point. Shared examples cover meaningful text with joining
+characters, including Persian and emoji.
+
+| Live control | RU | EN | ES |
+| --- | --- | --- | --- |
+| Vague business website | 3/3 | 3/3 | 3/3 |
+| Store scope, budget and delivery | 3/3 | 3/3 | 3/3 |
+| Conflicting language requirements | 3/3 | 3/3 | 3/3 |
+| Complete brief | 3/3 | 3/3 | 3/3 |
+
+All 36 new Draft v1 sessions returned results via the API. All 99 production-provider calls
+on gpt-6.1-sol succeeded. The evidence includes the actual runtime fingerprints and review
+sheets. One executor call was line-wrapped after collection, with identical Python syntax
+trees. The six database-dependent tests skipped in the broad Python run also passed on a
+temporary PostgreSQL 18 instance alongside the Result API and workflow-runner tests (84 passed).
+
+The broad Python suite passed 2,970 tests. The full frontend check passed, including
+349 Chromium cases for Atom Lab, 1,148 web-mirror tests, contract drift and production
+builds. The manifest selections passed with Python UTF-8 mode disabled under the C locale
+on Linux.

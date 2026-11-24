@@ -1,7 +1,7 @@
+import { hasAuthoredText } from "../shared/authoredText";
 import outputWording from "./outputWording.json";
 import {
   LIST_FIELDS,
-  hasAuthoredText,
   type AcceptanceBuilderResult,
   type DeltaCriterion,
   type DeltaStatus,

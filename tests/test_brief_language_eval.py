@@ -600,16 +600,19 @@ def test_draft_cli_selects_cases_before_collection(monkeypatch, tmp_path, suite,
         assert not out.exists()
         return
     assert evaluation.main() == 0
-    manifest = json.loads((out / "manifest.json").read_text())
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     expected = [c for c in evaluation.draft_risk_cases() if family is None or c["family"] == family]
     assert manifest["cases"] == expected
     assert set(manifest["runs"]) == {f"{c['id']}--{n}" for c in expected for n in range(1, 4)}
     assert collector.call_count == count
 
 
-@pytest.fixture(scope="module")
-def reviewed_drafts():
-    path = ROOT / "tests/fixtures/acceptance_builder_eval/any-894-review-4-live.evidence.json"
+@pytest.fixture(scope="module", params=[4, 5])
+def reviewed_drafts(request):
+    path = (
+        ROOT
+        / f"tests/fixtures/acceptance_builder_eval/any-894-review-{request.param}-live.evidence.json"
+    )
     return json.loads(path.read_text(encoding="utf-8"))["runs"]
 
 
@@ -622,7 +625,16 @@ def test_reviewed_draft_matrix_matches_the_current_cases_and_rubric(reviewed_dra
     for run in reviewed_drafts:
         record = run["record"]
         assert record["case"] == cases[record["case"]["id"]]
-        assert evaluation.review_status(record, run["review"]) == "PASS"
+        review = run["review"]
+        assert evaluation.review_status(record, review) == "PASS"
+        if record["case"]["family"] == "contradiction":
+            for quote in (None, "Which language is mentioned here?"):
+                assert (
+                    evaluation.review_status(record, {**review, "language_question": quote})
+                    == "PENDING"
+                )
+            old_sheet = {k: v for k, v in review.items() if k != "language_question"}
+            assert evaluation.review_status(record, {**old_sheet, "notes": ""}) == "PENDING"
 
 
 def test_feasibility_report_requires_the_reviewed_linked_question(reviewed_drafts):

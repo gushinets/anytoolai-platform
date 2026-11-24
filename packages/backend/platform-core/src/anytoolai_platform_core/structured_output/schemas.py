@@ -10,6 +10,14 @@ def normalize_schema_mapping(schema: Mapping[str, Any] | None) -> dict[str, Any]
     return normalize_mapping(schema)
 
 
+def publication_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply write-only constraints to a copy of the stored-result schema."""
+    result = normalize_mapping(schema)
+    if "publication" in result.get("$defs", {}):
+        result.setdefault("allOf", []).append({"$ref": "#/$defs/publication"})
+    return result
+
+
 def normalize_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
     return {
         str(key): normalize_value(item)

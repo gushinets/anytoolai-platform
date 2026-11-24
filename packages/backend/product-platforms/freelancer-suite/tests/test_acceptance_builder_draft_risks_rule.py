@@ -10,7 +10,7 @@ import jsonschema
 import pytest
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 
-from scripts.agent.draft_risk_review import scope_questions
+from scripts.agent.draft_risk_review import decision_questions
 
 ROOT = Path(__file__).resolve().parents[5]
 FIXTURES = ROOT / "tests/fixtures/acceptance_builder_eval"
@@ -18,8 +18,9 @@ PRODUCT = next(p for p in FreelancerSuiteBundle().config_roots() if p.name == "a
 SCHEMA = json.loads((PRODUCT / "schemas/draft_output.schema.json").read_text(encoding="utf-8"))
 SUITE = json.loads((FIXTURES / "draft_risks_questions.json").read_text(encoding="utf-8"))
 CASES = {case["id"]: case for case in SUITE["cases"]}
-SCOPE_REVIEWS = json.loads((FIXTURES / "reviewed_scope_questions.json").read_text(encoding="utf-8"))
-
+DECISION_REVIEWS = json.loads(
+    (FIXTURES / "reviewed_decision_questions.json").read_text(encoding="utf-8")
+)
 
 
 # Each expectation describes this fixture. Free-form source fidelity is also reviewed against
@@ -91,7 +92,7 @@ def check_complete(values):
         )
 
 
-def check_contradiction(issues, questions, criteria):
+def check_contradiction(issues, criteria):
     (index,) = [n for n, issue in enumerate(issues) if issue["category"] == "contradiction"]
     evidence = issues[index]["evidence"].lower()
     alternatives = (
@@ -99,28 +100,14 @@ def check_contradiction(issues, questions, criteria):
         r"английская версия|english version|versión completa en inglés",
     )
     assert has_all(evidence, alternatives)
-    assert any(
-        q["source_issue_index"] == index
-        and has_all(
-            q["question"],
-            (
-                r"како[йм]|какая|какие|какую|каки[ех]|выб|нужн|требуется|долж|"
-                r"which|what language|what version|should|do you (?:want|require|prefer)|"
-                r"cuál|qué idioma|qué versión|debe|quiere|prefiere|"
-                r"только.{1,50}или|only.{1,50} or |solo.{1,50} o ",
-                r"язык|языч|русск|английск|language|russian|english|idioma|ruso|inglés",
-            ),
-        )
-        for q in questions
-    ), "the linked question must ask for the language decision"
     assert has_all(criteria, (r"форм|form", r"почт|e-?mail|correo"))
     assert not re.search("русск|английск|russian|english|ruso|inglés", criteria)
 
 
-def scope_review_key(case, output, question):
+def decision_review_key(case, output, question):
     evidence = [
         case["input"],
-        SUITE["review_rubric"]["feasibility"],
+        SUITE["review_rubric"][case["checks"]],
         output["issues"][question["source_issue_index"]],
         question,
     ]
@@ -165,8 +152,6 @@ def check_result(case, output):
             "wrong milestone"
         )
 
-        candidates = scope_questions(output, case["language"])
-        assert candidates, "missing question linked to combined feasibility finding"
         assert any(
             i["category"] == "scope_risk"
             and re.search(
@@ -175,14 +160,6 @@ def check_result(case, output):
             )
             for i in issues
         )
-        decisions = [SCOPE_REVIEWS.get(scope_review_key(case, output, q)) for q in candidates]
-        assert any(
-            decision and decision["accepted"] and decision["question"] == q["question"]
-            for decision, q in zip(decisions, candidates, strict=True)
-        ), (
-            "FAIL: question does not decide which scope" if all(decisions)
-            else "PENDING: review which scope the answer selects"
-        )
         facts = json.dumps(values, ensure_ascii=False).lower()
         assert has_all(facts, (r"500", r"15[ .,\u202f\xa0]?000", deadline))
         assert not re.search(
@@ -190,11 +167,24 @@ def check_result(case, output):
             " ".join(i["description"] for i in issues).lower(),
         )
     elif rule == "contradiction":
-        check_contradiction(issues, questions, criteria)
+        check_contradiction(issues, criteria)
     else:
         assert rule == "complete"
         assert issues == questions == []
         check_complete(values)
+
+    if rule in {"feasibility", "contradiction"}:
+        candidates = decision_questions(output, rule, case["language"])
+        assert candidates, f"missing question linked to {rule} finding"
+        decisions = [DECISION_REVIEWS.get(decision_review_key(case, output, q)) for q in candidates]
+        label = "which scope" if rule == "feasibility" else "the language decision"
+        assert any(
+            decision and decision["accepted"] and decision["question"] == q["question"]
+            for decision, q in zip(decisions, candidates, strict=True)
+        ), (
+            f"FAIL: question does not decide {label}" if all(decisions)
+            else f"PENDING: review {label}"
+        )
 
 
 @pytest.mark.parametrize("case", CASES.values(), ids=CASES.keys())
@@ -317,11 +307,38 @@ def test_complete_brief_preserves_each_agreed_term(original, replacement):
         check_result(case, output)
 
 
-def test_equivalent_language_decision_is_accepted():
-    case = CASES["AB-894-CTRL-CONTRADICTION-RU"]
+@pytest.mark.parametrize(
+    ("lang", "mention", "delivery"),
+    [
+        ("ru", "Какой язык здесь упоминается?", "На каком языке должна быть готовая страница?"),
+        (
+            "en",
+            "Which language is mentioned here?",
+            "Which language should we deliver the page in?",
+        ),
+        ("es", "¿Qué idioma se menciona aquí?", "¿En qué idioma debemos entregar la página?"),
+    ],
+)
+def test_language_question_requires_a_reviewed_delivery_choice(lang, mention, delivery):
+    case = translated_contradiction_case(lang)
     output = deepcopy(case["canonical"])
-    output["questions"][0]["question"] = "На каком языке должна быть готовая страница?"
+    for question, status in ((mention, "FAIL"), (delivery + "?", "PENDING")):
+        output["questions"][0]["question"] = question
+        with pytest.raises(AssertionError, match=status):
+            check_result(case, output)
+    output["questions"][0]["question"] = delivery
     check_result(case, output)
+
+
+def translated_contradiction_case(lang):
+    if lang == "ru":
+        return CASES["AB-894-CTRL-CONTRADICTION-RU"]
+    archive = json.loads(
+        (FIXTURES / "any-894-draft-grounding-live.evidence.json").read_text(encoding="utf-8")
+    )
+    case_id = f"AB-894-CTRL-CONTRADICTION-{lang.upper()}"
+    output = next(run["output"] for run in archive["runs"] if run["case_id"] == case_id)
+    return {**archive["cases"][case_id], "checks": "contradiction", "canonical": output}
 
 
 @pytest.mark.parametrize(
@@ -410,9 +427,10 @@ def test_scope_decisions_require_reviewed_evidence(lang, date_only, scope_choice
         check_result(case, output)
 
 
-def test_fourth_review_outputs_meet_deterministic_product_checks():
+@pytest.mark.parametrize("round_number", [4, 5])
+def test_reviewed_outputs_meet_deterministic_product_checks(round_number):
     archive = json.loads(
-        (FIXTURES / "any-894-review-4-live.evidence.json").read_text(encoding="utf-8")
+        (FIXTURES / f"any-894-review-{round_number}-live.evidence.json").read_text(encoding="utf-8")
     )
     for run in archive["runs"]:
         record = run["record"]

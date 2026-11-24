@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AcceptanceBuilderProduct, checkDefinition, draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
+import { hasAuthoredText } from "../src/products/shared/authoredText";
 import { ACCEPTANCE_BUILDER_MESSAGES } from "../src/products/acceptanceBuilder/messages";
 import {
   DELTA_CRITERIA,
@@ -16,7 +17,7 @@ import {
   VERDICTS,
   extractCheckResult,
   extractDraftResult, composeCopyText, ISSUE_CATEGORIES, LEVELS,
-  hasAuthoredText, hasCriteria,
+  hasCriteria,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
 import {
   errorResponse,
@@ -173,6 +174,17 @@ describe("Acceptance Builder result parsing", () => {
     expect(vectors.text.every(hasAuthoredText)).toBe(true);
   });
 
+  it("matches the pinned Draft schema for every Unicode code point", () => {
+    const { $defs } = schema<{ $defs: { authoredText: { pattern: string } } }>("draft_output.schema.json");
+    const published = new RegExp($defs.authoredText.pattern, "u");
+    for (let code = 0; code <= 0x10ffff; code++) {
+      const character = String.fromCodePoint(code);
+      if (hasAuthoredText(character) !== published.test(character)) {
+        throw new Error(`Authored-text mismatch at U+${code.toString(16)}`);
+      }
+    }
+  });
+
   it("keeps issue links and list positions when historical text is unavailable", () => {
     const output = draftOutput(".weak_input");
     const issues = output.issues as { evidence?: string, description: string }[];
@@ -191,6 +203,20 @@ describe("Acceptance Builder result parsing", () => {
     expect(composeCopyText(extractDraftResult(legacy)!)).toContain("Incomplete saved draft");
     criteria[0] = "\u0085";
     expect(extractDraftResult(legacy)).toBeNull();
+  });
+
+  it("counts only authored criteria in an otherwise readable saved Draft", () => {
+    const legacy = { extracted: draftOutput().extracted };
+    const values = legacy.extracted.values as { acceptance_criteria: string[] };
+    values.acceptance_criteria = ["\u200b"];
+    const incomplete = extractDraftResult(legacy)!;
+    expect(hasCriteria(incomplete)).toBe(false);
+    expect(incomplete.document.summary).toBe("Incomplete saved draft");
+    expect(composeCopyText(incomplete)).not.toContain("\u200b");
+    values.acceptance_criteria.push("Deliver 👩‍💻");
+    const mixed = extractDraftResult(legacy)!;
+    expect(hasCriteria(mixed)).toBe(true);
+    expect(composeCopyText(mixed)).toContain("Deliver 👩‍💻");
   });
 
   it("restores legacy Draft lists without claiming risks were assessed", () => {
@@ -373,7 +399,11 @@ describe("Acceptance Builder page", () => {
     const output = draftOutput(".weak_input");
     const questions = output.questions as { question: string }[];
     questions[0]!.question = "\ufeff";
-    await run("draft", output);
+    const extracted = draftOutput().extracted;
+    const values = extracted.values as { acceptance_criteria: string[] };
+    values.acceptance_criteria = ["\u200b"];
+    const events: ProductRunEvent[] = [];
+    await run("draft", { ...output, extracted }, events);
     const recap = await screen.findByText("Structured recap");
     fireEvent.click(recap);
     expect(recap.closest("details")?.textContent).toContain("Incomplete saved draft");
@@ -382,6 +412,8 @@ describe("Acceptance Builder page", () => {
     const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]![0];
     expect(copied).toContain("Incomplete saved draft");
     expect(copied).toContain("1. Text unavailable in the saved draft.");
+    expect(copied).not.toContain("\u200b");
+    expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: false });
     expect(copied).toContain((output.issues as { description: string }[])[0]!.description);
   });
 

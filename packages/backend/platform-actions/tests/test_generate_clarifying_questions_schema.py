@@ -33,7 +33,12 @@ class TestGenerateClarifyingQuestionsInputSchema:
         )
 
     def test_issue_items_match_detection_output(self) -> None:
-        produced = _schema("issue_detection_output.schema.json")["properties"]["issues"]["items"]
+        output = _schema("issue_detection_output.schema.json")
+        produced = output["properties"]["issues"]["items"]
+        overlay = output["$defs"]["publication"]["properties"]["issues"]["items"]["properties"]
+        for field, constraint in overlay.items():
+            definition = constraint["$ref"].removeprefix("#/$defs/")
+            produced["properties"][field].update(output["$defs"][definition])
         assert QUESTIONS_INPUT["properties"]["issues"]["items"] == produced
 
     def test_full_valid_input(self) -> None:

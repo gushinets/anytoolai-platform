@@ -4,6 +4,8 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from anytoolai_platform_core.common.authored_text import has_authored_text
+
 from ._shared import (
     _coerce_integer_valued,
     _cross_validation_error,
@@ -15,11 +17,8 @@ from ._shared import (
 )
 
 
-_AUTHORED_TEXT = re.compile(r"[^\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]")
-
-
 def _nonblank_string(value: Any) -> bool:
-    return isinstance(value, str) and _AUTHORED_TEXT.search(value) is not None
+    return isinstance(value, str) and has_authored_text(value)
 
 
 _FIELD_TYPE_CHECKS: Mapping[str, Any] = {

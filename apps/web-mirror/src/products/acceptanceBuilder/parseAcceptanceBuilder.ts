@@ -1,6 +1,8 @@
+import { hasAuthoredText } from "../shared/authoredText";
 import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
 import { trimBackendWhitespace } from "../runtime/fieldValidation";
 import { composeDocument } from "./presentation";
+export { hasAuthoredText };
 export { composeCopyText } from "./presentation";
 
 // Acceptance Builder's canonical results (`acceptance_builder.draft_output_v1` / `check_output_v1`)
@@ -62,10 +64,6 @@ function mapAll<T>(items: unknown, map: (item: unknown) => T | null): T[] | null
     out.push(mapped);
   }
   return out;
-}
-
-export function hasAuthoredText(value: string): boolean {
-  return trimBackendWhitespace(value.replaceAll("\ufeff", "")).length > 0;
 }
 
 // A stored Draft v1 used Python's whitespace set, which allowed a BOM on its own.

@@ -214,5 +214,225 @@
   "effed6b355609d8ab898465f9e9b69f5513c0d58ec7d111e27b20da6a47d5daa": {
     "question": "Какой объём работ обязательно должен быть готов к сдаче завтра при бюджете 15 000 рублей, учитывая, что запуск рекламы запланирован на пятницу?",
     "accepted": true
+  },
+  "4a169cc060238c927e5a0c943f4f72905382c5f665293c4e6ae3c64b2dcd0507": {
+    "question": "Какая языковая версия должна войти в результат?",
+    "accepted": true
+  },
+  "4391c8a41bf18aab51a503d0bf82746504f152eea683815c1c6c72579b3c3b1b": {
+    "question": "На каких языках должен быть лендинг: только на русском или на русском и английском?",
+    "accepted": true
+  },
+  "f31d6a9069da679461661e88938a5e1a6690ad569a30ea85df6668b07d7890dd": {
+    "question": "Уточните, пожалуйста: лендинг должен быть только на русском языке или нужны русская и полная английская версии?",
+    "accepted": true
+  },
+  "4288673b3aa1ab14a4d0dff5a187c2a0f0ecc303c49ba1babd5fdd9ea623b6c7": {
+    "question": "Подскажите, лендинг должен быть только на русском языке или иметь также полную английскую версию?",
+    "accepted": true
+  },
+  "b191d3baf8704a959f2fd51571f1cbb3a5d41711ebdef77e5b184e6066a45e5f": {
+    "question": "Should the landing page be Russian-only, or should it have both Russian and full English versions?",
+    "accepted": true
+  },
+  "e6f359e8733d892197d1b553ca25fef274583f7469f1c4c47dc5055a89fa7892": {
+    "question": "Should the landing page be Russian-only, or should it have both Russian and full English versions?",
+    "accepted": true
+  },
+  "67833f1be956a923d025c6b79046f3071b459f60ffd1541349ba30261ad92817": {
+    "question": "Should the landing page be Russian-only, or should it have both Russian and English versions?",
+    "accepted": true
+  },
+  "d19f59d56f523a2180554c2a25b43dc0fb3c7b7baac7365803a1d8e9bca3687e": {
+    "question": "¿La entrega debe incluir únicamente la página en ruso o también una versión completa en inglés?",
+    "accepted": true
+  },
+  "d6ef2a9aa925aeab326d0113226032a21cc57d078f0dd675dd1477728dc207c6": {
+    "question": "¿Debemos entregar la página solo en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "b39aa74f1e211448048fdcad8fc26caf0d15739a87e8877cb025da0c44b9ef0a": {
+    "question": "¿Debemos entregar la página solo en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "1671ac5967a8dc1d29609105c05ff4717b845be9ffe013b12c1c859f345d4505": {
+    "question": "Какой вариант выбираете: лендинг только на русском языке или лендинг на русском с полной английской версией?",
+    "accepted": true
+  },
+  "a1a62e7b674b56a48c8acec8230b11f2679507adfae0baf0c32a843be245185c": {
+    "question": "Какой языковой вариант лендинга вы выбираете: только на русском языке или на русском с полной английской версией?",
+    "accepted": true
+  },
+  "ac16c107838df9b1b74e6a97718b97bbdd80fd931cb8b1bc65aa011e91a19348": {
+    "question": "Какой вариант нужно реализовать: лендинг только на русском языке или лендинг на русском с полной английской версией?",
+    "accepted": true
+  },
+  "5d40c2fdc6faa94d74534b5b17efadb3fe1bada8e23ba4304983e8f13dab5dd8": {
+    "question": "Should the landing page be Russian-only, or should it have both Russian and full English versions?",
+    "accepted": true
+  },
+  "ad101e10f858363c913a533e8648fa51f6557f268dfc2b7f52a206736983257d": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "ee288088ee99b348d929fb29427b99717d6f4468d7223f267bb3413e6a338909": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "a7572772292701ce800526e01a694e1b6a6d7a933ac56a049628871d6d26b297": {
+    "question": "¿La página debe entregarse solo en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "58f89a623c2f14130695b0d69f302ebefc4016670e2bec62c91a4a18c95ef0d7": {
+    "question": "¿Debemos entregar la página únicamente en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "df8453be568d13130c06defdbb5edf876e7609af6730e43abc8effb1c4a91b41": {
+    "question": "¿Debemos entregar la página solo en ruso o en ruso e inglés?",
+    "accepted": true
+  },
+  "49ba475ae86706b11b26f8b920a34ac0c701a5c8afcc050f4e8f05d8d664c291": {
+    "question": "Какой вариант требуется: лендинг только на русском языке или лендинг с русской и полной английской версиями?",
+    "accepted": true
+  },
+  "734290ed8991b5aa60b5a05854d3c7220c10051c6a5c9916ae5e0328174272da": {
+    "question": "Какой вариант лендинга нужно сделать: только на русском языке или с полной английской версией?",
+    "accepted": true
+  },
+  "85fe0c6bb839d691c2f1ef11b45277cf23e2aea51f0164cf3bb073cec1fc0069": {
+    "question": "Какой вариант лендинга вы выбираете: только на русском языке или с полной английской версией?",
+    "accepted": true
+  },
+  "e28f3e08d59f25c6cd895a31aea3503658200ea5835251737c59cd75dcdd067b": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "90357f6c7bdbc45fd53521eeead2f63a88fa8a1267aa9fb927522f96449afe13": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "3bc08195136fc655959779cd812840467aad0a1df90356528dd6eb751eb7eb1f": {
+    "question": "Should the landing page be Russian-only, or should it have both Russian and full English versions?",
+    "accepted": true
+  },
+  "398a33a0bf88359b2753dab0786a4194edea7a0183fd985206c027d7e6c2136a": {
+    "question": "¿Desean que la página esté solo en ruso o que se entregue en ruso y con una versión completa en inglés?",
+    "accepted": true
+  },
+  "cdc607fc7f5ae38821a821da36a15b740db72fdc4863611250deb2b0e467e286": {
+    "question": "¿Desean que la página esté solo en ruso o que se entregue en ruso y también con una versión completa en inglés?",
+    "accepted": true
+  },
+  "a153f28ac6df8f8e822447a80181acfdb3d70501ae6ea087590da475a00e5191": {
+    "question": "¿La entrega debe incluir la página solo en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "750ded230941c28fa370af2612fed22445b9bd48d049b95cb0b62d84964c58ae": {
+    "question": "Какой вариант нужно реализовать: страницу только на русском языке или страницу на русском языке с полной английской версией?",
+    "accepted": true
+  },
+  "52e429f4097125c871c25c612a6c4446104182b3b8aa4d8f0620f75883379992": {
+    "question": "Какой вариант нужно реализовать: лендинг только на русском языке или лендинг на русском языке с полной английской версией?",
+    "accepted": true
+  },
+  "4e77d4042799dafe4aff0ab36f481e3b347dee4553df5625192e4eca31dca063": {
+    "question": "Какой вариант выбираете: страница только на русском языке или страница на русском с полной английской версией?",
+    "accepted": true
+  },
+  "5870c3c1c50112130c6e86c18a9d71defd3bccbc1a0ea91ee569da973e5f724a": {
+    "question": "Какой язык здесь упоминается?",
+    "accepted": false
+  },
+  "cedf07e1398bacd627ddda763efabd80ba8e14be4cd8bd171247fd0eaf6191fd": {
+    "question": "На каком языке должна быть готовая страница?",
+    "accepted": true
+  },
+  "2e80f9a605332f0a268bf8459bb349648074303d2baf706b4a940afcb275c699": {
+    "question": "Which language is mentioned here?",
+    "accepted": false
+  },
+  "56de17d4074082e27ddd514ef2406d9856a83c8c016c580c1df47ec3547cb011": {
+    "question": "Which language should we deliver the page in?",
+    "accepted": true
+  },
+  "146fd85fed0c3efb015836f5d1de301c53aca685e8f3406013944b92ee4080c4": {
+    "question": "¿Qué idioma se menciona aquí?",
+    "accepted": false
+  },
+  "bc1bce77e2655f7e86508595e4012ebdd95ab5cf7695a428f9b800a33979a9bd": {
+    "question": "¿En qué idioma debemos entregar la página?",
+    "accepted": true
+  },
+  "f0624e0b7bf058e1b711f19dc5393c997a59622ead2772297ce265a0cf1dd208": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles?",
+    "accepted": true
+  },
+  "510c1005606e8398a94ae13d713de551d45bdb4f2b781cddee54c40d0ae0698b": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles?",
+    "accepted": true
+  },
+  "e783c2bed37d18cb021e449809e70af2980d00fb32fb3484060be80bd2632981": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: the 500 products, customer accounts, online payment and 1C integration?",
+    "accepted": true
+  },
+  "9bf2ee425ac431c651bbaf6dbc36f96763b799f70ab19c4e13947b079a6d8237": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué partes de la tienda deben estar listas para la entrega de mañana: los 500 productos, las cuentas de cliente, el pago en línea y la integración con 1C?",
+    "accepted": true
+  },
+  "7cee9ca634d807b81c731559ee8b011c19fc1cd828189869989559b7f874071d": {
+    "question": "¿Qué parte del encargo debe quedar terminada para la entrega de mañana con el presupuesto de 15 000 rublos?",
+    "accepted": true
+  },
+  "8f34bf3e8a83ffe57bcd39dd9cb9b256b93544801a13716534e80691c9935f3e": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué parte de la tienda necesitáis que esté lista para la entrega de mañana, teniendo en cuenta que la publicidad empieza el viernes?",
+    "accepted": true
+  },
+  "9bdc93865c1b6e5b037f7be3c697ec341f0aa2fe0d7dd7bf1253103f5daa0366": {
+    "question": "Какой объём магазина должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая запуск рекламы в пятницу?",
+    "accepted": true
+  },
+  "cecdb38735d2e0e5aca5a3556b1b85b2dd74f09d4ffff1a5f47f0033dc8c88f1": {
+    "question": "Какой состав работ должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей с учётом запуска рекламы в пятницу?",
+    "accepted": true
+  },
+  "519574ebcebbbc4500165c30cea02be991e1e2241ca5be7612b0bb2ed796842c": {
+    "question": "Какой объём магазина должен быть полностью готов к сдаче завтра в рамках бюджета 15 000 рублей: все 500 товаров, личный кабинет, онлайн-оплата и интеграция с 1С или выбранная вами часть этого объёма?",
+    "accepted": true
+  },
+  "0a1980e6a8d0109cb7226389092ec9594ea4bcf3e5c7484326aae3b7af6d9ea3": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "c6b29c11c820fd1687bb279be5f5e139c6931601af7960cc8376e4dcb51beec6": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "feb5e454bba45c7dc4e66c31acd95b3bb3f81620f71d69c5a5eb2cc0c0853450": {
+    "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+    "accepted": true
+  },
+  "8fbe16e74f734dae52241d9bfecf5a3535c7406d3c82c9d21a2134bd0424f01b": {
+    "question": "¿Desean que la página esté solo en ruso o que se entregue en ruso y con una versión completa en inglés?",
+    "accepted": true
+  },
+  "f8940166c704504b6b42cd593579981d160c89ce1974fdf4ea19926ca1ad562d": {
+    "question": "¿Debemos entregar la página solo en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "99a9b2b78d45ce1401fea822925d0f6556869be062a8c60355dbda1397a6e28c": {
+    "question": "¿La página debe entregarse solo en ruso o en ruso con una versión completa en inglés?",
+    "accepted": true
+  },
+  "2f0c67935d884a651eede124da79b09450f5b237216540bfc5efd0fa2d97b21e": {
+    "question": "Какой вариант нужно реализовать: лендинг только на русском языке или лендинг с русской и полной английской версиями?",
+    "accepted": true
+  },
+  "a37aecc0e66196981d0ec041a06f3e7914a63b3b8c0a9540a1f36cf9fc78a479": {
+    "question": "Какой вариант нужно реализовать: лендинг только на русском языке или лендинг с русской и полной английской версиями?",
+    "accepted": true
+  },
+  "85365fc8ee13bd6e7dbed004a7a30e775daadda30576dc2a41c5250e440bb325": {
+    "question": "Какой вариант нужно реализовать: страницу только на русском языке или страницу на русском с полной английской версией?",
+    "accepted": true
   }
 }

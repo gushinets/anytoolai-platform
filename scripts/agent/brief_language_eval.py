@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from draft_risk_review import scope_questions
+from draft_risk_review import DECISION_FIELDS, decision_questions
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -136,9 +136,10 @@ def authored_fields(output: dict) -> dict[str, str]:
 
 
 def review_template(record: dict) -> dict:
+    decision_field = DECISION_FIELDS.get(record["case"].get("family"))
     return {
         "evidence_sha256": digest(record),
-        **({"scope_question": None} if record["case"].get("family") == "feasibility" else {}),
+        **({decision_field: None} if decision_field else {}),
         "reviewer": "",
         "fields": {path: None for path in authored_fields(record.get("output") or {})},
         "criteria": {question: None for question in record["case"]["criteria"]},
@@ -240,11 +241,18 @@ def review_status(record: dict, review: dict) -> str:
         or None in decisions
     ):
         return "PENDING"
-    if record["case"].get("family") == "feasibility":
-        eligible = scope_questions(record["output"], record["case"]["expected_language"])
+    family = record["case"].get("family")
+    if family in DECISION_FIELDS:
+        eligible = decision_questions(record["output"], family, record["case"]["expected_language"])
         if not eligible:
             return "FAIL"
-        if review.get("scope_question") not in [q["question"] for q in eligible]:
+        field = DECISION_FIELDS[family]
+        quotes = [q["question"] for q in eligible]
+        if field in review or family == "feasibility":
+            if review.get(field) not in quotes:
+                return "PENDING"
+        # Earlier contradiction reviews recorded the exact linked quotation at the end of notes.
+        elif not any(quote and review.get("notes", "").endswith(quote) for quote in quotes):
             return "PENDING"
     return "PASS"
 

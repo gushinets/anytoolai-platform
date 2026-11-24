@@ -59,6 +59,8 @@ from anytoolai_platform_core.structured_output.errors import (
     STRUCTURED_OUTPUT_VALIDATION_SAFE_MESSAGE,
     StructuredOutputValidationError,
 )
+from anytoolai_platform_core.structured_output.schemas import normalize_mapping
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -345,9 +347,9 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
     assert provider_request.correlation_id == "corr-456"
     assert provider_request.semantic_attempt_index == 1
     assert "Budget and timeline details" in provider_request.prompt
-    assert provider_request.response_schema == registry.get_schema(
-        "kernel.schemas.extract_output_v1"
-    ).schema
+    assert provider_request.response_schema == normalize_mapping(
+        registry.get_schema("kernel.schemas.extract_output_v1").schema
+    )
 
 
 def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() -> None:
@@ -943,7 +945,12 @@ def test_structured_llm_executor_retries_on_invalid_date_with_actionable_feedbac
     )
 
 
-def test_structured_llm_executor_finalize_cross_validation_uses_resolved_action_type() -> None:
+@pytest.mark.parametrize(
+    ("category", "description"),
+    [("not_in_taxonomy", "d"), ("timeline", "\u200b")],
+    ids=["taxonomy", "publication-schema"],
+)
+def test_structured_llm_executor_finalize_rejects_exhausted_output(category, description) -> None:
     """ANY-251 regression: the retry loop resolves the cross-validator via
     `action_config.action_type`, but `_finalize_response` used to look it up via
     `request.action_type` instead -- a different field that direct executor callers are not
@@ -952,10 +959,9 @@ def test_structured_llm_executor_finalize_cross_validation_uses_resolved_action_
     validator resolved from the action config, not silently skip it and let an already-exhausted,
     taxonomy-violating response be accepted as a successful final output."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = _FixedResponseSpyGateway(
-        '{"issues": [{"category": "not_in_taxonomy", '
-        '"description": "d", "severity": "high"}]}'
-    )
+    spy_gateway = _FixedResponseSpyGateway(json.dumps({
+        "issues": [{"category": category, "description": description, "severity": "high"}]
+    }))
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,

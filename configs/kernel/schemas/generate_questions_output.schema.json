@@ -9,13 +9,11 @@
         "properties": {
           "question": {
             "type": "string",
-            "minLength": 1,
-            "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+            "minLength": 1
           },
           "rationale": {
             "type": "string",
-            "minLength": 1,
-            "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+            "minLength": 1
           },
           "priority": {
             "type": "string",
@@ -32,6 +30,28 @@
         },
         "required": ["question", "rationale", "priority", "category", "source_issue_index"],
         "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "authoredText": {
+      "type": "string",
+      "pattern": "[^\\u0000-\\u0020\\u007f-\\u00a0\\u00ad\\u034f\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u115f-\\u1160\\u1680\\u17b4-\\u17b5\\u180b-\\u180f\\u2000-\\u200f\\u2028-\\u202f\\u205f-\\u206f\\u3000\\u3164\\ufe00-\\ufe0f\\ufeff\\uffa0\\ufff0-\\ufffb\ud804\udcbd\ud804\udccd\ud80d\udc30-\ud80d\udc3f\ud82f\udca0-\ud82f\udca3\ud834\udd73-\ud834\udd7a\udb40\udc00-\udb43\udfff]"
+    },
+    "publication": {
+      "properties": {
+        "questions": {
+          "items": {
+            "properties": {
+              "question": {
+                "$ref": "#/$defs/authoredText"
+              },
+              "rationale": {
+                "$ref": "#/$defs/authoredText"
+              }
+            }
+          }
+        }
       }
     }
   },

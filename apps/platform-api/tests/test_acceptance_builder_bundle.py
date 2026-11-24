@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import re
 from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
@@ -28,12 +29,16 @@ import sqlalchemy as sa
 from anytoolai_platform_actions.structured_llm.cross_validation import extract_structured_fields
 from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.common.authored_text import has_authored_text
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.errors import StructuredOutputSchemaMismatchError
-from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
+from anytoolai_platform_core.structured_output.schemas import (
+    normalize_schema_mapping,
+    publication_schema,
+)
 from anytoolai_platform_core.structured_output.validator import validate_structured_output_value
 from anytoolai_platform_core.workflows.models import JobStatus
 from anytoolai_platform_core.workflows.repository import JobRepository
@@ -515,9 +520,9 @@ def test_draft_happy_path_composes_the_structured_result(
     }
 
 
-@pytest.mark.parametrize("stored_bom", [False, True])
+@pytest.mark.parametrize("stored_text", [None, "\ufeff", "\u200b"])
 def test_result_api_reopens_persisted_draft_v1(
-    app: Any, request_platform_api, session_factory: SessionFactory, stored_bom: bool
+    app: Any, request_platform_api, session_factory: SessionFactory, stored_text: str | None
 ) -> None:
     started, _ = _run_to_result(
         app,
@@ -532,9 +537,9 @@ def test_result_api_reopens_persisted_draft_v1(
     )
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     legacy_output = evidence["runs"][0]["output"]
-    if stored_bom:
+    if stored_text is not None:
         legacy_output = _expected_output(DRAFT, ".weak_input")
-        legacy_output["questions"][0]["question"] = "\ufeff"
+        legacy_output["questions"][0]["question"] = stored_text
     with transaction_boundary(session_factory) as session:
         jobs = JobRepository(session)
         job = jobs.get(started["job_id"])
@@ -631,6 +636,9 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
         (EXTRACT, "deliverables", [], True),
         (EXTRACT, "deliverables", ["  "], True),
         (EXTRACT, "analysis_language", "ru_RU", True),
+        (EXTRACT, "acceptance_criteria", ["\u200b"], True),
+        (DETECT, "evidence", "\u2067\u2069", True),
+        (QUESTIONS, "rationale", "\U000e0100", False),
         (DETECT, "description", " ", True),
         (DETECT, "evidence", "\t", True),
         (QUESTIONS, "question", "\n", True),
@@ -668,16 +676,16 @@ def test_draft_retries_invalid_atom_before_publishing(
         **registry.provider_policies,
         fake.provider_policy_ref: replace(fake, retry_policy=live_retry),
     }
-    adapter = InvalidOutputAdapter(
-        FIXTURE_ROOT, variants={step: ".weak_input" for step in STEPS[DRAFT]}
-    )
+    suffix = "" if field == "acceptance_criteria" else ".weak_input"
+    brief = WEAK_BRIEF_TEXT if suffix else BRIEF_TEXT
+    adapter = InvalidOutputAdapter(FIXTURE_ROOT, variants={step: suffix for step in STEPS[DRAFT]})
     worker = build_worker(
         session_factory=session_factory,
         config_root=CONFIG_ROOT,
         config_registry=replace(registry, provider_policies=policies),
         provider_adapters={"fake": adapter},
     )
-    started = _start(app, request_platform_api, DRAFT, {"brief_text": WEAK_BRIEF_TEXT}).json()
+    started = _start(app, request_platform_api, DRAFT, {"brief_text": brief}).json()
     try:
         job = asyncio.run(worker.process_job(started["job_id"]))
     finally:
@@ -697,7 +705,7 @@ def test_draft_retries_invalid_atom_before_publishing(
             )
         )
         assert response.status_code == HTTPStatus.OK
-        assert response.json()["output"] == _expected_output(DRAFT, ".weak_input")
+        assert response.json()["output"] == _expected_output(DRAFT, suffix)
     else:
         assert job.status is JobStatus.failed
         assert job.result_artifact_id is None
@@ -782,33 +790,47 @@ def test_output_rejects_independent_contradictory_recap(language, scenario):
         jsonschema.validate(output, schema)
 
 
-def test_atom_and_publication_text_contracts_share_the_unicode_boundary():
-    vectors = json.loads(
-        (REPO_ROOT / "tests/fixtures/acceptance_builder_eval/authored_text.json").read_text()
-    )
+def test_python_and_published_authored_text_match_for_every_code_point():
     schema = _schema(OUTPUT_SCHEMA_REFS[DRAFT])
-    publication = jsonschema.Draft202012Validator({**schema, "$ref": "#/$defs/publication"})
+    pattern = re.compile(schema["$defs"]["authoredText"]["pattern"])
+    for code in range(0x110000):
+        character = chr(code)
+        assert has_authored_text(character) == bool(pattern.search(character)), hex(code)
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "section", "fields"),
+    [
+        ("issue_detection_output", "issues", ("description", "evidence")),
+        ("generate_questions_input", "issues", ("description", "evidence")),
+        ("generate_questions_output", "questions", ("question", "rationale")),
+        ("draft", "questions", ("question", "rationale")),
+    ],
+)
+def test_atom_and_publication_text_contracts_share_the_unicode_boundary(
+    schema_name, section, fields
+):
+    fixture = REPO_ROOT / "tests/fixtures/acceptance_builder_eval/authored_text.json"
+    vectors = json.loads(fixture.read_text(encoding="utf-8"))
     draft = _expected_output(DRAFT, ".weak_input")
-    validators = [
-        jsonschema.Draft202012Validator(
-            json.loads((CONFIG_ROOT / f"schemas/{name}.schema.json").read_text())["properties"][
-                section
-            ]["items"]["properties"][field]
-        )
-        for name, section, fields in (
-            ("issue_detection_output", "issues", ("description", "evidence")),
-            ("generate_questions_input", "issues", ("description", "evidence")),
-            ("generate_questions_output", "questions", ("question", "rationale")),
-        )
-        for field in fields
-    ]
+    if schema_name == "draft":
+        schema = _schema(OUTPUT_SCHEMA_REFS[DRAFT])
+        payload = draft
+    else:
+        path = CONFIG_ROOT / f"schemas/{schema_name}.schema.json"
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        payload = {section: draft[section]}
+        if schema_name == "generate_questions_input":
+            payload.update(context="brief", target_audience="client")
+    validator = jsonschema.Draft202012Validator(publication_schema(schema))
+    first, *rest = payload[section]
     for kind, samples in vectors.items():
+        expected = kind == "text"
         for sample in samples:
-            expected = kind == "text"
             assert extract_structured_fields._nonblank_string(sample) == expected
-            assert all(v.is_valid(sample) == expected for v in validators)
-            draft["questions"][0]["question"] = sample
-            assert publication.is_valid(draft) == expected
+            for field in fields:
+                modified = {**payload, section: [{**first, field: sample}, *rest]}
+                assert validator.is_valid(modified) == expected, (field, ascii(sample))
 
 
 def test_workflow_refuses_to_publish_blank_text_from_final_mapping(
@@ -818,7 +840,7 @@ def test_workflow_refuses_to_publish_blank_text_from_final_mapping(
 
     def select_with_blank_text(runner, state):
         payload, source = select_output(runner, state)
-        payload["extracted"]["values"]["deliverables"][0] = "\ufeff"
+        payload["extracted"]["values"]["deliverables"][0] = "\u200b"
         return payload, source
 
     monkeypatch.setattr(SequentialWorkflowRunner, "_select_final_output", select_with_blank_text)

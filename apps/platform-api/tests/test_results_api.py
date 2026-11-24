@@ -44,6 +44,9 @@ def session_factory() -> Iterator[SessionFactory]:
 def _seed_result(
     session,
     *,
+    workflow_id: str = WORKFLOW_ID,
+    schema_ref: str = SCHEMA_REF,
+    scenario_id: str = "kernel_demo.handoff_smoke_source_v1",
     tenant_id: str = "anytoolai",
     region: str = "ru",
     artifact_type: str = "structured_output",
@@ -58,7 +61,7 @@ def _seed_result(
             region=region,
             product_id="kernel_demo",
             frontend_id="kernel_demo_ce",
-            scenario_id="kernel_demo.handoff_smoke_source_v1",
+            scenario_id=scenario_id,
             scenario_version=1,
             guest_id="guest_demo",
             status=ScenarioSessionStatus.completed,
@@ -74,7 +77,7 @@ def _seed_result(
             product_id=scenario.product_id,
             frontend_id=scenario.frontend_id,
             scenario_session_id=scenario.id,
-            workflow_id=WORKFLOW_ID,
+            workflow_id=workflow_id,
             workflow_version=WORKFLOW_VERSION,
         )
     )
@@ -82,7 +85,7 @@ def _seed_result(
     assert job is not None
     metadata = {
         "artifact_role": "workflow_result",
-        "schema_ref": SCHEMA_REF,
+        "schema_ref": schema_ref,
         "schema_version": SCHEMA_VERSION,
         "workflow_id": job.workflow_id,
         "workflow_version": job.workflow_version,
