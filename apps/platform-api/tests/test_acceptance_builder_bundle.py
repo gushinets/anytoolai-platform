@@ -29,7 +29,7 @@ from anytoolai_platform_api.bootstrap import build_runtime
 from anytoolai_platform_core.artifacts.repository import ArtifactRepository
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
-from anytoolai_platform_core.storage.db import event_log_table, jobs_table, provider_calls_table
+from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.errors import StructuredOutputSchemaMismatchError
 from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
@@ -260,7 +260,9 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes(scenario_id:
         invalid.update(_comparison_mutations(valid))
     else:
         question = _fixture(QUESTIONS)["questions"][0]
+        jsonschema.validate({"extracted": valid["extracted"]}, schema)
         invalid["missing_issues"] = _mutated(valid, lambda o: o.pop("issues"))
+        invalid["missing_questions"] = _mutated(valid, lambda o: o.pop("questions"))
         invalid["unknown_question_key"] = dict(valid, questions=[dict(question, extra=True)])
         invalid["too_many_questions"] = dict(valid, questions=[question] * 6)
     for name, candidate in invalid.items():
@@ -505,7 +507,7 @@ def test_draft_happy_path_composes_the_structured_result(
     }
 
 
-def test_result_api_reopens_persisted_draft_v1_without_relaxing_current_validation(
+def test_result_api_reopens_persisted_draft_v1(
     app: Any, request_platform_api, session_factory: SessionFactory
 ) -> None:
     started, _ = _run_to_result(
@@ -525,36 +527,17 @@ def test_result_api_reopens_persisted_draft_v1_without_relaxing_current_validati
         jobs = JobRepository(session)
         job = jobs.get(started["job_id"])
         assert job is not None and job.result_artifact_id is not None
+        assert job.workflow_version == 1
         artifacts = ArtifactRepository(session)
         artifact = artifacts.get(job.result_artifact_id)
         assert artifact is not None
         artifacts.update(replace(artifact, content_json=legacy_output))
 
-    def fetch_result() -> httpx.Response:
-        return asyncio.run(
-            request_platform_api(
-                app, "GET", f"/v1/results/{artifact.id}", request_id="req_legacy_draft_result"
-            )
+    response = asyncio.run(
+        request_platform_api(
+            app, "GET", f"/v1/results/{artifact.id}", request_id="req_legacy_draft_result"
         )
-
-    rejected = fetch_result()
-    assert rejected.status_code == HTTPStatus.NOT_FOUND
-    assert rejected.json()["error"]["code"] == "result_artifact_unavailable"
-
-    with transaction_boundary(session_factory) as session:
-        # Seed the old persisted version. The repository prevents changing a running job's contract.
-        session.execute(
-            sa.update(jobs_table).where(jobs_table.c.id == job.id).values(workflow_version=1)
-        )
-        ArtifactRepository(session).update(
-            replace(
-                artifact,
-                content_json=legacy_output,
-                metadata={**artifact.metadata, "workflow_version": 1},
-            )
-        )
-
-    response = fetch_result()
+    )
     assert response.status_code == HTTPStatus.OK, response.text
     result = response.json()
     assert result["workflow_version"] == 1

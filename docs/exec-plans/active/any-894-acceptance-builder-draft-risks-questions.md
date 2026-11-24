@@ -96,3 +96,30 @@ description in the open recap and clipboard.
 Validation passed for 217 focused Python tests, 36 PostgreSQL Result API tests, 1,142 web tests,
 11 browser smoke tests, frontend typecheck and lint for the changed files, config and architecture
 validation, generated docs, and Acceptance Builder deployment profile generation.
+
+## Second review fixes
+
+1. Keep the Draft workflow, scenario and schema at v1. Accept both complete payload shapes in the
+   public Draft schema. The active workflow always writes both issue and question lists.
+2. Pass the A04 taxonomy to A05 in Acceptance Builder and Brief Decoder to validate category values
+   before composing the final result.
+3. Record which builds can reopen drafts after the preview is rolled back.
+
+### Rollback boundary
+
+The old Acceptance Builder API validates results against a closed schema that only has
+`extracted`. Returning to that API with the same database makes Drafts saved by this change
+unavailable, even when both new arrays are empty. A workflow version change cannot resolve this
+schema mismatch. If the preview must roll back after accepting Drafts, retain its database and
+use a build with the compatible Draft result schema to serve them. If the original API must be
+restored, use the verified pre-release backup in a separate database and retain the candidate
+database for recovery of results saved after the backup. See the
+[release rollback procedure](../../../infra/deployment/vps-release-runbook.md).
+
+The current schema accepted both captured historical results and all 18 enriched results. The
+pre-change schema rejected all 18 enriched results. The Result API regression replayed the
+historical payload under workflow v1. The A05 regression returned an unknown category on the
+first provider response and verified that the next semantic attempt produced a valid result.
+
+Backend validation passed with 2,458 tests and six skips. Config, architecture, docs and
+generated-doc checks also passed.

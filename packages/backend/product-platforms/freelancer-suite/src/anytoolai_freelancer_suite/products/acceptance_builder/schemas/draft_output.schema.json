@@ -362,11 +362,11 @@
       }
     }
   },
-  "required": [
-    "extracted",
-    "issues",
-    "questions"
-  ],
+  "required": ["extracted"],
+  "dependentRequired": {
+    "issues": ["questions"],
+    "questions": ["issues"]
+  },
   "additionalProperties": false,
   "$defs": {}
 }

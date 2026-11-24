@@ -1810,23 +1810,6 @@ class ConfigLoader:
                     path=path,
                 )
 
-                historical_refs = workflow_data.get("historical_output_schema_refs", {})
-                if not isinstance(historical_refs, dict) or any(
-                    not isinstance(previous_version, str)
-                    or re.fullmatch(r"[1-9][0-9]*", previous_version) is None
-                    or not isinstance(version, int)
-                    or int(previous_version) >= version
-                    or not isinstance(ref, str)
-                    or not ref.strip()
-                    for previous_version, ref in historical_refs.items()
-                ):
-                    raise InvalidConfigShapeError(
-                        path,
-                        "Historical output schemas must map quoted earlier versions to schema refs",
-                        config_id=workflow_id,
-                        ref_type="historical_output_schema_refs",
-                    )
-
                 self._reject_forbidden_raw_llm_fields(
                     payload=workflow_data,
                     file_path=path,
@@ -1901,7 +1884,6 @@ class ConfigLoader:
                     input_schema_ref=input_schema_ref,
                     output_schema_ref=output_schema_ref,
                     steps=steps,
-                    historical_output_schema_refs=historical_refs,
                     metadata={"_file_path": str(path)},
                 )
                 self._remember_source("workflow", workflow_id, path)
@@ -2427,13 +2409,6 @@ class ConfigLoader:
                 ref_type="output_schema_ref",
                 ref_value=workflow.output_schema_ref,
             )
-            for historical_ref in workflow.historical_output_schema_refs.values():
-                self._validate_schema_ref(
-                    config_id=workflow_id,
-                    file_path=source_path,
-                    ref_type="historical_output_schema_refs",
-                    ref_value=historical_ref,
-                )
             for step in workflow.steps:
                 self._validate_reference(
                     config_id=workflow_id,

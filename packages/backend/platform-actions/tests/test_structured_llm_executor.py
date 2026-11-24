@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import tomllib
 from dataclasses import replace
 from pathlib import Path
@@ -720,17 +721,32 @@ def test_structured_llm_executor_retries_generate_gap_rewrites_on_cross_validati
     ]
 
 
-def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_validation_failure() -> (
-    None
-):
-    """A05 out-of-bounds source_issue_index must get the same semantic retry as any other
-    cross-validation failure, with deterministic physical provider-call accounting."""
+@pytest.mark.parametrize(
+    ("invalid_question_fields", "taxonomy"),
+    [
+        pytest.param({"source_issue_index": 5}, {}, id="out-of-bounds-index"),
+        pytest.param(
+            {"category": "certificate_content"},
+            {"taxonomy": ["timeline", "scope"]},
+            id="unknown-taxonomy-category",
+        ),
+    ],
+)
+def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_validation_failure(
+    invalid_question_fields: dict[str, Any], taxonomy: dict[str, list[str]]
+) -> None:
+    """A05 retries invalid fields before publishing the action's structured output."""
     registry = build_config_registry(CONFIG_ROOT)
+    question = {
+        "question": "q",
+        "rationale": "r",
+        "priority": "high",
+        "category": "timeline",
+        "source_issue_index": 0,
+    }
     spy_gateway = _TwoAttemptSpyGateway(
-        '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
-        '"category": "timeline", "source_issue_index": 5}]}',
-        '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
-        '"category": "timeline", "source_issue_index": 0}]}',
+        json.dumps({"questions": [{**question, **invalid_question_fields}]}),
+        json.dumps({"questions": [question]}),
     )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
@@ -768,23 +784,14 @@ def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_
             "issues": [{"category": "timeline", "description": "d", "severity": "high"}],
             "context": "context",
             "target_audience": "audience",
+            **taxonomy,
         },
     )
     session = object()
 
     response = asyncio.run(executor.execute(request, session=session))
 
-    assert response.structured_output == {
-        "questions": [
-            {
-                "question": "q",
-                "rationale": "r",
-                "priority": "high",
-                "category": "timeline",
-                "source_issue_index": 0,
-            }
-        ]
-    }
+    assert response.structured_output == {"questions": [question]}
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
         2,

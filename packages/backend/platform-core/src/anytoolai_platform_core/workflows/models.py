@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -45,7 +44,6 @@ class WorkflowDefinition:
     steps: list[WorkflowStepDefinition]
     schema_version: int = 1
     metadata: dict[str, Any] = field(default_factory=dict)
-    historical_output_schema_refs: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

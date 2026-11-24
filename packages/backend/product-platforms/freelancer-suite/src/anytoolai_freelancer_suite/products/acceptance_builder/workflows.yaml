@@ -1,10 +1,8 @@
 workflows:
 - workflow_id: acceptance_builder.draft_v1
-  version: 2
+  version: 1
   input_schema_ref: acceptance_builder.draft_input_v1
   output_schema_ref: acceptance_builder.draft_output_v1
-  historical_output_schema_refs:
-    "1": acceptance_builder.draft_legacy_output_v1
   steps:
   - step_id: extract
     action_config_id: acceptance_builder.extract_v1
@@ -25,7 +23,7 @@ workflows:
     action_config_id: acceptance_builder.detect_issues_v1
     input_mapping:
       source_text: scenario.input.brief_text
-      taxonomy: 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction"]'
+      taxonomy: &issue_taxonomy 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction"]'
     output_mapping:
       context.workflow_output.issues: steps.detect_issues.output.issues
       # A05 requires at least one issue; seed the empty default it overrides below.
@@ -36,6 +34,7 @@ workflows:
     when: steps.detect_issues.output.issues
     input_mapping:
       issues: steps.detect_issues.output.issues
+      taxonomy: *issue_taxonomy
       context: scenario.input.brief_text
       target_audience: 'literal:"the client who wrote the brief"'
       max_questions: 'literal:5'

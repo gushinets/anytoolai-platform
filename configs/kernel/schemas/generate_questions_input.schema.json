@@ -36,6 +36,15 @@
       "type": "string",
       "minLength": 1
     },
+    "taxonomy": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "max_questions": {
       "type": "integer",
       "minimum": 1,

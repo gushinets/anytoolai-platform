@@ -68,18 +68,10 @@ def resolve_canonical_workflow_result(
     ):
         raise CanonicalArtifactError("artifact is not a canonical workflow result")
 
-    # The persisted workflow version can select an older shape for the same public schema.
-    historical_ref = workflow.historical_output_schema_refs.get(str(job.workflow_version))
-    validation_schema = (
-        schema if historical_ref is None else config_registry.get_schema(historical_ref)
-    )
-    if validation_schema is None:
-        raise CanonicalArtifactError("artifact's historical output schema is unavailable")
-
     try:
         validated = validate_structured_output_value(
             artifact.content_json,
-            schema=validation_schema.schema,
+            schema=schema.schema,
             schema_ref=schema.schema_ref,
             schema_version=schema.version,
         )

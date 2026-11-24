@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import Field
 
@@ -30,4 +31,3 @@ class WorkflowDefinition(ContractModel):
     input_schema_ref: str
     output_schema_ref: str
     steps: list[WorkflowStepDefinition]
-    historical_output_schema_refs: dict[str, str] = Field(default_factory=dict)

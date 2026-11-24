@@ -193,7 +193,12 @@ def test_every_step_writes_its_own_key_of_the_composed_workflow_output(workflow_
         assert len(keys) == len(targets) - 1
     else:
         assert len(keys) == len(targets)
-    assert keys == set(schema["properties"]) == set(schema["required"])
+    assert keys == set(schema["properties"])
+    if workflow_id == DRAFT:
+        assert schema["required"] == ["extracted"]
+        assert schema["dependentRequired"] == {"issues": ["questions"], "questions": ["issues"]}
+    else:
+        assert keys == set(schema["required"])
 
 
 def test_config_owned_literals_agree_with_the_output_schemas() -> None:
@@ -321,6 +326,7 @@ def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas(
     steps = _steps(DRAFT)
     props = draft["properties"]
     taxonomy = _literal(steps["detect_issues"]["input_mapping"]["taxonomy"])
+    assert _literal(steps["generate_questions"]["input_mapping"]["taxonomy"]) == taxonomy
     for field, atom in (("issues", "issue_detection"), ("questions", "generate_questions")):
         item = props[field]["items"]
         kernel = _load_schema(f"kernel.schemas.{atom}_output_v1")

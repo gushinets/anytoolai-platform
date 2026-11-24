@@ -39,6 +39,7 @@ class TestGenerateClarifyingQuestionsInputSchema:
                 "context": "Client project kickoff conversation.",
                 "target_audience": "client stakeholder",
                 "max_questions": 3,
+                "taxonomy": ["timeline", "scope"],
             },
             schema=QUESTIONS_INPUT,
         )

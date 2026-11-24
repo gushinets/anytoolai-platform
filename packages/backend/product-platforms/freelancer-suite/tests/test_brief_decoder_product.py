@@ -229,6 +229,7 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     steps = _steps()
     fields = _literal(steps["extract"]["input_mapping"]["fields"])
     taxonomy = _literal(steps["detect_issues"]["input_mapping"]["taxonomy"])
+    assert _literal(steps["generate_questions"]["input_mapping"]["taxonomy"]) == taxonomy
     schema = _load_schema("brief_decoder.decode_output_v1")["properties"]
     value_properties = schema["brief"]["properties"]["values"]["properties"]
 
@@ -237,9 +238,6 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     assert set(schema["brief"]["properties"]["missing_fields"]["items"]["enum"]) == set(field_names)
     assert set(schema["brief"]["properties"]["confidence"]["properties"]) == set(field_names)
     assert set(schema["issues"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
-    # Code review finding (me #1): A05's questions[].category reuses its source issue's
-    # category (generate_questions.v1.md) -- it must be closed over the same taxonomy, not left
-    # an open string the A05 cross-validator never checks.
     assert set(schema["questions"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
     assert _literal(steps["extract"]["input_mapping"]["strict"]) is False
     # Code review finding (me #7): the canonical schema's question cap must equal what A05 is
