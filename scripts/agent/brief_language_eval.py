@@ -165,8 +165,14 @@ def output_contract_error(record: dict, *, historical: bool = False) -> str | No
     error = next(_output_validator(scenario).iter_errors(output), None)
     if error is not None:
         return f"{scenario} output violates {error.validator} at {error.json_path}"
-    if "issues" in output and not output["issues"] and output["questions"]:
-        return f"{scenario} output has questions without issues"
+    if "issues" in output:
+        issue_count = len(output["issues"])
+        for index, question in enumerate(output["questions"]):
+            if not 0 <= question["source_issue_index"] < issue_count:
+                return (
+                    f"{scenario} output at $.questions[{index}].source_issue_index "
+                    f"must reference an issue (expected 0 <= index < {issue_count})"
+                )
     return None
 
 

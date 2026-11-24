@@ -305,3 +305,20 @@ Draft risk evidence in archive mode. The report leaves the original archive file
 All 173 evaluator and acceptance tests passed. The unchanged fourth and fifth review matrices
 passed again in the default report, with 72 PASS, 0 FAIL, and 0 PENDING. Each case and language
 combination scored 3/3 in each archive. The regrade used the saved outputs and provider ledgers.
+
+### Question references in the acceptance report
+
+Check each question's source index against the final list of issues after schema validation
+in the common evaluator. Exercise both Draft and Brief Decoder through the report CLI with
+a complete ledger and review sheet. Replay the existing ANY-761 archive cases and both saved
+Draft matrices.
+
+The report rejects an out-of-range reference with the exact JSON field path and the
+allowed range, then grades the next record. Both CLI regressions use fully reviewed
+records and complete ledgers. The last valid index passes and the first index beyond
+the list fails even in the second question.
+
+All 175 focused tests passed, including the existing ANY-761 archive CLI tests.
+The original fourth and fifth review matrices each returned 36 PASS, 0 FAIL, and 0
+PENDING in the default report. The report replay used the saved evidence without
+modifying either archive or calling the model.

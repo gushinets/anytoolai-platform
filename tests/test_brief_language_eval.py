@@ -628,6 +628,15 @@ def risk_record(family, sections, steps, attempt=1):
     return run
 
 
+def brief_decoder_record():
+    run = record(("extract", "detect_issues", "generate_questions", "generate_document"))
+    case = next(case for case in CASES if case["id"] == "ANY761-BD-RU-basic")
+    output = deepcopy(CANONICAL[case["id"]])
+    run.update(case=case, output=output, attempt=1, snapshot={})
+    run["ledger"]["artifacts"][0]["content_json"] = output
+    return run
+
+
 def write_report_inputs(out, *runs, historical=False):
     keys = [f"{run['case']['id']}--{run['attempt']}" for run in runs]
     cases = {run["case"]["id"]: run["case"] for run in runs}
@@ -778,6 +787,42 @@ def test_risk_report_demands_a05_for_nonempty_issues(with_a05, monkeypatch, tmp_
     assert capsys.readouterr().out == f"{key}: {'PASS' if with_a05 else 'PENDING'}\n"
 
 
+@pytest.mark.parametrize("draft", [True, False], ids=["draft", "brief-decoder"])
+def test_report_checks_every_question_reference(draft, monkeypatch, tmp_path, capsys):
+    if draft:
+        output = CANONICAL["ANY761-AB-D-RU-weak"]
+        sections = {key: output[key] for key in ("issues", "questions")}
+        valid = risk_record("vague", sections, ("extract", "detect_issues", "generate_questions"))
+    else:
+        valid = brief_decoder_record()
+
+    output = valid["output"]
+    last_valid_index = len(output["issues"]) - 1
+    first_question = {**output["questions"][0], "source_issue_index": last_valid_index}
+    output["questions"] = [first_question, {**first_question, "question": "Какой срок согласован?"}]
+    assert evaluation.output_contract_error(valid) is None
+
+    invalid = deepcopy(valid)
+    invalid["attempt"] = valid["attempt"] + 1
+    invalid_output = invalid["output"]
+    invalid_output["questions"][1]["source_issue_index"] = len(invalid_output["issues"])
+    assert evaluation._output_validator(valid["case"]["scenario_id"]).is_valid(invalid_output)
+    invalid_key, valid_key = write_report_inputs(tmp_path, invalid, valid)
+
+    # Preserve all reviewed prose and bind the sheet to the malformed record.
+    review = completed_review(valid)
+    review["evidence_sha256"] = evaluation.digest(invalid)
+    (tmp_path / f"{invalid_key}.review.json").write_text(json.dumps(review), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+
+    assert evaluation.main() == 1
+    invalid_line, valid_line = capsys.readouterr().out.splitlines()
+    assert invalid_line.startswith(f"{invalid_key}: FAIL")
+    assert "$.questions[1].source_issue_index" in invalid_line
+    assert f"0 <= index < {len(output['issues'])}" in invalid_line
+    assert valid_line == f"{valid_key}: PASS"
+
+
 @pytest.mark.parametrize("problem", ["failed_call", "missing_artifact", "skipped_action"])
 def test_a04_needs_successful_same_session_evidence(problem):
     run = risk_record("complete", {"issues": [], "questions": []}, ("extract", "detect_issues"))
@@ -798,10 +843,7 @@ def test_clean_draft_cannot_claim_questions_without_issues():
 
 @pytest.mark.parametrize("field", ["issues", "questions"])
 def test_brief_decoder_rejects_missing_or_nonarray_sections(field):
-    run = record(["extract", "detect_issues", "generate_questions", "generate_document"])
-    run["case"] = next(case for case in CASES if case["id"] == "ANY761-BD-RU-basic")
-    run["output"] = deepcopy(CANONICAL[run["case"]["id"]])
-    run["ledger"]["artifacts"][0]["content_json"] = run["output"]
+    run = brief_decoder_record()
     assert evaluation.review_status(run, completed_review(run)) == "PASS"
     run["output"].pop(field)
     assert evaluation.review_status(run, completed_review(run)) == "FAIL"
