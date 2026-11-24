@@ -114,7 +114,7 @@ schema mismatch. If the preview must roll back after accepting Drafts, retain it
 use a build with the compatible Draft result schema to serve them. If the original API must be
 restored, use the verified pre-release backup in a separate database and retain the candidate
 database for recovery of results saved after the backup. See the
-[release rollback procedure](../../../infra/deployment/vps-release-runbook.md).
+[Draft result rollback procedure](../../../infra/deployment/vps-release-runbook.md#rollback-acceptance-builder-draft-results).
 
 The current schema accepted both captured historical results and all 18 enriched results. The
 pre-change schema rejected all 18 enriched results. The Result API regression replayed the

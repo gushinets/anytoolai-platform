@@ -106,6 +106,9 @@ The host file is `/opt/payments-portal/deploy/caddy/Caddyfile.prod`. The contain
    revision. The migrator can succeed before the web container fails. If cleanup stopped
    the candidate, use `prod-recovery-postgres-up` to inspect the schema. If the candidate
    is accepting or processing work, quiesce it and preserve any new data before rollback.
+   If the candidate saved Acceptance Builder Drafts, check the
+   [Draft result compatibility](#rollback-acceptance-builder-draft-results) before choosing
+   a build and database, even if the Alembic revision matches.
    Run `prod-down` from the candidate checkout before starting the prior version. If the
    prior version requires an older schema, start PostgreSQL alone with the recovery command
    and restore the verified pre-release dump into a new database. Stop the recovery container
@@ -116,5 +119,24 @@ The host file is `/opt/payments-portal/deploy/caddy/Caddyfile.prod`. The contain
 5. On a Lab-only failure, restore the Caddyfile with product routes working and Lab closed.
    Quiesce Lab before stopping it and preserve its volume. Follow the Lab recovery procedure
    if its schema changed. [Lab database rollback](README.md#backup-recovery-and-rollback)
+
+### Rollback Acceptance Builder Draft results
+
+In ANY-894, the Draft v1 result gained `issues` and `questions`. The pre-change API accepts
+only `extracted` and returns HTTP 404 (`result_artifact_unavailable`) for enriched Drafts,
+including ones with both arrays empty. This can happen with the same PostgreSQL volume and
+Alembic revision.
+
+1. Quiesce the candidate and preserve its database. Record representative saved result IDs
+   and the account or guest session that can open them.
+2. To keep post-release Drafts available, retain the candidate database and use an API build
+   that accepts both Draft v1 payloads and supports the database revision. Before reopening
+   ingress, use an authorized account or guest session to verify that
+   `GET /v1/results/{result_id}` returns HTTP 200 for a saved pre-release Draft and a saved
+   enriched Draft, when both are present.
+3. If rollback requires the original API, restore the verified pre-release dump into a
+   separate database using the recovery steps above. Keep the candidate database for recovery.
+   Results saved after that dump are absent from the restored database. Before reopening
+   ingress, verify product readiness and reopen a saved pre-release Draft through the Result API.
 
 [November 12 release record](../../docs/exec-plans/completed/four-products-and-atom-lab-release.md)
