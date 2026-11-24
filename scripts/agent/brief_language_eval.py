@@ -12,20 +12,28 @@ import hashlib
 import json
 import re
 import time
+from functools import cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from draft_risk_review import DECISION_FIELDS, decision_questions
+from jsonschema import Draft202012Validator
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "tests/fixtures/brief_language_eval/cases.json"
 WORKER_PYTHON = "/app/apps/platform-worker/.venv/bin/python"
-SCENARIOS = (
-    "brief_decoder.decode_v1",
-    "acceptance_builder.draft_v1",
-    "acceptance_builder.check_v1",
+PRODUCTS = (
+    ROOT / "packages/backend/product-platforms/freelancer-suite/src"
+    / "anytoolai_freelancer_suite/products"
 )
+DRAFT = "acceptance_builder.draft_v1"
+OUTPUT_SCHEMAS = {
+    "brief_decoder.decode_v1": "brief_decoder/schemas/decode_output.schema.json",
+    DRAFT: "acceptance_builder/schemas/draft_output.schema.json",
+    "acceptance_builder.check_v1": "acceptance_builder/schemas/check_output.schema.json",
+}
+SCENARIOS = tuple(OUTPUT_SCHEMAS)
 
 # Read the running worker's files, not a potentially different host checkout. Never export keys.
 SNAPSHOT = """
@@ -135,13 +143,41 @@ def authored_fields(output: dict) -> dict[str, str]:
     return fields
 
 
-def review_template(record: dict) -> dict:
+@cache
+def _output_validator(scenario: str) -> Draft202012Validator:
+    path = PRODUCTS / OUTPUT_SCHEMAS[scenario]
+    return Draft202012Validator(json.loads(path.read_text(encoding="utf-8")))
+
+
+def output_contract_error(record: dict, *, historical: bool = False) -> str | None:
+    """Check the planned scenario before treating its output as reviewable evidence."""
+    output = record.get("output")
+    if output is None and not record.get("result_id"):
+        return None
+    scenario = record["case"]["scenario_id"]
+    if isinstance(output, dict):
+        if historical and scenario.startswith("acceptance_builder.") and "document" in output:
+            # The archived document shape predates the current stored-result schema.
+            return None
+        if scenario == DRAFT and not historical and not {"issues", "questions"} <= output.keys():
+            return f"{scenario} output requires both issues and questions"
+    error = next(_output_validator(scenario).iter_errors(output), None)
+    if error is not None:
+        return f"{scenario} output violates {error.validator} at {error.json_path}"
+    if "issues" in output and not output["issues"] and output["questions"]:
+        return f"{scenario} output has questions without issues"
+    return None
+
+
+def review_template(record: dict, *, historical: bool = False) -> dict:
     decision_field = DECISION_FIELDS.get(record["case"].get("family"))
+    output = record.get("output") or {}
+    fields = {} if output_contract_error(record, historical=historical) else authored_fields(output)
     return {
         "evidence_sha256": digest(record),
         **({decision_field: None} if decision_field else {}),
         "reviewer": "",
-        "fields": {path: None for path in authored_fields(record.get("output") or {})},
+        "fields": dict.fromkeys(fields),
         "criteria": {question: None for question in record["case"]["criteria"]},
         "notes": "",
     }
@@ -154,23 +190,28 @@ def primary_language(tag: object) -> str | None:
     return tag.split("-")[0].lower()
 
 
-def analysis_language_matches(record: dict) -> bool:
+def analysis_language_matches(record: dict, *, historical: bool = False) -> bool:
     output = record.get("output")
     if not output or not record["case"]["scenario_id"].startswith("acceptance_builder."):
         return True
     values = output.get("extracted", {}).get("values", {})
     # Historical document outputs must also pass the generate_document ledger check below.
-    if "document" in output and "analysis_language" not in values:
+    if historical and "document" in output and "analysis_language" not in values:
         return True
     actual = primary_language(values.get("analysis_language"))
     expected = primary_language(record["case"].get("expected_language"))
     return actual is not None and expected is not None and actual == expected
 
 
-def review_status(record: dict, review: dict) -> str:
-    expected = review_template(record)
-    if review.get("evidence_sha256") != expected["evidence_sha256"]:
+def review_status(record: dict, review: dict, *, historical: bool = False) -> str:
+    """Grade current evidence. Historical contracts require an explicit archive replay."""
+    if review.get("evidence_sha256") != digest(record):
         raise ValueError("review does not belong to this evidence")
+    if record.get("error") or record.get("evidence_error") or output_contract_error(
+        record, historical=historical
+    ):
+        return "FAIL"
+    expected = review_template(record, historical=historical)
     decisions = []
     for group in ("fields", "criteria"):
         if set(review.get(group, {})) != set(expected[group]):
@@ -178,10 +219,7 @@ def review_status(record: dict, review: dict) -> str:
         decisions += list(review[group].values())
     if any(value is not None and type(value) is not bool for value in decisions):
         raise ValueError("review decisions must be true, false or null")
-    if (
-        record.get("error") or record.get("evidence_error") or False in decisions
-        or not analysis_language_matches(record)
-    ):
+    if False in decisions or not analysis_language_matches(record, historical=historical):
         return "FAIL"
     ledger = record.get("ledger") or {}
     if not record.get("output") or not ledger.get("calls"):
@@ -204,15 +242,15 @@ def review_status(record: dict, review: dict) -> str:
             "generate_questions",
             "generate_document",
         },
-        "acceptance_builder.draft_v1": {"extract", "detect_issues", "generate_questions"},
+        DRAFT: {"extract", "detect_issues", "generate_questions"},
         "acceptance_builder.check_v1": {"extract", "compare"},
     }[scenario]
-    if scenario.startswith("acceptance_builder.") and "document" in record["output"]:
-        expected_steps = expected_steps | {"generate_document"}  # Retained pre-correction evidence.
-    if scenario == "acceptance_builder.draft_v1" and "issues" not in record["output"]:
-        # Evidence from workflow v1 predates issue detection.
+    output = record["output"]
+    if historical and scenario.startswith("acceptance_builder.") and "document" in output:
+        expected_steps.add("generate_document")
+    if historical and scenario == DRAFT and "issues" not in output:
         expected_steps -= {"detect_issues", "generate_questions"}
-    elif "generate_questions" in expected_steps and not record["output"]["issues"]:
+    elif "generate_questions" in expected_steps and not output["issues"]:
         expected_steps.remove("generate_questions")
     completed = [action for action in actions if action["status"] != "skipped"]
     successful_calls = {
@@ -243,7 +281,12 @@ def review_status(record: dict, review: dict) -> str:
         return "PENDING"
     family = record["case"].get("family")
     if family in DECISION_FIELDS:
-        eligible = decision_questions(record["output"], family, record["case"]["expected_language"])
+        if "detect_issues" not in expected_steps:
+            return "FAIL"
+        language = primary_language(record["case"].get("expected_language"))
+        if language not in {"ru", "en", "es"}:
+            return "FAIL"
+        eligible = decision_questions(output, family, language)
         if not eligible:
             return "FAIL"
         field = DECISION_FIELDS[family]
@@ -321,6 +364,7 @@ def collect(args: argparse.Namespace, case: dict, attempt: int, snapshot: dict) 
                 Exception
             ) as exc:  # Preserve the completed run even when evidence retrieval fails.
                 record["evidence_error"] = f"{type(exc).__name__}: {exc}"
+    record["evidence_error"] = output_contract_error(record) or record["evidence_error"]
     return record
 
 
@@ -366,6 +410,7 @@ def main() -> int:
         manifest = json.loads(evidence_path(args.out, "manifest.json").read_text(encoding="utf-8"))
         statuses = []
         for key in manifest["runs"]:
+            reason = None
             path = evidence_path(args.out, f"{key}.json")
             if not path.exists():
                 status = "PENDING"
@@ -379,12 +424,18 @@ def main() -> int:
                     or record["snapshot"] != manifest["snapshot"]
                 ):
                     raise ValueError("run differs from the planned case/configuration")
-                review = json.loads(
-                    evidence_path(args.out, f"{key}.review.json").read_text(encoding="utf-8")
-                )
-                status = review_status(record, review)
+                reason = output_contract_error(record)
+                if reason or record.get("error") or record.get("evidence_error"):
+                    status = "FAIL"
+                else:
+                    review_path = evidence_path(args.out, f"{key}.review.json")
+                    status = (
+                        review_status(record, json.loads(review_path.read_text(encoding="utf-8")))
+                        if review_path.exists()
+                        else "PENDING"
+                    )
             statuses.append(status)
-            print(f"{key}: {status}")
+            print(f"{key}: {status}" + (f" ({reason})" if reason else ""))
         return 0 if statuses and set(statuses) == {"PASS"} else 1
     url = urlsplit(args.api_url)
     if (
@@ -429,12 +480,14 @@ def main() -> int:
             key = f"{case['id']}--{attempt}"
             record = collect(args, case, attempt, snapshot)
             write_json(evidence_path(args.out, f"{key}.json"), record)
-            write_json(evidence_path(args.out, f"{key}.review.json"), review_template(record))
-            print(
-                f"{key}: {'ERROR' if record['error'] else 'collected; review pending'}", flush=True
+            write_json(
+                evidence_path(args.out, f"{key}.review.json"), review_template(record)
             )
-            if record["error"] or record["evidence_error"]:
+            error = record["error"] or record["evidence_error"]
+            if error:
+                print(f"{key}: ERROR ({error})", flush=True)
                 return 1
+            print(f"{key}: collected; review pending", flush=True)
     return 0
 
 

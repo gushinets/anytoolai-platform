@@ -266,3 +266,22 @@ The broad Python suite passed 2,970 tests. The full frontend check passed, inclu
 349 Chromium cases for Atom Lab, 1,148 web-mirror tests, contract drift and production
 builds. The manifest selections passed with Python UTF-8 mode disabled under the C locale
 on Linux.
+
+### Sixth review
+
+Validate collected output against the planned scenario before enumerating review fields.
+Current Draft evidence requires both issue and question arrays, plus a successful
+`detect_issues` ledger entry. Only a confirmed empty issues list permits skipping
+`generate_questions`. Use explicit opt-in when replaying historical output contracts.
+Exercise malformed records through the CLI and regrade both 36-run archives.
+
+The evaluator now reports incompatible output as FAIL and continues through the manifest.
+A valid Draft with missing A04 evidence stays PENDING. CLI regressions cover all four
+families, malformed arrays, an incomplete review directory, conditional A05, and a
+collection run that saves the incompatible output and diagnostic. Separate tests replay the
+historical Draft shapes through the archival path.
+
+All 164 evaluator and product acceptance tests passed. Regrading the original review sheets
+with the updated report command returned 36 PASS for review four and 36 PASS for review five.
+Every family and language pair scored 3/3 in each archive. The captured files retained their
+original bytes, and the regrade used the saved results and ledgers without new provider calls.

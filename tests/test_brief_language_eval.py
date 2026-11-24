@@ -57,8 +57,8 @@ def record(steps=("extract", "compare")):
     }
 
 
-def completed_review(run):
-    review = evaluation.review_template(run)
+def completed_review(run, *, historical=False):
+    review = evaluation.review_template(run, historical=historical)
     review["reviewer"] = "test-reviewer"
     for group in ("fields", "criteria"):
         review[group] = dict.fromkeys(review[group], True)
@@ -297,8 +297,11 @@ def test_legacy_machine_only_weak_draft_has_no_prose_to_review():
     run["output"] = {"extracted": CANONICAL[run["case"]["id"]]["extracted"]}
     run["ledger"]["artifacts"][0]["content_json"] = run["output"]
     assert evaluation.authored_fields(run["output"]) == {}
-    assert evaluation.review_status(run, evaluation.review_template(run)) == "PENDING"
-    assert evaluation.review_status(run, completed_review(run)) == "PASS"
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+    template = evaluation.review_template(run, historical=True)
+    assert evaluation.review_status(run, template, historical=True) == "PENDING"
+    review = completed_review(run, historical=True)
+    assert evaluation.review_status(run, review, historical=True) == "PASS"
 
 
 UNSAFE_KEYS = (
@@ -405,16 +408,20 @@ def test_legacy_document_requires_its_historical_ledger_step():
     run = ab_record("ANY761-AB-D-RU-weak")
     del run["output"]["extracted"]["values"]["analysis_language"]
     run["output"]["document"] = {"summary": "Уточните требования.", "sections": []}
-    assert evaluation.review_status(run, completed_review(run)) == "PENDING"
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+    review = completed_review(run, historical=True)
+    assert evaluation.review_status(run, review, historical=True) == "PENDING"
     run["ledger"]["actions"].append({
         **run["ledger"]["actions"][0], "id": "document", "step_id": "generate_document",
     })
     run["ledger"]["calls"].append({
         **run["ledger"]["calls"][0], "id": "document-call", "action_run_id": "document",
     })
-    assert evaluation.review_status(run, completed_review(run)) == "PASS"
+    review = completed_review(run, historical=True)
+    assert evaluation.review_status(run, review, historical=True) == "PASS"
     run["output"]["extracted"]["values"]["analysis_language"] = "en"
-    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+    review = completed_review(run, historical=True)
+    assert evaluation.review_status(run, review, historical=True) == "FAIL"
 
 
 @pytest.mark.parametrize(
@@ -605,6 +612,166 @@ def test_draft_cli_selects_cases_before_collection(monkeypatch, tmp_path, suite,
     assert manifest["cases"] == expected
     assert set(manifest["runs"]) == {f"{c['id']}--{n}" for c in expected for n in range(1, 4)}
     assert collector.call_count == count
+
+
+def risk_record(family, sections, steps, attempt=1):
+    case = next(
+        case for case in evaluation.draft_risk_cases()
+        if case["family"] == family and case["expected_language"] == "ru"
+    )
+    output = {"extracted": CANONICAL["ANY761-AB-D-RU-weak"]["extracted"], **sections}
+    run = record(steps)
+    run.update(case=case, output=deepcopy(output), attempt=attempt, snapshot={})
+    run["ledger"]["artifacts"][0]["content_json"] = run["output"]
+    return run
+
+
+def write_report_inputs(out, *runs):
+    keys = [f"{run['case']['id']}--{run['attempt']}" for run in runs]
+    cases = {run["case"]["id"]: run["case"] for run in runs}
+    evaluation.write_json(
+        out / "manifest.json", {"runs": keys, "cases": list(cases.values()), "snapshot": {}}
+    )
+    for key, run in zip(keys, runs, strict=True):
+        evaluation.write_json(out / f"{key}.json", run)
+        evaluation.write_json(out / f"{key}.review.json", completed_review(run))
+    return keys
+
+
+@pytest.mark.parametrize("family", ["vague", "feasibility", "contradiction", "complete"])
+def test_risk_report_cannot_certify_an_extract_only_stack(
+    family, monkeypatch, tmp_path, capsys
+):
+    stale = risk_record(family, {}, ("extract",))
+    clean = risk_record(
+        "complete", {"issues": [], "questions": []}, ("extract", "detect_issues"), attempt=2
+    )
+    stale_key, clean_key = write_report_inputs(tmp_path, stale, clean)
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+
+    assert evaluation.main() == 1
+    stale_line, clean_line = capsys.readouterr().out.splitlines()
+    assert stale_line.startswith(f"{stale_key}: FAIL")
+    assert "requires both issues and questions" in stale_line
+    assert clean_line == f"{clean_key}: PASS"
+
+
+@pytest.mark.parametrize(
+    ("sections", "steps", "status"),
+    [
+        ({"issues": []}, ("extract", "detect_issues"), "FAIL"),
+        ({"questions": []}, ("extract",), "FAIL"),
+        ({"issues": [], "questions": None}, ("extract", "detect_issues"), "FAIL"),
+        ({"issues": {}, "questions": []}, ("extract", "detect_issues"), "FAIL"),
+        ({"issues": [None], "questions": []}, ("extract", "detect_issues"), "FAIL"),
+        ({"issues": [], "questions": []}, ("extract",), "PENDING"),
+        ({"issues": [], "questions": []}, ("extract", "detect_issues"), "PASS"),
+    ],
+)
+def test_report_requires_both_arrays_and_a04_for_clean_drafts(
+    sections, steps, status, monkeypatch, tmp_path, capsys
+):
+    run = risk_record("complete", sections, steps)
+    (key,) = write_report_inputs(tmp_path, run)
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+    assert evaluation.main() == (0 if status == "PASS" else 1)
+    assert capsys.readouterr().out.startswith(f"{key}: {status}")
+
+
+@pytest.mark.parametrize("with_a05", [False, True])
+def test_risk_report_demands_a05_for_nonempty_issues(with_a05, monkeypatch, tmp_path, capsys):
+    sections = {k: CANONICAL["ANY761-AB-D-RU-weak"][k] for k in ("issues", "questions")}
+    steps = ("extract", "detect_issues", "generate_questions") if with_a05 else (
+        "extract", "detect_issues",
+    )
+    run = risk_record("vague", sections, steps)
+    (key,) = write_report_inputs(tmp_path, run)
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+    assert evaluation.main() == (0 if with_a05 else 1)
+    assert capsys.readouterr().out == f"{key}: {'PASS' if with_a05 else 'PENDING'}\n"
+
+
+@pytest.mark.parametrize("problem", ["failed_call", "missing_artifact", "skipped_action"])
+def test_a04_needs_successful_same_session_evidence(problem):
+    run = risk_record("complete", {"issues": [], "questions": []}, ("extract", "detect_issues"))
+    if problem == "failed_call":
+        run["ledger"]["calls"][1]["status"] = "failed"
+    elif problem == "missing_artifact":
+        run["ledger"]["actions"][1]["output_artifact_id"] = "absent"
+    else:
+        run["ledger"]["actions"][1]["status"] = "skipped"
+    assert evaluation.review_status(run, completed_review(run)) == "PENDING"
+
+
+def test_clean_draft_cannot_claim_questions_without_issues():
+    sections = {"issues": [], "questions": CANONICAL["ANY761-AB-D-RU-weak"]["questions"]}
+    run = risk_record("complete", sections, ("extract", "detect_issues"))
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+@pytest.mark.parametrize("field", ["issues", "questions"])
+def test_brief_decoder_rejects_missing_or_nonarray_sections(field):
+    run = record(["extract", "detect_issues", "generate_questions", "generate_document"])
+    run["case"] = next(case for case in CASES if case["id"] == "ANY761-BD-RU-basic")
+    run["output"] = deepcopy(CANONICAL[run["case"]["id"]])
+    run["ledger"]["artifacts"][0]["content_json"] = run["output"]
+    assert evaluation.review_status(run, completed_review(run)) == "PASS"
+    run["output"].pop(field)
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+    run["output"][field] = None
+    assert evaluation.review_status(run, completed_review(run)) == "FAIL"
+
+
+def test_run_preserves_incompatible_output_and_reports_why(monkeypatch, tmp_path, capsys):
+    out = tmp_path / "results"
+    run = risk_record("complete", {"issues": [], "questions": None}, ("extract",))
+    args = cli_args("run", out)
+    args[args.index("--scenario") + 1] = "acceptance_builder.draft_v1"
+    args.extend(["--suite", "draft-risks", "--family", "complete"])
+    responses = [
+        {"guest_id": "guest-1"},
+        {"scenario_session_id": run["session_id"], "job_id": "job-1"},
+        {"status": "completed", "result_artifact_id": run["result_id"]},
+        {"output": run["output"]},
+    ]
+    request = Mock(side_effect=responses)
+    monkeypatch.setattr(evaluation, "_request", request)
+    monkeypatch.setattr(evaluation, "_docker", Mock(side_effect=[
+        "{}", json.dumps(run["ledger"]), "{}",
+    ]))
+    monkeypatch.setattr(evaluation, "_git_state", lambda: {})
+    monkeypatch.setattr(sys, "argv", args)
+
+    assert evaluation.main() == 1
+    assert request.call_count == len(responses)
+    assert "ERROR" in capsys.readouterr().out
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    first, *remaining = manifest["runs"]
+    saved = json.loads((out / f"{first}.json").read_text(encoding="utf-8"))
+    assert saved["output"] == run["output"]
+    assert "type at $.questions" in saved["evidence_error"]
+    monkeypatch.setattr(sys, "argv", cli_args("report", out))
+    assert evaluation.main() == 1
+    assert capsys.readouterr().out.splitlines() == [
+        f"{first}: FAIL ({saved['evidence_error']})",
+        *(f"{key}: PENDING" for key in remaining),
+    ]
+
+
+def test_report_can_read_partial_collection_without_a_review_sheet(monkeypatch, tmp_path, capsys):
+    corrupt = risk_record("complete", {"issues": [], "questions": None}, ("extract",))
+    valid = risk_record(
+        "complete", {"issues": [], "questions": []}, ("extract", "detect_issues"), attempt=2
+    )
+    corrupt_key, valid_key = write_report_inputs(tmp_path, corrupt, valid)
+    for key in (corrupt_key, valid_key):
+        (tmp_path / f"{key}.review.json").unlink()
+    monkeypatch.setattr(sys, "argv", cli_args("report", tmp_path))
+    assert evaluation.main() == 1
+    assert capsys.readouterr().out.splitlines() == [
+        f"{corrupt_key}: FAIL (acceptance_builder.draft_v1 output violates type at $.questions)",
+        f"{valid_key}: PENDING",
+    ]
 
 
 @pytest.fixture(scope="module", params=[4, 5])
