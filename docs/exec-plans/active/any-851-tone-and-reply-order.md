@@ -6,9 +6,9 @@
 - Owner: agent
 - Linear: ANY-851
 - Created: 2026-11-23
-- Last updated: 2026-11-23
-- Review date: 2026-11-23
-- Next action: review recorded live QA outputs, then rerun the release on the public form.
+- Last updated: 2026-11-24
+- Review date: 2026-11-24
+- Next action: review the first-round regression evidence, then verify the public release.
 - Blocker: none
 
 ## Goal
@@ -71,3 +71,55 @@ concern, before any explanation.
 - A multilingual run returned Russian for two English delay updates and repeated the request in
   one Spanish update. Update now applies every tone in the source or explicitly selected locale
   and describes the registers without language-specific examples.
+
+## First review follow-up
+
+1. Establish the author's position from the reply goal before drafting. Acknowledge what the
+   client experienced, expected or reported. Preserve admissions, apologies and commitments
+   that the author explicitly supplies.
+2. Make Reply Draft openings distinguish the three tones in the selected language. Keep the
+   author's position, next step and scope context in the same order across tones.
+3. Require the client-facing project name or description in Update. Check each S1 result
+   against the original notes before comparing tones.
+4. Preserve the original evidence. Rerun S1 and S4 pairs, the R05 supported-admission control,
+   and S2/S7 request checks in Russian, English and Spanish.
+
+Only Reply Draft receives a client message alongside a separately authored reply goal. Update
+already has a source-attribution rule for disputed operational statuses. Proposal AI has an
+explicit tone contract and writes from freelancer-authored inputs. Prepaid Request has
+separate rules for disputed commercial terms. Brief Decoder and Acceptance Builder produce
+analysis artifacts and have no reply tone selection.
+
+The original English S1 results omitted the yoga studio in both tones. Their passing pair
+comparison did not establish source fidelity. The original Russian S4 pair was also graded
+without a separate tone-distinction criterion. The follow-up evaluates each source fact and
+the paired tone difference separately.
+
+The first Luna rerun preserved the client's attribution in S4 but put the explanation ahead
+of the offer in several cases. Russian R05 acknowledged the typo while omitting the invoice
+number. The prompt now requires the decision to begin immediately after the acknowledgement,
+reserves background for a later sentence, and carries over identifiers for the subject of
+the author's decision.
+
+Update now preserves each status on the part it describes and assigns the request for
+outstanding materials before drafting. The added resolved-material controls check that a
+historical blocker still explains the delay and triggers no new request.
+
+### Follow-up verification
+
+- All six S1 runs kept the yoga studio landing page and the status of each part. All nine S4
+  runs kept the author's position and put the two options before the brief context. The warm
+  and firm openings differed in each language. All three R05 runs kept INV-104, admitted the
+  typo and preserved the amount, commitment, scope and dates.
+- All three resolved-material controls retained the earlier cause without requesting the
+  photos again. In the nine outstanding-material runs, S7 neutral in Russian repeated the one
+  request across both output fields. The other eight issued it once.
+- The earlier comparison sample used eleven matching inputs each on Terra and Sol. Terra
+  preserved the S4 order and attribution in all six sampled replies. Sol added an apology in
+  the English warm reply. The comparison uses an earlier prompt revision and is exploratory.
+- Config, architecture and docs validation passed. The Freelancer Suite and evaluator
+  tests passed (1,932 tests).
+
+The [review follow-up evidence](any-851-tone-and-reply-order-review-1.evidence.json) contains
+the 30 final Luna runs and 22 comparison runs. It records the prompt fingerprints separately
+for Update, Reply Draft and the comparison sample.

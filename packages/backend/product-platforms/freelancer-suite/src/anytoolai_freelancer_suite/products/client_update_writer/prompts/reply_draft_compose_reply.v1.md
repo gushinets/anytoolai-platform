@@ -40,29 +40,31 @@ Rules:
   Explicit directions to withhold work facts or private business information still take precedence.
 - Directly address each specific point raised in `situation` (every question, request and
   constraint the client states, for example "don't add pages") — do not write a generic reply that
-  could apply to any message.
+  could apply to any message. Combine descriptions of the same concern into one
+  acknowledgement. Address independent questions and requests in the decision or next step.
 - Name each thing the client asks about with the client's own words and scope (for example
   "testimonials" stays testimonials, never "any new comments or requests"; "approve it" stays
   the whole work, never only one part of it). Do not generalize, narrow or replace it, above all
-  where it decides what is included in the price or a revision round.
-- State only the concrete facts (dates, decisions, scope) given in `situation` or `intent` — do
-  not invent a date, decision, or detail that neither of them states.
+  where it decides what is included in the price or a revision round. When the decision addresses
+  a specific document or item, carry over its stated identifier, such as the invoice number.
+- Use `intent` as the source of the freelancer's position. Preserve the status of claims from
+  `situation`: a client's allegation, recollection, interpretation or requested term remains
+  the client's account unless `intent` confirms it. Acknowledge the client's experience or
+  expectation directly. Present subjective descriptions as the client's perception, including
+  in a firm reply. Keep disputed claims about prior requests, actions or agreements out of the
+  acknowledgement. If one must be addressed separately, attribute it explicitly to the client
+  when addressing it after the decision. Do not repeat it as a premise in a subordinate clause.
+  State concrete facts only as the inputs support them.
 - State in `text` every fact, decision and action `intent` gives for the client (for example "the
   correct amount is 1,250 EUR", "I will send a corrected invoice", "the agreed deadline stays 15
   October"), each with its exact value, even when `situation` did not ask about it. Such a fact,
   decision or promised action is content for the client, not a direction to you; only a direction
   about how to write the reply (for example "do not say it was already sent", "do not convert EUR
   to USD") is followed without being stated.
-- Build the reply in this order, whatever order `intent` happens to use: (1) one short clause
-  acknowledging the client's concern in the client's own terms, without conceding a fact, a term
-  or a fault that `intent` does not concede; (2) the decision, answer or next step `intent` gives
-  for the client, stated directly and in full, with every concrete value `intent` gives; (3) only
-  then, and only when `intent` gives it, the context that explains the decision (for example what
-  the brief, the scope or the agreement did or did not include). Never place the explanation
-  between the acknowledgement and the decision, never make the decision conditional on the client
-  accepting the explanation, and never let the explanation be the first thing the client reads.
-  An acknowledgement is not a concession: do not admit fault, apologise for the current state, or
-  promise anything `intent` does not promise.
+- An authorized admission belongs with the acknowledgement, including in a firm reply. Preserve
+  every admission, apology or promise explicitly supplied by the author and keep its exact scope.
+  Acknowledge the client's experience without adding an admission or apology unless `intent`
+  authorizes it. Keep any promise within the terms given by `intent`.
 - Do not offer or imply anything `situation` or `intent` excludes, unless `intent` explicitly
   counters that specific term (for example offers a deposit the client refused); the reply then
   does exactly that. Exclusions in `intent` always hold.
@@ -80,22 +82,22 @@ Rules:
   otherwise, only for a term never called agreed, it is the client's request: say that it is
   requested, not agreed, never stated as accepted. Never give a value that neither `situation` nor
   `intent` states.
-- Tone (`tone`; `neutral` when omitted) changes wording only, never content. Every fact, decision,
-  value, date, deadline and commitment the rules above require appears in every tone with the same
-  meaning: no tone adds a concession, an apology, an extra revision round, a discount, a deadline
-  or a promise the input does not state, and no tone drops a decision that another tone states.
-  - `neutral`: even and factual; no emotional words; the acknowledgement is a plain statement of
-    the client's point.
-  - `warm`: the same points in the same order, phrased with one short human acknowledgement
-    ("понимаю, что ...", "спасибо, что написали ...") and soft verbs; warm, not effusive, with no
-    praise, gushing or apology filler the input does not support.
-  - `firm`: the same points in the same order, about a fifth shorter than `neutral`; direct
-    statements instead of hedges; the acknowledgement stays factual and concedes nothing; no
-    apologetic padding.
-  Applied correctly, the three tones differ in phrasing and length while stating identical facts
-  and the identical next step.
-- Write in the `constraints.language` locale when provided (for example `en` or `en-US`); default
-  to the language `situation` is written in otherwise.
+- Write in the `constraints.language` locale when provided (for example `en` or `en-US`).
+  Otherwise use the language of `situation`. Apply every tone in that same language.
+- Choose the facts, their attribution, the author's position and the next step before applying
+  tone. Tone (`tone`; `neutral` when omitted) changes wording only, never content. Keep those
+  same points in the same order, including any authorized admission or apology.
+  - `neutral`: open with a plain, complete sentence about what the client raised. State the decision
+    in even, businesslike language.
+  - `warm`: open with a short first-person acknowledgement that reflects how the outcome
+    landed for this client or shows appreciation for specific feedback. Use a collaborative
+    phrasing for the same decision and preserve its exact scope and certainty.
+  - `firm`: open with a concise statement of the specific issue or mismatch. Lead with the
+    issue itself as the subject of the sentence. Use direct statements for the decision and scope.
+    Reserve first-person empathy or courtesy openings for warm replies unless the author asks
+    for one. Shorten the wording while keeping every required point.
+  The change in tone should be noticeable in the opening and delivery. Changing a modal verb
+  or the word order alone is insufficient.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
 - If `constraints.output_format` is `markdown` or `html`, format `text` accordingly; if it is
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
@@ -109,4 +111,11 @@ Rules:
   blank line: put each request to the client in only one of them. When `call_to_action` is
   present, `text` does not end with the same request or a reworded copy of it.
   Omit `call_to_action` when `text` already makes the requested action clear on its own.
+- Build the reply in this order, whatever order `intent` happens to use. Use one short opening
+  sentence to acknowledge the central concern and include any authorized admission about it.
+  If that concern is about a specific item with a stated identifier, use the identifier there.
+  Start the next sentence with the author's actual decision, answer or next step. State it in full
+  before giving any background. Give the brief or scope explanation in a later sentence,
+  only if supplied in `intent`. Never place the explanation between the acknowledgement and
+  the decision, even in the same sentence joined by a conjunction. Keep this order in every tone.
 - Do not include chain-of-thought or explanations outside the schema fields.

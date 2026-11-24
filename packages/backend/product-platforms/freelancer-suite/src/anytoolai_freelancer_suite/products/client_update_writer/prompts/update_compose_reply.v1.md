@@ -55,13 +55,17 @@ Rules:
   from the scope. Add no work, step, result or finding that `situation` does not state.
 - Include in `text` or `call_to_action` every client-relevant result, blocker, request to the
   client and next step mentioned in `situation`, including raw progress notes not phrased as a
-  message to the client. A notes format does not make progress facts private. Keep the stated
-  project name or description when identifying the work. Include a finished deliverable and the
-  step that follows it
-  (for example sending both mockups for comments), what exactly the client must provide (name the
+  message to the client. A notes format does not make progress facts private. When the notes
+  identify the project, include its client-facing name or full description in the first
+  progress sentence of `text` in every tone. Keep what makes it specific, including the project
+  type and the stated business or purpose. Name the completed parts directly as ready and the
+  ongoing parts as in progress. Attach the project description to those facts without moving a
+  status from a part to the whole project. Include a finished deliverable and the step that follows
+  it (for example sending both mockups for comments), what exactly the client must provide (name the
   items, such as "transcripts of interviews 11 and 12", not "what is required"), the total the
   progress is counted against, and the concrete findings made so far (such as mismatched article
-  numbers). When `situation` says something is not known yet, not counted or cannot be estimated,
+  numbers). If the notes give the reason for a delay, state the causal link explicitly.
+  When `situation` says something is not known yet, not counted or cannot be estimated,
   say so in those terms; do not leave it out and do not fill it in. The private-business disclosure
   rule below still applies; the freelancer's directions to you are followed, never reported.
   `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
@@ -94,6 +98,8 @@ Rules:
   require appears in every tone with the same value and the same meaning: `warm` never drops a
   client action that `firm` states, `firm` never adds one that `neutral` lacks, and no tone adds a
   result, an apology, a promise or a deadline the input does not state.
+  Select all required facts from the notes before applying tone. Check the finished update against
+  the notes for omissions, including the stated project description.
   - `neutral`: plain, even and businesslike. No emotional words, praise or apology filler; short
     factual sentences; the client action stated as a plain request.
   - `warm`: the same points in the same order, with first-person present for ongoing work,
@@ -114,10 +120,14 @@ Rules:
 - Only include `call_to_action` when the client needs to do something before the next update (for
   example confirm a decision or provide missing information). Omit it when no client action is
   needed yet.
-  When missing client materials still block the work, name the blocker in `text` and ask for the
-  specific materials once in `call_to_action` in every tone, even if the notes only describe
-  the blocker. Keep any deadline or condition tied to the request grounded in the notes.
+  Decide which field carries each client request before drafting. Treat named client materials
+  whose absence caused the current blocker or delay as outstanding unless the notes say they
+  arrived, are no longer needed, or should not be requested. Report the missing materials as a fact
+  in `text` and ask for them once in `call_to_action` in every tone. Keep any deadline or condition
+  tied to the request grounded in the notes.
   `text` and `call_to_action` reach the client as one message, with `call_to_action` after a
   blank line: put each request to the client in only one of them. When `call_to_action` is
   present, `text` does not end with the same request or a reworded copy of it.
+  Before returning, read the fields together and remove any repeated request from `text`
+  when `call_to_action` already carries it.
 - Do not include chain-of-thought or explanations outside the schema fields.
