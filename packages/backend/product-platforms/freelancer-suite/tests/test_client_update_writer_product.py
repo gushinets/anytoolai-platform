@@ -685,8 +685,9 @@ def test_prepaid_request_prompt_requires_a_payment_request_only_in_rule_d() -> N
                 "Do not offer or imply anything `situation` or `intent` excludes",
                 "unless `intent` explicitly counters that specific term",
                 "Exclusions in `intent` always hold",
-                "keep its exact value and give it the status",  # ANY-628 limits keep value and status
-                "give it the status of the first rule that applies",  # ANY-631 one prioritized rule
+                "keep its exact value",
+                "evaluate agreement status from `intent`",
+                "status of the first rule that applies",  # ANY-631 one prioritized rule
                 "(1) `intent` accepts, declines or counters it: do exactly that with the value `intent` gives",
                 "an accepted change (for example a second revision round) replaces the earlier term",
                 "a direction that only limits what to write about the term",

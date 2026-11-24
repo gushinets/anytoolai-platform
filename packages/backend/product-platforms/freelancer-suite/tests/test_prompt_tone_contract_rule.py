@@ -28,11 +28,13 @@ def test_update_prompt_keeps_client_actions_across_tones() -> None:
     assert "`warm` never drops a client action that `firm` states" in text
     assert "Include each needed client request once in `text`" in text
     assert "unless the notes say they arrived, are no longer needed" in text
+    assert "state the wait in first person with that same number" in text
 
 
 def test_warm_update_uses_a_friendly_milestone_when_supported() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "When the notes report good progress, use that friendly clause" in text
+    assert "Keep third-person notes about progress and blockers impersonal in this tone too" in text
 
 
 def test_update_rechecks_project_identity_against_source_notes() -> None:
@@ -54,6 +56,12 @@ def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> Non
     assert "remains the client's account unless `intent` confirms it" in text
     assert "Put any evaluative adjective inside the attributed perception" in text
     assert "claims about prior requests, actions or agreements out of the acknowledgement" in text
+    assert "preserve the original actor, status, and scope of each claim" in text
+    assert (
+        "A request and a belief that the result differs from the agreement are separate claims"
+        in text
+    )
+    assert "describe a term as agreed in the freelancer's voice when `intent` confirms it" in text
     assert (
         "An authorized admission belongs with the acknowledgement, including in a firm reply"
         in text

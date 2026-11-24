@@ -8,7 +8,7 @@
 - Created: 2026-11-23
 - Last updated: 2026-11-24
 - Review date: 2026-11-24
-- Next action: review the second-round regression evidence, then verify the public release.
+- Next action: review the latest regression evidence, then verify the public release.
 - Blocker: none
 
 ## Goal
@@ -156,3 +156,49 @@ feeds this combined message renderer.
   fields and verifies that the second attempt returns the complete message in one field.
 
 [Second-round live evidence](any-851-tone-and-reply-order-review-2.evidence.json)
+
+## Third review follow-up
+
+1. Preserve the actor, status and scope of each client claim in Reply Draft. Treat a request,
+   the client's assessment of the result and a confirmed agreement as independent facts.
+2. Determine speaker number from the freelancer's own words in the four prompts that share
+   the speaker-identity rule. Use impersonal or work-centred phrasing for progress when the
+   author's number is unstated. Brief Decoder and Acceptance Builder emit analysis artifacts
+   without a freelancer-authored message.
+3. Grade source relations in S4 and speaker number in S2/S7 independently of tone. Verify
+   the original inputs and positive controls for an explicit agreement, singular author and
+   plural author in each language. Keep the second-round raw outputs for comparison.
+
+Acceptance checks:
+
+- S4 preserves the client's request for brighter work and any reported disagreement about
+  the current result with their original status. If the reply refers to either claim, it
+  keeps the two separate and never recasts either as a prior agreement on brightness. The
+  author-confirmed control states the agreement exactly as given in the reply goal.
+- S2/S7 reports the missing materials impersonally on the original third-person notes. In
+  the controls, it preserves an explicit singular or plural author voice. A pronoun or
+  conjugated verb in a client quote does not change the freelancer's speaker number.
+
+The second-round artifact retains the original S4 warm RU and S2 firm ES outputs. Those two
+outputs fail the new criteria: one strengthened the client's claim about what was agreed,
+and one added a plural freelancer voice to third-person notes. The prior PASS labels are
+historical.
+
+### Verification of claim status and speaker number
+
+- All ten S4 runs on the original input kept the client's claims at their original status.
+  The three author-confirmed controls stated the agreement and kept the two-version decision
+  as an offer. The joint agreement did not create a team commitment.
+- All ten S2/S7 runs on third-person notes described the missing photos impersonally. All
+  six explicit-voice controls retained the speaker number for the wait, including the
+  Russian singular and plural forms. Every delay run made one photo request.
+- The six S1 and three R05 regression runs preserved the source facts, deadlines and
+  commitments. All 38 Luna runs used the existing single-text result contract. The saved,
+  displayed and copied message matched.
+- Config, architecture and docs validation passed. The Freelancer Suite and evaluator
+  tests passed (1,932 tests).
+
+Terra and Sol each passed the six explicit-voice controls on the final Update prompt. The
+comparative runs used the temporary test worker. Luna remains the default model.
+
+[Third-round live evidence](any-851-tone-and-reply-order-review-3.evidence.json)
