@@ -1,4 +1,4 @@
-"""Collect ANY-761 canonical outputs and ledger evidence on an isolated local live stack.
+"""Collect multilingual brief evaluations and ledger evidence on an isolated local live stack.
 
 Model selection belongs to the stack's backend configuration. This collector never changes it.
 Each invocation creates a new directory; failures and previous series are never overwritten.
@@ -35,6 +35,11 @@ root = Path('/app')
 products = (root / 'packages/backend/product-platforms/freelancer-suite/src'
             / 'anytoolai_freelancer_suite/products')
 files = [root / 'configs/kernel/litellm_router.yaml']
+kernel = root / 'configs/kernel/schemas'
+files.extend(kernel / name for name in (
+    'extract_input.schema.json', 'extract_output.schema.json', 'issue_detection_output.schema.json',
+    'generate_questions_input.schema.json', 'generate_questions_output.schema.json',
+))
 for name in ('brief_decoder', 'acceptance_builder'):
     files += sorted(p for p in (products / name).rglob('*') if p.is_file())
 hashes = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
@@ -303,12 +308,36 @@ def collect(args: argparse.Namespace, case: dict, attempt: int, snapshot: dict) 
     return record
 
 
+def draft_risk_cases() -> list[dict]:
+    suite = json.loads(
+        (ROOT / "tests/fixtures/acceptance_builder_eval/draft_risks_questions.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    cases = []
+    for case in suite["cases"]:
+        briefs = {case["language"]: case["input"]["brief_text"], **case.get("translations", {})}
+        for lang, brief in briefs.items():
+            cases.append(
+                {
+                    "id": f"{case['id'].rsplit('-', 1)[0]}-{lang.upper()}",
+                    "scenario_id": "acceptance_builder.draft_v1",
+                    "family": case["checks"],
+                    "expected_language": lang,
+                    "input": {"brief_text": brief},
+                    "criteria": suite["review_rubric"][case["checks"]],
+                }
+            )
+    return cases
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
     run.add_argument("--api-url", required=True)
     run.add_argument("--project", required=True, type=_parse_compose_project)
+    run.add_argument("--suite", choices=("language", "draft-risks"), default="language")
     run.add_argument("--scenario", choices=SCENARIOS, required=True)
     run.add_argument("--family", choices=("basic", "weak", "mixed", "override"))
     run.add_argument("--repeats", type=int, default=3)
@@ -355,12 +384,19 @@ def main() -> int:
     if args.repeats < 1 or args.timeout < 1:
         parser.error("repeats and timeout must be positive")
     args.api_url = args.api_url.rstrip("/")
+    cases = (
+        draft_risk_cases()
+        if args.suite == "draft-risks"
+        else json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
+    )
     cases = [
         case
-        for case in json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
+        for case in cases
         if case["scenario_id"] == args.scenario
         and (args.family is None or case["family"] == args.family)
     ]
+    if not cases:
+        parser.error("no cases match the selected suite, scenario and family")
     runs = [f"{case['id']}--{attempt}" for attempt in range(1, args.repeats + 1) for case in cases]
     for key in runs:
         evidence_path(args.out, f"{key}.json")

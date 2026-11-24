@@ -479,6 +479,12 @@ def test_draft_happy_path_composes_the_structured_result(
         "analysis_language",
     ]
 
+    # Verify the Draft-specific policy was actually sent to A01.
+    descriptions = {field["name"]: field["description"] for field in extract_input["fields"]}
+    assert "omit acceptance_criteria from values" in descriptions["acceptance_criteria"]
+    assert "keep the independently checkable conditions" in descriptions["acceptance_criteria"]
+    assert "omit assumptions and list it in missing_fields" in descriptions["assumptions"]
+
     # The one next action this product allows is recorded through the generic endpoint.
     response = asyncio.run(
         request_platform_api(
@@ -611,6 +617,80 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     )
     assert check_output == _expected_output(CHECK, ".weak_input")
     assert check_output["comparison"]["verdict"] == "does_not_meet"
+
+
+@pytest.mark.parametrize(
+    ("action", "field", "invalid", "recover"),
+    [
+        (EXTRACT, "deliverables", [], True),
+        (EXTRACT, "deliverables", ["  "], True),
+        (EXTRACT, "analysis_language", "ru_RU", True),
+        (DETECT, "description", " ", True),
+        (DETECT, "evidence", "\t", True),
+        (QUESTIONS, "question", "\n", True),
+        (QUESTIONS, "rationale", " \t\n", True),
+        (QUESTIONS, "question", "  ", False),
+    ],
+)
+def test_draft_retries_invalid_atom_before_publishing(
+    app, request_platform_api, session_factory, action, field, invalid, recover
+):
+    class InvalidOutputAdapter(RecordingProviderAdapter):
+        async def complete(self, request):
+            response = await super().complete(request)
+            if request.action_config_id == action and (
+                request.semantic_attempt_index == 1 or not recover
+            ):
+                output = json.loads(response.output_text)
+                value = (
+                    output["values"]
+                    if action == EXTRACT
+                    else output["issues" if action == DETECT else "questions"][0]
+                )
+                value[field] = invalid
+                return replace(response, output_text=json.dumps(output))
+            return response
+
+    registry = app.state.runtime.config_registry
+    fake = registry.provider_policies["default_fake_provider_v1"]
+    live_retry = registry.provider_policies["sol_text_generation_v1"].retry_policy
+    policies = {
+        **registry.provider_policies,
+        fake.provider_policy_ref: replace(fake, retry_policy=live_retry),
+    }
+    adapter = InvalidOutputAdapter(
+        FIXTURE_ROOT, variants={step: ".weak_input" for step in STEPS[DRAFT]}
+    )
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        config_registry=replace(registry, provider_policies=policies),
+        provider_adapters={"fake": adapter},
+    )
+    started = _start(app, request_platform_api, DRAFT, {"brief_text": WEAK_BRIEF_TEXT}).json()
+    try:
+        job = asyncio.run(worker.process_job(started["job_id"]))
+    finally:
+        worker.dispose()
+    assert [c.semantic_attempt_index for c in adapter.calls if c.action_config_id == action] == [
+        1,
+        2,
+    ]
+    if recover:
+        assert job.status is JobStatus.succeeded
+        response = asyncio.run(
+            request_platform_api(
+                app,
+                "GET",
+                f"/v1/results/{job.result_artifact_id}",
+                request_id="req_recovered_draft",
+            )
+        )
+        assert response.status_code == HTTPStatus.OK
+        assert response.json()["output"] == _expected_output(DRAFT, ".weak_input")
+    else:
+        assert job.status is JobStatus.failed
+        assert job.result_artifact_id is None
 
 
 @pytest.mark.parametrize(

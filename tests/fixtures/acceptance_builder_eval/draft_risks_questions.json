@@ -50,6 +50,10 @@
             "rationale": "Это поможет согласовать условия приёмки."
           }
         ]
+      },
+      "translations": {
+        "en": "I need a website for my business. I want it to look beautiful and modern and bring in customers. Get in touch if you can do it.",
+        "es": "Necesito un sitio web para mi negocio. Quiero que sea bonito y moderno y que atraiga clientes. Escríbanme si pueden hacerlo."
       }
     },
     {
@@ -97,8 +101,8 @@
             "source_issue_index": 0,
             "category": "scope_risk",
             "priority": "high",
-            "question": "Что важнее всего запустить завтра при бюджете 15 000 рублей?",
-            "rationale": "Ответ определит приоритет запуска."
+            "question": "Что важнее всего сдать завтра при бюджете 15 000 рублей?",
+            "rationale": "Ответ определит объём завтрашней сдачи."
           },
           {
             "source_issue_index": 1,
@@ -155,8 +159,8 @@
             "source_issue_index": 0,
             "category": "scope_risk",
             "priority": "high",
-            "question": "What takes priority for launch tomorrow within 15 000 rubles?",
-            "rationale": "This defines the launch scope."
+            "question": "What takes priority for delivery tomorrow within 15 000 rubles?",
+            "rationale": "This defines the delivery scope."
           },
           {
             "source_issue_index": 1,
@@ -213,8 +217,8 @@
             "source_issue_index": 0,
             "category": "scope_risk",
             "priority": "high",
-            "question": "¿Qué tiene prioridad para el lanzamiento de mañana con 15 000 rublos?",
-            "rationale": "La respuesta define el alcance del lanzamiento."
+            "question": "¿Qué tiene prioridad para la entrega de mañana con 15 000 rublos?",
+            "rationale": "La respuesta define el alcance de la entrega."
           },
           {
             "source_issue_index": 1,
@@ -266,6 +270,10 @@
             "rationale": "Ответ позволит согласовать критерий приёмки."
           }
         ]
+      },
+      "translations": {
+        "en": "We need a landing page for a course. The page must be in Russian only. The page needs a full English version. Deadline: 10 business days, budget: 40 000 rubles. We need an application form that sends submissions by email.",
+        "es": "Necesitamos una página de aterrizaje para un curso. La página debe estar solo en ruso. La página necesita una versión completa en inglés. Plazo: 10 días hábiles, presupuesto: 40 000 rublos. Necesitamos un formulario de solicitud que envíe las solicitudes por correo electrónico."
       }
     },
     {
@@ -280,8 +288,12 @@
         "extracted": {
           "values": {
             "acceptance_criteria": [
-              "Все блоки свёрстаны по согласованному макету.",
-              "Форма доставляет тестовую заявку на почту."
+              "Пять блоков (оффер, программа, преподаватель, тарифы, форма заявки) свёрстаны по согласованному макету.",
+              "Форма доставляет тестовую заявку на info@school.example.",
+              "Лендинг адаптирован под мобильные устройства.",
+              "Срок — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены два раунда правок."
             ],
             "assumptions": [
               "Заказчик предоставляет тексты и фото."
@@ -295,7 +307,29 @@
         },
         "issues": [],
         "questions": []
+      },
+      "translations": {
+        "en": "We need a landing page for an online school with 5 blocks (offer, curriculum, teacher, pricing, application form). We supply the text and photos. The form sends applications to info@school.example. Mobile layout required. Deadline: 14 business days, budget: 60 000 rubles, 2 rounds of revisions included. Acceptance: all blocks follow the approved layout and the form delivers a test application.",
+        "es": "Necesitamos una página de aterrizaje para una escuela en línea con 5 bloques (oferta, programa, docente, tarifas, formulario de solicitud). Nosotros proporcionamos los textos y las fotos. El formulario envía las solicitudes al correo info@school.example. Adaptación para móviles. Plazo: 14 días hábiles, presupuesto: 60 000 rublos, se incluyen 2 rondas de revisiones. Aceptación: todos los bloques siguen el diseño acordado y el formulario entrega una solicitud de prueba."
       }
     }
-  ]
+  ],
+  "review_rubric": {
+    "vague": [
+      "The business website is the only specified deliverable. Style and customer growth are wishes.",
+      "Ask openly for required pages/functions and for the decision that approves the design. No platform, deadline, deliverable or number is presupposed."
+    ],
+    "feasibility": [
+      "500 products, customer accounts, payment and 1C must fit tomorrow’s delivery and a budget of 15 000 rubles. Advertising starts Friday; the store launch is undated. Each mention of a date or amount must retain its subject and status.",
+      "Identify the combined feasibility risk and the open revision scope. Ask what work to prioritize or bound, without inventing a commitment or declaring delivery impossible."
+    ],
+    "contradiction": [
+      "Report both conflicting language requirements with their evidence. Ask the client which language/version to deliver; neither alternative is agreed.",
+      "Preserve the independent email form requirement."
+    ],
+    "complete": [
+      "Preserve all five named blocks, agreed layout, client-supplied text and photos, test form delivery and recipient, mobile support, 14 business days, 60 000 rubles and two included revision rounds.",
+      "The brief is complete and consistent. No findings or questions."
+    ]
+  }
 }

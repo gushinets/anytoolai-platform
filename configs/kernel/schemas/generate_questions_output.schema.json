@@ -9,11 +9,13 @@
         "properties": {
           "question": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "rationale": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "priority": {
             "type": "string",

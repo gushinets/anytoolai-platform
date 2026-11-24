@@ -32,6 +32,10 @@ class TestGenerateClarifyingQuestionsInputSchema:
             schema=QUESTIONS_INPUT,
         )
 
+    def test_issue_items_match_detection_output(self) -> None:
+        produced = _schema("issue_detection_output.schema.json")["properties"]["issues"]["items"]
+        assert QUESTIONS_INPUT["properties"]["issues"]["items"] == produced
+
     def test_full_valid_input(self) -> None:
         validate(
             instance={

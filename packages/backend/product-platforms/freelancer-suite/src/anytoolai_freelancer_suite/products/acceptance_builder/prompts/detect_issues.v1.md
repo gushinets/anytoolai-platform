@@ -39,6 +39,7 @@ Rules:
   is likely to cause rework, `low` otherwise.
 - `evidence` is a short quote or close paraphrase from the brief; omit it when the issue is an
   absence (nothing in the brief to quote).
+- Keep each fact tied to its stated subject and status in descriptions and evidence. Distinguish delivery, advertising and go-live when the client describes separate events. An omitted deadline stays open.
 - Report only real problems in this brief. If it is clear and complete, return an empty `issues`
   array -- that is a valid, successful result.
 - Assess combined feasibility. When the stated scope, deadline and budget may not fit

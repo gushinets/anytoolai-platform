@@ -548,3 +548,15 @@ def test_evaluator_uses_the_shared_language_tag_contract():
         assert evaluation.primary_language(tag) == tag.split("-")[0].lower()
     for tag in tags["rejected"]:
         assert evaluation.primary_language(tag) is None
+
+
+def test_draft_risk_suite_covers_all_four_briefs_in_each_language():
+    cases = evaluation.draft_risk_cases()
+    assert len({c["id"] for c in cases}) == len(cases) == 12
+    assert len({c["input"]["brief_text"] for c in cases}) == 12
+    assert {(c["family"], c["expected_language"]) for c in cases} == {
+        (family, lang)
+        for family in ("vague", "complete", "contradiction", "feasibility")
+        for lang in ("ru", "en", "es")
+    }
+    assert all(c["scenario_id"] == "acceptance_builder.draft_v1" and c["criteria"] for c in cases)

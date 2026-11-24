@@ -8,11 +8,17 @@ workflows:
     action_config_id: acceptance_builder.extract_v1
     input_mapping:
       source_text: scenario.input.brief_text
-      fields: literal:[{"name":"acceptance_criteria","type":"array_of_strings","description":"Conditions the brief says the
-        finished work must satisfy. When two statements directly contradict each other, put neither version in
-        acceptance_criteria. Keep non-conflicting checkable conditions and exact dates, amounts and counts.","required":false},{"name":"assumptions","type":"array_of_strings","description":"Things
-        the brief explicitly takes for granted. Wishes about style or business outcomes are not assumptions.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete
-        deliverables the client expects.","required":false},{"name":"analysis_language","type":"string","description":"Case-insensitive
+      fields: literal:[{"name":"acceptance_criteria","type":"nonempty_text_list","description":"Include only explicit, verifiable conditions on the delivered work or agreement.
+        For each item identify what the client could inspect or test, or the explicit agreed term they could verify.
+        Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test.
+        A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria.
+        In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently
+        checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in
+        acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers.
+        Keep dates and amounts attached to the event or obligation they qualify.","required":false},{"name":"assumptions","type":"nonempty_text_list","description":"Explicit project premises such as who supplies materials or an external dependency.
+        General background, wishes, and the mere existence of the client or their business are not project premises.
+        If none is stated, omit assumptions and list it in missing_fields.","required":false},{"name":"deliverables","type":"nonempty_text_list","description":"Concrete
+        deliverables the client expects.","required":false},{"name":"analysis_language","type":"language_tag","description":"Case-insensitive
         analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric
         subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it,
         even for a vague brief; it is presentation metadata, not a project requirement.","required":true}]

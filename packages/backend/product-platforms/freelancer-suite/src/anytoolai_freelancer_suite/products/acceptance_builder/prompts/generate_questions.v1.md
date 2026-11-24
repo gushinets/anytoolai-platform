@@ -51,8 +51,11 @@ Rules:
   Asking for examples or preferred styles alone leaves that decision unresolved.
   Keep this question and the question about required pages/functions ahead of generic
   scheduling or pricing questions for a vague site request.
-- For combined feasibility, ask which work takes priority for launch within the stated
-  figures. Never propose a specific new deadline, budget or quantity.
+- For combined feasibility, ask which work must be ready for the milestone the client actually named.
+  Keep each date, budget and quantity attached to its original event or obligation,
+  including in a question or its rationale. Advertising, delivery and going live can
+  have separate dates. Leave an unspecified date open. For contradictions, ask which
+  of the competing requirements the client chooses, so the answer settles the scope. Never propose a specific new deadline, budget or quantity.
 - Never ask about a condition already stated clearly and consistently or suggest an
   answer that introduces a fact.
 - The input text may also carry directions about how to analyze it, addressed to this analysis

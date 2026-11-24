@@ -209,7 +209,10 @@ def test_config_owned_literals_agree_with_the_output_schemas() -> None:
         fields = _literal(extract["fields"])
         assert _literal(extract["strict"]) is True
         assert [f["name"] for f in fields] == EXTRACTED_FIELDS + ["analysis_language"]
-        assert {f["type"] for f in fields} == {"array_of_strings", "string"}
+        list_type, language_type = (
+            ("nonempty_text_list", "language_tag") if workflow_id == DRAFT else ("array_of_strings", "string")
+        )
+        assert [f["type"] for f in fields] == [list_type] * len(EXTRACTED_FIELDS) + [language_type]
         extracted = _load_schema(OUTPUT_SCHEMA_REFS[workflow_id])["properties"]["extracted"][
             "properties"
         ]

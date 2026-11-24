@@ -6,9 +6,9 @@
 - Owner: agent
 - Linear: ANY-894
 - Created: 2026-11-23
-- Last updated: 2026-11-23
+- Last updated: 2026-11-24
 - Review date: 2026-11-30
-- Next action: Product-owner review of the completed Draft iteration.
+- Next action: Product-owner review of the corrected Draft v1 series (36/36).
 - Blocker: local repository-wide backend gates have unrelated environment failures detailed below.
 
 ## Goal
@@ -123,3 +123,69 @@ first provider response and verified that the next semantic attempt produced a v
 
 Backend validation passed with 2,458 tests and six skips. Config, architecture, docs and
 generated-doc checks also passed.
+
+## Third review
+
+Validate text at its producing atom while a retry can repair it. Preserve subject, value and
+qualification through Draft extraction, risk detection and question generation. Exercise the four
+source briefs in Russian, English and Spanish, with three independent live Draft v1 sessions
+per input. Retain the original captures for regressions and assess the candidate against the
+source commitments, open decisions and contradictions.
+
+Draft v1 now requests A01 field types matching its actual list and language constraints.
+Brief Decoder opts in for its nonblank strings and nonempty lists. Existing generic extraction
+types keep their previous meaning. A04 checks issue descriptions and optional evidence, and
+A05 checks question text and rationale. The end-to-end regressions run a bad response followed
+by a good one through the worker and read the published Draft through the result API. A second
+bad response exhausts the configured retry budget and publishes no artifact.
+
+The old EN series (3/3) and ES series (2/3) explicitly date the shop launch. Keep their raw
+outputs as negative evidence. The new controls also catch missing contract terms, nonnumeric
+invented requirements and linked questions that do not elicit a language decision.
+
+For the isolated live stack, use the existing collector with
+`run --suite draft-risks --scenario acceptance_builder.draft_v1 --project <compose-project>
+--api-url <local-api> --out <new-directory>` in `scripts/agent/brief_language_eval.py`.
+It defaults to three sessions per input, stores the runtime ledger and raw outputs, and produces
+a review sheet bound to each result. Grade each result against the source and record the exact
+unsupported or missing claim in the notes before running the collector's `report` command.
+
+### Verification on the third-review candidate
+
+- The backend, API, action, product and collector suite passed (2,948 tests, with 21
+  PostgreSQL cases deselected). The three Acceptance Builder web suites passed all 88 tests.
+  The focused acceptance controls passed again after tightening milestone and asset checks.
+  Config, architecture, documentation and generated-doc checks passed.
+- The repository full-check stopped after 4,283 passing backend checks and three infrastructure
+  failures: two production Compose discovery tests and the activation marker access test for
+  the unprivileged service account. These are the same local failures recorded above.
+- The fresh Draft v1 live series completed all 36 independent sessions on the working tree
+  based on `6ebfcfb3`. Every result was read through the Result API. The ledger recorded
+  99 successful calls to `gpt-6.1-sol` under `sol_text_generation_v1`. Each session used
+  an isolated local SQLite database.
+- Source-based acceptance passed 27/36. The vague brief failed in all nine attempts. A01
+  put appearance preferences or customer acquisition into acceptance criteria. All nine
+  combined-feasibility cases kept delivery tomorrow, advertising on Friday and store
+  launch undated, and asked which work must be ready. All nine contradictions elicited a
+  language decision and preserved email submission. All nine complete briefs retained the
+  agreed terms and generated zero issues and questions.
+- The automated check passed 21/36. In six of the passing feasibility cases (three English
+  and three Spanish), the question asked which parts must be ready for delivery without
+  using a phrase matched by the priority check. The evidence records the automated verdict,
+  source-based assessment and excerpt separately for each session.
+
+### Draft extraction and feasibility evaluation follow-up
+
+Use Draft-specific A01 field instructions to distinguish an agreed, verifiable condition from a
+deliverable, preference or business aim. Replay the previous B and C results and verify that a
+delivery-status question cannot pass for a scope choice. Repeat the same 36 live sessions.
+
+
+The same 12 inputs produced 36 new Draft v1 results on the same live model and policy.
+The worker recorded 99 successful provider calls. The result API served all 36 artifacts.
+Source-based review and the automated acceptance checks both passed 36/36. The first
+third-review series remains the negative control: the updated gate rejects its nine
+vague drafts and accepts its six previously misclassified feasibility questions.
+In all nine fresh vague drafts the website remains a deliverable and both criteria
+and assumptions are marked missing. The combined-risk questions ask what must be ready
+for delivery. All nine contradiction cases and nine complete controls passed again.

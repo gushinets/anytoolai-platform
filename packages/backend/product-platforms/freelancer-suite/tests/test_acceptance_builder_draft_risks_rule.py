@@ -2,6 +2,7 @@
 
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 
 import jsonschema
@@ -20,6 +21,123 @@ CASES = {
 }
 
 
+# Each expectation describes this fixture. Free-form source fidelity is also reviewed against
+# the case rubric. These probes never run on arbitrary customer text in production.
+COMPLETE_TERMS = {
+    "named blocks": (
+        r"\b(?:5|five|cinco|пять)\b",
+        r"оффер|offer|oferta",
+        r"программ|curriculum|program|syllabus",
+        r"преподавател|teacher|instructor|docente|profesor",
+        r"тариф|pric|tarifa|precio",
+        r"форм|form",
+    ),
+    "agreed layout": (
+        r"макет|layout|design|diseño|maqueta",
+        r"согласован|утвержд|approv|agreed|acordad|aprobad",
+    ),
+    "test submission": (r"тестов|test|prueba", r"заявк|application|submission|solicitud|envío"),
+    "recipient": (r"info@school\.example",),
+    "mobile": (r"мобиль|mobile|móvil|móviles",),
+    "deadline": (r"14\s+(?:рабоч\w*\s+дн|business days|working days|días (?:hábiles|laborables))",),
+    "budget": (r"60[ ,.\u202f\xa0]?000\s*(?:руб|₽|rub)",),
+    "included revisions": (
+        r"(?:\b2\b|два|двух|dos|two)\s+(?:раунд|rond|round)",
+        r"правок|правк|revision|revisi[oó]n|correcci[oó]n|cambios",
+        r"включ|вход|includ|inclu",
+    ),
+}
+WRONG_MILESTONE = re.compile(
+    r"(?:завтрашн\w* запуск|запустить завтра|запуск(?: магазина)? (?:уже |на )?завтра|launch(?:ing)? (?:the (?:shop|store) )?(?:by |on )?(?:tomorrow|friday)"
+    r"|(?:shop|store) goes live (?:tomorrow|friday)|lanzamiento (?:de (?:la tienda )?)?(?:mañana|el viernes)"
+    r"|entrega (?:el )?viernes|delivery (?:on |by )?friday|сдач\w* (?:в|к) пятниц\w*)"
+)
+UNSTATED_TERMS = re.compile(
+    r"\d|wordpress|shopify|wix|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+    r"lunes|martes|miércoles|jueves|viernes|sábado|domingo|tomorrow|mañana)\b|"
+    r"понедельник|вторник|(?:в |к )сред[уе]|четверг|пятниц|суббот|воскресень|завтра"
+)
+
+
+def prose(output):
+    for name, values in output["extracted"]["values"].items():
+        if name != "analysis_language":
+            yield from values
+    for section, fields in (
+        ("issues", ("description", "evidence")),
+        ("questions", ("question", "rationale")),
+    ):
+        for item in output[section]:
+            yield from (item[field] for field in fields if field in item)
+
+
+def has_all(text, patterns):
+    return all(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
+
+
+def check_complete(values):
+    terms = values.get("acceptance_criteria", []) + values.get("deliverables", [])
+    for label, patterns in COMPLETE_TERMS.items():
+        # The names can be listed across sections. Qualifiers belong to their own term.
+        candidates = [" ".join(terms)] if label == "named blocks" else terms
+        assert any(has_all(line, patterns) for line in candidates), label
+    assets = values.get("assumptions", []) + values.get("deliverables", [])
+    owner = r"заказчик|клиент|client|customer|school|escuela|nosotros|we\b"
+    supply = r"предостав|переда|suppl|provid|proporcion|facilit|aport"
+    for material in (r"текст|text|copy", r"фото|photo|foto"):
+        assert any(has_all(line, (owner, supply, material)) for line in assets), (
+            "client-supplied assets"
+        )
+
+
+def check_contradiction(issues, questions, criteria):
+    (index,) = [n for n, issue in enumerate(issues) if issue["category"] == "contradiction"]
+    evidence = issues[index]["evidence"].lower()
+    alternatives = (
+        r"только на русском|russian only|only in russian|solo en ruso",
+        r"английская версия|english version|versión completa en inglés",
+    )
+    assert has_all(evidence, alternatives)
+    assert any(
+        q["source_issue_index"] == index
+        and has_all(
+            q["question"],
+            (
+                r"како[йм]|какая|какие|какую|каки[ех]|выб|нужн|требуется|долж|"
+                r"which|what language|what version|should|do you (?:want|require|prefer)|"
+                r"cuál|qué idioma|qué versión|debe|quiere|prefiere|"
+                r"только.{1,50}или|only.{1,50} or |solo.{1,50} o ",
+                r"язык|языч|русск|английск|language|russian|english|idioma|ruso|inglés",
+            ),
+        )
+        for q in questions
+    ), "the linked question must ask for the language decision"
+    assert has_all(criteria, (r"форм|form", r"почт|e-?mail|correo"))
+    assert not re.search("русск|английск|russian|english|ruso|inglés", criteria)
+
+
+def asks_for_delivery_scope(question):
+    text = question.casefold()
+    if re.search(r"приоритет|границ|первую очередь|важнее|обязательн|priori|must[ -]have", text):
+        return True
+    # The client can select a minimum delivery scope without using the word "priority".
+    return has_all(
+        text,
+        (
+            r"deliver|tomorrow|entreg|mañana|сдач|завтра",
+            (
+                r"как(?:ой|ая|ую|ие) (?:объ[её]м|част[ьи]|работы|функции)\b[^?.!;]*?долж\w*\b|"
+                r"what (?:must|needs to|should) be (?:ready|delivered|included|completed)\b|"
+                r"qué (?:debe|necesita) (?:estar|quedar|entregarse|incluirse|completarse)\b|"
+                r"(?:which|what) (?:parts?|features?|functions?|work|scope)\b[^?.!;]*?"
+                r"(?:must|should|need(?:s)? to|(?:is|are) required)\b|"
+                r"(?:qué|cuáles) (?:partes?|funciones?|elementos?|alcance)\b[^?.!;]*?"
+                r"(?:debe\w*|necesit\w*|son (?:imprescindibles|obligatori\w*))\b"
+            ),
+        ),
+    )
+
+
 def check_result(case, output):
     jsonschema.validate(output, SCHEMA)
     issues = output["issues"]
@@ -32,26 +150,52 @@ def check_result(case, output):
     rule = case["checks"]
     if rule == "vague":
         assert len(questions) > 1
-        assert re.search("страниц|функц", asked)
+        assert re.search("страниц|функц|pages?|features?|function|páginas?|funcion", asked)
         assert any(
-            re.search("дизайн|оформлен", q["question"].lower())
-            and re.search("соглас|утверж|одобр|приним|принят", q["question"].lower())
+            re.search("дизайн|оформлен|design|diseño", q["question"].lower())
+            and re.search(
+                "соглас|утверж|одобр|приним|принят|approv|accept|sign.off|apr[ou]|aprob|acept|valid",
+                q["question"].lower(),
+            )
             for q in questions
         )
-        assert not re.search(r"\d", asked + " ".join(i["description"] for i in issues))
-        assert {"acceptance_criteria", "assumptions"} <= set(output["extracted"]["missing_fields"])
+        assert not any(UNSTATED_TERMS.search(line.lower()) for line in prose(output)), (
+            "unstated term"
+        )
+        assert {"acceptance_criteria", "assumptions"} <= set(
+            output["extracted"]["missing_fields"]
+        ), "the vague brief states neither acceptance conditions nor project premises"
+        assert any(
+            re.search(r"сайт|website|web ?site|sitio web|página web", item.casefold())
+            for item in values.get("deliverables", [])
+        ), "the explicitly requested website must remain a deliverable"
     elif rule == "feasibility":
         deadline = {"ru": "завтра", "en": "tomorrow", "es": "mañana"}[case["language"]]
+
+        assert not any(WRONG_MILESTONE.search(line.lower()) for line in prose(output)), (
+            "wrong milestone"
+        )
 
         def combined(issue):
             text = (issue["description"] + " " + issue.get("evidence", "")).lower()
             return (
                 issue["severity"] == "high"
                 and issue["category"] in {"scope_risk", "timeline_risk", "budget_risk"}
-                and all(fact in text for fact in ("500", "15 000", deadline))
+                and has_all(
+                    text,
+                    (
+                        r"500",
+                        r"15[ .,\u202f\xa0]?000",
+                        deadline,
+                        r"кабинет|account|cuenta",
+                        r"оплат|payment|pago",
+                        r"1[cс]",
+                    ),
+                )
             )
 
-        assert any(combined(i) for i in issues)
+        feasibility_indexes = {index for index, issue in enumerate(issues) if combined(issue)}
+        assert feasibility_indexes, "missing combined feasibility finding"
         assert any(
             i["category"] == "scope_risk"
             and re.search(
@@ -60,28 +204,23 @@ def check_result(case, output):
             )
             for i in issues
         )
-        assert re.search(
-            "приоритет|запуск|запустить|границ|первую очередь|"
-            "priorit|launch|scope|prioridad|lanzamiento|alcance",
-            asked,
-        )
+        assert any(
+            q["source_issue_index"] in feasibility_indexes
+            and asks_for_delivery_scope(q["question"])
+            for q in questions
+        ), "ask which scope takes priority for the stated milestone"
         facts = json.dumps(values, ensure_ascii=False).lower()
-        assert "500" in facts and ("15 000" in facts or deadline in facts)
+        assert has_all(facts, (r"500", r"15[ .,\u202f\xa0]?000", deadline))
         assert not re.search(
             "невозможно|нереально|не получится|impossible|cannot be done|imposible",
             " ".join(i["description"] for i in issues).lower(),
         )
     elif rule == "contradiction":
-        (index,) = [n for n, issue in enumerate(issues) if issue["category"] == "contradiction"]
-        evidence = issues[index]["evidence"].lower()
-        assert "только на русском" in evidence and "английская версия" in evidence
-        assert any(q["source_issue_index"] == index for q in questions)
-        assert "форм" in criteria and "почт" in criteria
-        assert not re.search("русск|английск", criteria)
+        check_contradiction(issues, questions, criteria)
     else:
         assert rule == "complete"
         assert issues == questions == []
-        assert all(word in criteria for word in ("блок", "форм", "заявк"))
+        check_complete(values)
 
 
 @pytest.mark.parametrize("case", CASES.values(), ids=CASES.keys())
@@ -128,4 +267,134 @@ def test_captured_live_series_covers_each_brief_three_times():
     assert {(run["case_id"], run["run"]) for run in runs} == expected
     assert len({run["session_id"] for run in runs}) == len(runs) == len(expected)
     for run in runs:
-        check_result(CASES[run["case_id"]], run["output"])
+        # Keep the original live evidence immutable, including the known incorrect questions.
+        bad_launch = run["case_id"] == "AB-894-C-EN" or (
+            run["case_id"] == "AB-894-C-ES" and run["run"] in {2, 3}
+        )
+        if bad_launch:
+            with pytest.raises(AssertionError, match="wrong milestone"):
+                check_result(CASES[run["case_id"]], run["output"])
+        else:
+            check_result(CASES[run["case_id"]], run["output"])
+
+
+@pytest.mark.parametrize(
+    ("case_id", "section", "field", "replacement", "reason"),
+    [
+        ("AB-894-B-RU", "issues", "description", "Сайт нужен к пятнице.", "unstated term"),
+        (
+            "AB-894-B-RU",
+            "questions",
+            "question",
+            "Какие страницы нужны в WordPress?",
+            "unstated term",
+        ),
+        (
+            "AB-894-C-ES",
+            "questions",
+            "rationale",
+            "Prepara el lanzamiento de mañana.",
+            "wrong milestone",
+        ),
+        (
+            "AB-894-C-EN",
+            "questions",
+            "question",
+            "What takes priority for launch tomorrow?",
+            "wrong milestone",
+        ),
+        (
+            "AB-894-CTRL-CONTRADICTION-RU",
+            "questions",
+            "question",
+            "Вы видите противоречие между формулировками?",
+            "language decision",
+        ),
+    ],
+)
+def test_one_changed_claim_fails_acceptance(case_id, section, field, replacement, reason):
+    case = CASES[case_id]
+    output = deepcopy(case["canonical"])
+    output[section][0][field] = replacement
+    with pytest.raises(AssertionError, match=reason):
+        check_result(case, output)
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement"),
+    [
+        ("преподаватель", "бонус"),
+        ("согласованному макету", "техническому описанию"),
+        ("тестовую заявку", "заявку"),
+        ("info@school.example", "sales@school.example"),
+        ("мобильные устройства", "ноутбуки"),
+        ("14 рабочих дней", "14 календарных дней"),
+        ("60 000 рублей", "60 000 долларов"),
+        ("Включены два раунда", "Оплачиваются отдельно два раунда"),
+    ],
+)
+def test_complete_brief_preserves_each_agreed_term(original, replacement):
+    case = CASES["AB-894-CTRL-COMPLETE-RU"]
+    output = deepcopy(case["canonical"])
+    criteria = output["extracted"]["values"]["acceptance_criteria"]
+    assert any(original in line for line in criteria)
+    criteria[:] = [line.replace(original, replacement) for line in criteria]
+    with pytest.raises(AssertionError):
+        check_result(case, output)
+
+
+def test_equivalent_language_decision_is_accepted():
+    case = CASES["AB-894-CTRL-CONTRADICTION-RU"]
+    output = deepcopy(case["canonical"])
+    output["questions"][0]["question"] = "На каком языке должна быть готовая страница?"
+    check_result(case, output)
+
+
+@pytest.mark.parametrize(
+    ("language", "question"),
+    [
+        ("en", "Are all parts of the shop ready for delivery tomorrow?"),
+        ("es", "¿Están listas todas las partes de la tienda para la entrega de mañana?"),
+        ("ru", "Весь ли магазин готов к сдаче завтра?"),
+        ("en", "What time must the shop be ready for delivery tomorrow?"),
+        ("en", "What is the cost of the full scope?"),
+        ("es", "¿Cuánto cuesta todo el alcance?"),
+    ],
+)
+def test_feasibility_status_or_price_question_does_not_choose_scope(language, question):
+    case = CASES[f"AB-894-C-{language.upper()}"]
+    output = deepcopy(case["canonical"])
+    output["questions"][0]["question"] = question
+    with pytest.raises(AssertionError, match="which scope"):
+        check_result(case, output)
+
+
+@pytest.mark.parametrize(
+    ("filename", "expect_vague_failure"),
+    [
+        ("any-894-review-3-live.evidence.json", True),
+        ("any-894-draft-grounding-live.evidence.json", False),
+    ],
+)
+def test_live_draft_matrix(filename, expect_vague_failure):
+    evidence = json.loads((FIXTURES / filename).read_text(encoding="utf-8"))
+    cases = evidence["cases"]
+    runs = evidence["runs"]
+    assert {(case["family"], case["language"]) for case in cases.values()} == {
+        (family, language)
+        for family in ("vague", "feasibility", "contradiction", "complete")
+        for language in ("ru", "en", "es")
+    }
+    expected = {(key, attempt) for key in cases for attempt in (1, 2, 3)}
+    assert {(r["case_id"], r["run"]) for r in runs} == expected
+    assert len({r["session_id"] for r in runs}) == len(runs) == 36
+    for run in runs:
+        case = cases[run["case_id"]]
+        rule = {"language": case["language"], "checks": case["family"]}
+        if expect_vague_failure and case["family"] == "vague":
+            with pytest.raises(
+                AssertionError, match="neither acceptance conditions nor project premises"
+            ):
+                check_result(rule, run["output"])
+        else:
+            check_result(rule, run["output"])

@@ -217,8 +217,12 @@ def test_a05_is_guarded_and_a10_reads_its_output_optionally() -> None:
 # `brief.values`. Code review finding (round #1, finding #8): a names-only comparison would miss
 # e.g. `target_audience` silently changing from `string` to `array_of_strings` in the literal.
 _A01_TYPE_TO_JSON_SCHEMA_TYPE = {
-    "string": {"type": "string"},
-    "array_of_strings": {"type": "array", "items": {"type": "string"}},
+    "nonblank_string": {"type": "string", "minLength": 1, "pattern": r"\S"},
+    "nonempty_text_list": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string", "minLength": 1, "pattern": r"\S"},
+    },
 }
 
 
@@ -249,11 +253,7 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     for field in fields:
         expected_shape = _A01_TYPE_TO_JSON_SCHEMA_TYPE[field["type"]]
         declared_property = value_properties[field["name"]]
-        assert declared_property["type"] == expected_shape["type"], field["name"]
-        if expected_shape["type"] == "array":
-            assert declared_property["items"]["type"] == expected_shape["items"]["type"], (
-                field["name"]
-            )
+        assert declared_property == expected_shape, field["name"]
 
 
 @pytest.mark.parametrize("state", ["present_and_missing", "absent_from_both", "confidence_only"])

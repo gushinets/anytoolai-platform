@@ -13,7 +13,8 @@
           },
           "description": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "severity": {
             "type": "string",
@@ -21,7 +22,8 @@
           },
           "evidence": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
         "required": ["category", "description", "severity"],
