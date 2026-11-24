@@ -86,10 +86,14 @@ The host file is `/opt/payments-portal/deploy/caddy/Caddyfile.prod`. The contain
 
 1. For each stack you update, close its ingress and quiesce it from the running checkout.
    Keep Lab's route ahead of any product maintenance response for `/tools/*` or `/v1/*`.
-   Save a fresh PostgreSQL dump. For a schema change, restore that dump into an isolated
-   database and run the candidate migrator there first. Verify the Alembic revision, row
-   counts, and checksums for the preserved data.
-   [Migration rehearsal and database rollback](execution-metering-cutover.md)
+   Save a fresh PostgreSQL dump after quiescing. If the release changes the database schema
+   or its rollback depends on a dump, restore that exact dump into a separate empty
+   verification database with `pg_restore --exit-on-error`. This includes ANY-894 even
+   when the Alembic revision matches. Compare the restored Alembic revision, row counts,
+   and checksums with the quiesced source. Defer the cutover until these checks pass.
+   For a schema change, then run the candidate migrator on the verification database and
+   check the target revision and preserved data.
+   [Backup and restore rehearsal](execution-metering-cutover.md#drain-and-backup-on-the-running-revision)
 2. Run `prod-quiesce` to drain the product queue, then `prod-down` from the running checkout
    after backup and any migration rehearsal. Run `prod-up` and `prod-ready` from the
    candidate. Keep the named volume. Check the enabled product pages and runtime-config
@@ -134,8 +138,9 @@ Alembic revision.
    ingress, use an authorized account or guest session to verify that
    `GET /v1/results/{result_id}` returns HTTP 200 for a saved pre-release Draft and a saved
    enriched Draft, when both are present.
-3. If rollback requires the original API, restore the verified pre-release dump into a
-   separate database using the recovery steps above. Keep the candidate database for recovery.
+3. If rollback requires the original API, restore the pre-release dump rehearsed during
+   [cutover preparation](#switch-the-stacks-and-verify) into a separate database using the
+   recovery steps above. Keep the candidate database for recovery.
    Results saved after that dump are absent from the restored database. Before reopening
    ingress, verify product readiness and reopen a saved pre-release Draft through the Result API.
 

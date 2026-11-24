@@ -285,3 +285,23 @@ All 164 evaluator and product acceptance tests passed. Regrading the original re
 with the updated report command returned 36 PASS for review four and 36 PASS for review five.
 Every family and language pair scored 3/3 in each archive. The captured files retained their
 original bytes, and the regrade used the saved results and ledgers without new provider calls.
+
+### Seventh review
+
+Expose the existing historical Acceptance Builder contract through a report-only option
+for unversioned ANY-761 archives. Mark new manifests with the current evidence contract.
+Test the archive and current paths side by side, then rerun both saved Draft risk reports.
+
+Require a pre-cutover restore rehearsal whenever the rollback path depends on a dump.
+The ANY-894 rollback to the pre-change API requires this rehearsal even when the Alembic
+revision matches. Use the existing isolated restore procedure and keep migration rehearsal
+conditional on a schema change.
+
+The same legacy Draft is FAIL in the default report and PASS in the explicit archive mode.
+CLI regressions also cover archived Draft and Check documents, incomplete review decisions,
+missing document steps, review digest mismatch, and rejection of current manifests and
+Draft risk evidence in archive mode. The report leaves the original archive files intact.
+
+All 173 evaluator and acceptance tests passed. The unchanged fourth and fifth review matrices
+passed again in the default report, with 72 PASS, 0 FAIL, and 0 PENDING. Each case and language
+combination scored 3/3 in each archive. The regrade used the saved outputs and provider ledgers.

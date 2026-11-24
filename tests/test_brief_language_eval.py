@@ -504,6 +504,8 @@ def test_cli_run_and_review_report_round_trip_preserves_json_data(monkeypatch, t
 
     assert evaluation.main() == 0
     collector.assert_called_once()
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["evidence_contract"] == "current"
     key = case["id"] + "--1"
     saved = json.loads((out / f"{key}.json").read_text(encoding="utf-8"))
     assert saved == run
@@ -626,7 +628,7 @@ def risk_record(family, sections, steps, attempt=1):
     return run
 
 
-def write_report_inputs(out, *runs):
+def write_report_inputs(out, *runs, historical=False):
     keys = [f"{run['case']['id']}--{run['attempt']}" for run in runs]
     cases = {run["case"]["id"]: run["case"] for run in runs}
     evaluation.write_json(
@@ -634,8 +636,93 @@ def write_report_inputs(out, *runs):
     )
     for key, run in zip(keys, runs, strict=True):
         evaluation.write_json(out / f"{key}.json", run)
-        evaluation.write_json(out / f"{key}.review.json", completed_review(run))
+        evaluation.write_json(
+            out / f"{key}.review.json", completed_review(run, historical=historical)
+        )
     return keys
+
+
+def any761_archive_record(mode, *, document=False, document_step=True):
+    case = next(case for case in CASES if case["id"] == f"ANY761-AB-{mode}-RU-weak")
+    canonical = CANONICAL[case["id"]]
+    output = {"extracted": deepcopy(canonical["extracted"])}
+    steps = ["extract"]
+    if mode == "C":
+        output["comparison"] = deepcopy(canonical["comparison"])
+        steps.append("compare")
+    if document:
+        del output["extracted"]["values"]["analysis_language"]
+        output["document"] = {"summary": "Уточните требования.", "sections": []}
+        if document_step:
+            steps.append("generate_document")
+    run = record(steps)
+    run.update(case=case, output=output, attempt=1, snapshot={})
+    run["ledger"]["artifacts"][0]["content_json"] = output
+    return run
+
+
+@pytest.mark.parametrize(("mode", "document"), [("D", False), ("D", True), ("C", True)])
+def test_cli_replays_any761_archive_only_with_explicit_opt_in(
+    mode, document, monkeypatch, tmp_path, capsys
+):
+    run = any761_archive_record(mode, document=document)
+    (key,) = write_report_inputs(tmp_path, run, historical=True)
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+    args = cli_args("report", tmp_path)
+    monkeypatch.setattr(sys, "argv", args)
+    assert evaluation.main() == 1
+    assert capsys.readouterr().out.startswith(f"{key}: FAIL")
+
+    monkeypatch.setattr(sys, "argv", [*args, "--historical-any-761"])
+    assert evaluation.main() == 0
+    assert capsys.readouterr().out == f"{key}: PASS\n"
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
+@pytest.mark.parametrize("missing", ["document_step", "review_decision"])
+def test_cli_archive_mode_still_requires_ledger_and_review(missing, monkeypatch, tmp_path, capsys):
+    run = any761_archive_record("D", document=True, document_step=missing != "document_step")
+    (key,) = write_report_inputs(tmp_path, run, historical=True)
+    if missing == "review_decision":
+        path = tmp_path / f"{key}.review.json"
+        review = completed_review(run, historical=True)
+        review["fields"]["/document/summary"] = None
+        path.write_text(json.dumps(review), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [*cli_args("report", tmp_path), "--historical-any-761"])
+    assert evaluation.main() == 1
+    assert capsys.readouterr().out == f"{key}: PENDING\n"
+
+
+def test_archive_report_checks_the_original_review_digest(monkeypatch, tmp_path):
+    run = any761_archive_record("D")
+    (key,) = write_report_inputs(tmp_path, run, historical=True)
+    review = completed_review(run, historical=True)
+    review["evidence_sha256"] = "different-record"
+    (tmp_path / f"{key}.review.json").write_text(json.dumps(review), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [*cli_args("report", tmp_path), "--historical-any-761"])
+    with pytest.raises(ValueError, match="does not belong to this evidence"):
+        evaluation.main()
+
+
+@pytest.mark.parametrize("kind", ["draft-risks", "current-manifest", "wrong-scenario"])
+def test_archive_cli_rejects_other_manifests(kind, monkeypatch, tmp_path, capsys):
+    if kind == "draft-risks":
+        run = risk_record("complete", {}, ("extract",))
+    else:
+        run = any761_archive_record("D")
+        if kind == "wrong-scenario":
+            run["case"] = {**run["case"], "scenario_id": "acceptance_builder.check_v1"}
+    write_report_inputs(tmp_path, run, historical=True)
+    if kind == "current-manifest":
+        path = tmp_path / "manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["evidence_contract"] = "current"
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [*cli_args("report", tmp_path), "--historical-any-761"])
+    with pytest.raises(SystemExit) as error:
+        evaluation.main()
+    assert error.value.code == 2
+    assert "requires an unversioned ANY-761 AB archive" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("family", ["vague", "feasibility", "contradiction", "complete"])

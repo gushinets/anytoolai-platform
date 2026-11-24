@@ -28,10 +28,11 @@ PRODUCTS = (
     / "anytoolai_freelancer_suite/products"
 )
 DRAFT = "acceptance_builder.draft_v1"
+CHECK = "acceptance_builder.check_v1"
 OUTPUT_SCHEMAS = {
     "brief_decoder.decode_v1": "brief_decoder/schemas/decode_output.schema.json",
     DRAFT: "acceptance_builder/schemas/draft_output.schema.json",
-    "acceptance_builder.check_v1": "acceptance_builder/schemas/check_output.schema.json",
+    CHECK: "acceptance_builder/schemas/check_output.schema.json",
 }
 SCENARIOS = tuple(OUTPUT_SCHEMAS)
 
@@ -243,7 +244,7 @@ def review_status(record: dict, review: dict, *, historical: bool = False) -> st
             "generate_document",
         },
         DRAFT: {"extract", "detect_issues", "generate_questions"},
-        "acceptance_builder.check_v1": {"extract", "compare"},
+        CHECK: {"extract", "compare"},
     }[scenario]
     output = record["output"]
     if historical and scenario.startswith("acceptance_builder.") and "document" in output:
@@ -391,6 +392,15 @@ def draft_risk_cases() -> list[dict]:
     return cases
 
 
+def _is_any761_archive_case(case: dict) -> bool:
+    prefix = {DRAFT: "ANY761-AB-D", CHECK: "ANY761-AB-C"}.get(case["scenario_id"])
+    return (
+        prefix is not None
+        and re.fullmatch(rf"{prefix}-(?:RU|EN|ES)-(?:basic|weak|mixed|override)", case["id"])
+        is not None
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -405,9 +415,21 @@ def main() -> int:
     run.add_argument("--out", type=Path, required=True)
     report = commands.add_parser("report")
     report.add_argument("--out", type=Path, required=True)
+    report.add_argument(
+        "--historical-any-761",
+        action="store_true",
+        help="Read an unversioned ANY-761 Acceptance Builder archive under its original contract",
+    )
     args = parser.parse_args()
     if args.command == "report":
         manifest = json.loads(evidence_path(args.out, "manifest.json").read_text(encoding="utf-8"))
+        historical = args.historical_any_761
+        if historical:
+            cases = manifest.get("cases", [])
+            if "evidence_contract" in manifest or not cases or not all(
+                _is_any761_archive_case(case) for case in cases
+            ):
+                report.error("--historical-any-761 requires an unversioned ANY-761 AB archive")
         statuses = []
         for key in manifest["runs"]:
             reason = None
@@ -424,13 +446,17 @@ def main() -> int:
                     or record["snapshot"] != manifest["snapshot"]
                 ):
                     raise ValueError("run differs from the planned case/configuration")
-                reason = output_contract_error(record)
+                reason = output_contract_error(record, historical=historical)
                 if reason or record.get("error") or record.get("evidence_error"):
                     status = "FAIL"
                 else:
                     review_path = evidence_path(args.out, f"{key}.review.json")
                     status = (
-                        review_status(record, json.loads(review_path.read_text(encoding="utf-8")))
+                        review_status(
+                            record,
+                            json.loads(review_path.read_text(encoding="utf-8")),
+                            historical=historical,
+                        )
                         if review_path.exists()
                         else "PENDING"
                     )
@@ -473,7 +499,13 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=False)
     write_json(
         evidence_path(args.out, "manifest.json"),
-        {"cases": cases, "runs": runs, "snapshot": snapshot, "source": _git_state()},
+        {
+            "cases": cases,
+            "runs": runs,
+            "snapshot": snapshot,
+            "source": _git_state(),
+            "evidence_contract": "current",
+        },
     )
     for attempt in range(1, args.repeats + 1):
         for case in cases:
