@@ -26,8 +26,7 @@ def test_tone_contract_is_present_verbatim(prompt: Path) -> None:
 def test_update_prompt_keeps_client_actions_across_tones() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "`warm` never drops a client action that `firm` states" in text
-    assert "once in `call_to_action` in every tone" in text
-    assert "Decide which field carries each client request before drafting" in text
+    assert "Include each needed client request once in `text`" in text
     assert "unless the notes say they arrived, are no longer needed" in text
 
 
@@ -53,7 +52,7 @@ def test_reply_prompt_orders_acknowledgement_before_explanation() -> None:
 def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
     assert "remains the client's account unless `intent` confirms it" in text
-    assert "Present subjective descriptions as the client's perception" in text
+    assert "Put any evaluative adjective inside the attributed perception" in text
     assert "claims about prior requests, actions or agreements out of the acknowledgement" in text
     assert (
         "An authorized admission belongs with the acknowledgement, including in a firm reply"
@@ -66,8 +65,9 @@ def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> Non
 
 def test_reply_tone_changes_the_opening() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
-    assert "`warm`: open with a short first-person acknowledgement" in text
-    assert "`firm`: open with a concise statement of the specific issue" in text
+    assert "free of first-person empathy, thanks and appreciation" in text
+    assert "`warm`: open with a short first-person expression of empathy" in text
+    assert "For an opinion, name the client's expectation or reaction directly" in text
     assert "Changing a modal verb or the word order alone is insufficient" in text
 
 

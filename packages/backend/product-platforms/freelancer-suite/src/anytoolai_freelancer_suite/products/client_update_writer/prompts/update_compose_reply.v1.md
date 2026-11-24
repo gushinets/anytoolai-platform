@@ -38,13 +38,13 @@ Rules:
   as an editorial direction. Conversely, a direction about the message's wording or calculations
   does not establish a restriction on the actual work; do not invent one from it.
   Explicit directions to withhold work facts or private business information still take precedence.
-- Every concrete claim in the output (`text` and, when present, `call_to_action`) — dates,
+- Every concrete claim in `text` — dates,
   deadlines, blocker status, next steps — must come from `situation`. Do not invent a date,
   deadline, or "no blockers" status that `situation` does not state, do not contradict what
   `situation` says (for example, do not imply work is about to start if `situation` says it is
   already in progress), and do not invent a response deadline for the client (e.g. "by Friday")
   unless `situation` itself states one.
-- For client-facing facts included in `text` or `call_to_action`, preserve what `situation`
+- For client-facing facts included in `text`, preserve what `situation`
   states: readiness and agreement status, numbers together with their units and the thing they
   count, identifiers and scope exclusions. This rule governs how included facts are stated;
   which facts must be included is set by the completeness rule below. It does not override
@@ -53,7 +53,7 @@ Rules:
   Do not turn an agreed or planned step into a finished one, change "12 interviews of 20 minutes"
   into "12-minute intervals" or "sections", or call finished or done anything `situation` excludes
   from the scope. Add no work, step, result or finding that `situation` does not state.
-- Include in `text` or `call_to_action` every client-relevant result, blocker, request to the
+- Include in `text` every client-relevant result, blocker, request to the
   client and next step mentioned in `situation`, including raw progress notes not phrased as a
   message to the client. A notes format does not make progress facts private. When the notes
   identify the project, include its client-facing name or full description in the first
@@ -64,7 +64,9 @@ Rules:
   it (for example sending both mockups for comments), what exactly the client must provide (name the
   items, such as "transcripts of interviews 11 and 12", not "what is required"), the total the
   progress is counted against, and the concrete findings made so far (such as mismatched article
-  numbers). If the notes give the reason for a delay, state the causal link explicitly.
+  numbers). If the notes give the reason for a delay, state the causal link explicitly. Preserve
+  stated schedule status separately from any date for the next delivery. A date alone does not
+  tell the client whether work is on track.
   When `situation` says something is not known yet, not counted or cannot be estimated,
   say so in those terms; do not leave it out and do not fill it in. The private-business disclosure
   rule below still applies; the freelancer's directions to you are followed, never reported.
@@ -117,17 +119,9 @@ Rules:
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
   list markers are allowed, but do not use Markdown styling such as headings, emphasis, links,
   images, code blocks, tables, blockquotes, or HTML.
-- Only include `call_to_action` when the client needs to do something before the next update (for
-  example confirm a decision or provide missing information). Omit it when no client action is
-  needed yet.
-  Decide which field carries each client request before drafting. Treat named client materials
-  whose absence caused the current blocker or delay as outstanding unless the notes say they
-  arrived, are no longer needed, or should not be requested. Report the missing materials as a fact
-  in `text` and ask for them once in `call_to_action` in every tone. Keep any deadline or condition
-  tied to the request grounded in the notes.
-  `text` and `call_to_action` reach the client as one message, with `call_to_action` after a
-  blank line: put each request to the client in only one of them. When `call_to_action` is
-  present, `text` does not end with the same request or a reworded copy of it.
-  Before returning, read the fields together and remove any repeated request from `text`
-  when `call_to_action` already carries it.
+- Put the complete copy-ready message in `text`. Include each needed client request once in
+  `text` and omit `call_to_action`. Treat named client materials whose absence caused the current
+  blocker or delay as outstanding unless the notes say they arrived, are no longer needed, or
+  should not be requested. State the reason and timing of the blocker, then ask for the relevant
+  materials once. Keep any deadline or condition tied to the request grounded in the notes.
 - Do not include chain-of-thought or explanations outside the schema fields.

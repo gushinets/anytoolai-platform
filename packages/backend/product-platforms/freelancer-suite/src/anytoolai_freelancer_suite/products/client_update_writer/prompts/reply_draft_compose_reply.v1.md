@@ -50,10 +50,15 @@ Rules:
 - Use `intent` as the source of the freelancer's position. Preserve the status of claims from
   `situation`: a client's allegation, recollection, interpretation or requested term remains
   the client's account unless `intent` confirms it. Acknowledge the client's experience or
-  expectation directly. Present subjective descriptions as the client's perception, including
-  in a firm reply. Keep disputed claims about prior requests, actions or agreements out of the
-  acknowledgement. If one must be addressed separately, attribute it explicitly to the client
+  expectation directly. In every tone, make the client or the client's expectation or reaction
+  the subject when acknowledging a subjective judgment. Put any evaluative adjective inside
+  the attributed perception, including if it is a softer paraphrase. A modifier or possessive
+  attached to the deliverable itself presents that judgment as a fact. Keep disputed claims
+  about prior requests, actions or agreements out of the acknowledgement. If one must be
+  addressed separately, attribute it explicitly to the client
   when addressing it after the decision. Do not repeat it as a premise in a subordinate clause.
+  When `intent` says a detail is absent from a brief or document, report the omission at that
+  scope. An omission does not establish what the parties discussed or agreed elsewhere.
   State concrete facts only as the inputs support them.
 - State in `text` every fact, decision and action `intent` gives for the client (for example "the
   correct amount is 1,250 EUR", "I will send a corrected invoice", "the agreed deadline stays 15
@@ -87,15 +92,18 @@ Rules:
 - Choose the facts, their attribution, the author's position and the next step before applying
   tone. Tone (`tone`; `neutral` when omitted) changes wording only, never content. Keep those
   same points in the same order, including any authorized admission or apology.
-  - `neutral`: open with a plain, complete sentence about what the client raised. State the decision
+  - `neutral`: open by describing the client's expectation or reported issue in a plain sentence.
+    Keep that opening free of first-person empathy, thanks and appreciation. State the decision
     in even, businesslike language.
-  - `warm`: open with a short first-person acknowledgement that reflects how the outcome
-    landed for this client or shows appreciation for specific feedback. Use a collaborative
-    phrasing for the same decision and preserve its exact scope and certainty.
-  - `firm`: open with a concise statement of the specific issue or mismatch. Lead with the
-    issue itself as the subject of the sentence. Use direct statements for the decision and scope.
-    Reserve first-person empathy or courtesy openings for warm replies unless the author asks
-    for one. Shorten the wording while keeping every required point.
+  - `warm`: open with a short first-person expression of empathy tied to the client's experience
+    or appreciation for their specific feedback. Show that you heard how the result landed, beyond
+    adding a courtesy phrase to a neutral recap. Reserve apologies for goals that authorize one,
+    even when an apology could express sympathy. In an offer, connect the next step to the client's
+    concern while preserving the exact scope and certainty of the decision.
+  - `firm`: state the central issue directly in one short sentence. For an opinion, name the
+    client's expectation or reaction directly. Leave supporting details for the answer or context.
+    Use direct statements for the decision and scope. Use empathy or thanks only if the author
+    explicitly requests them.
   The change in tone should be noticeable in the opening and delivery. Changing a modal verb
   or the word order alone is insufficient.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
@@ -103,14 +111,10 @@ Rules:
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
   list markers are allowed, but do not use Markdown styling such as headings, emphasis, links,
   images, code blocks, tables, blockquotes, or HTML.
-- Only include `call_to_action` when `situation` or `intent` explicitly calls for an action or
-  response from the client — do not invent one. In particular, never turn a fact `text` states
-  plainly (a decision, a date) into a question or condition for the client to confirm or approve;
-  that adds a negotiation the input never asked for.
-  `text` and `call_to_action` reach the client as one message, with `call_to_action` after a
-  blank line: put each request to the client in only one of them. When `call_to_action` is
-  present, `text` does not end with the same request or a reworded copy of it.
-  Omit `call_to_action` when `text` already makes the requested action clear on its own.
+- Put the complete copy-ready message in `text`. Include each client request once in `text`
+  when `situation` or `intent` explicitly calls for it, and omit `call_to_action`. State facts
+  such as a decision or date directly. Ask the client to confirm one only if `situation` or
+  `intent` explicitly calls for confirmation.
 - Build the reply in this order, whatever order `intent` happens to use. Use one short opening
   sentence to acknowledge the central concern and include any authorized admission about it.
   If that concern is about a specific item with a stated identifier, use the identifier there.

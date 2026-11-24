@@ -463,6 +463,7 @@ def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: st
     reply_step = next(step for step in workflow["steps"] if step["step_id"] == "compose_reply")
 
     assert reply_step["input_mapping"]["constraints"] == "?scenario.input.constraints"
+    assert reply_step["input_mapping"]["output_layout"] == 'literal:"single_text"'
 
 
 # The E2E test's amount/due_date assertion doesn't protect the *other* grounded facts the billing
@@ -710,7 +711,7 @@ def test_reply_prompts_keep_agreed_terms_and_exclusions(
 @pytest.mark.parametrize(
     "fragment",
     (
-        "For client-facing facts included in `text` or `call_to_action`",
+        "For client-facing facts included in `text`",
         "readiness and agreement status",
         "numbers together with their units and the thing they count, "
         "identifiers and scope exclusions",
@@ -745,7 +746,7 @@ def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() ->
 
     # This pins the instruction; generated-text completeness requires live acceptance (ANY-624).
     for fragment in (
-        "Include in `text` or `call_to_action` every client-relevant result, blocker, request "
+        "Include in `text` every client-relevant result, blocker, request "
         "to the client and next step mentioned in `situation`",
         "including raw progress notes not phrased as a message to the client",
         "A notes format does not make progress facts private",
@@ -1011,8 +1012,6 @@ def test_reply_draft_prompt_keeps_the_client_subject_and_scope() -> None:
     assert "Do not generalize, narrow or replace it" in prompt
 
 
-# ANY-626: the frontend appends `call_to_action` to `text`, so a request stated in both reaches the
-# client twice (QA R01, R02). Update composes the same two fields, so it carries the same rule.
 @pytest.mark.parametrize(
     "prompt_ref",
     [
@@ -1023,10 +1022,5 @@ def test_reply_draft_prompt_keeps_the_client_subject_and_scope() -> None:
 def test_compose_reply_prompt_states_each_client_request_once(prompt_ref: str) -> None:
     prompt = " ".join(_load_prompt_template(prompt_ref).split())
 
-    for fragment in (
-        "`text` and `call_to_action` reach the client as one message, with `call_to_action` after "
-        "a blank line: put each request to the client in only one of them.",
-        "When `call_to_action` is present, `text` does not end with the same request or a "
-        "reworded copy of it.",
-    ):
-        assert fragment in prompt, fragment
+    assert "Put the complete copy-ready message in `text`" in prompt
+    assert "omit `call_to_action`" in prompt

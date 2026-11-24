@@ -8,7 +8,7 @@
 - Created: 2026-11-23
 - Last updated: 2026-11-24
 - Review date: 2026-11-24
-- Next action: review the first-round regression evidence, then verify the public release.
+- Next action: review the second-round regression evidence, then verify the public release.
 - Blocker: none
 
 ## Goal
@@ -123,3 +123,36 @@ historical blocker still explains the delay and triggers no new request.
 The [review follow-up evidence](any-851-tone-and-reply-order-review-1.evidence.json) contains
 the 30 final Luna runs and 22 comparison runs. It records the prompt fingerprints separately
 for Update, Reply Draft and the comparison sample.
+
+## Second review follow-up
+
+1. Give Update and Reply Draft a single field for the complete client message, including any
+   request. Select that A07 output layout through the existing workflow input mapping and
+   enforce it through A07 cross-validation and validation retries.
+2. Anchor subjective descriptions to the client in every tone. Reserve first-person empathy
+   and appreciation for warm replies and use a plain acknowledgement in neutral replies.
+3. Verify the output contract through the runtime and compare every S4 tone pair on the same
+   input in RU, EN and ES. Repeat the S2/S7 outstanding and resolved-material cases.
+
+The result API and renderer retain the optional action field for stored results. Kernel Demo
+can still use two fields. Client Update Writer Prepaid Request already writes a single text
+field through A06. Proposal AI, Brief Decoder and Acceptance Builder have no A07 output that
+feeds this combined message renderer.
+
+### Second-round verification
+
+- All 34 live Luna runs on the local form returned only `text`. The saved result, displayed
+  message and clipboard content matched in every run.
+- All ten pending-material runs, including both Russian S7 neutral attempts, gave the delay
+  reason and Tuesday date and asked for the photos once. The three resolved-material controls
+  retained the delay history and asked for nothing.
+- Both English firm S4 attempts attributed the perceived dullness to the client. Both Spanish
+  neutral/warm pairs used distinct openings on the same input. All twelve S4 runs kept the
+  two options within the first revision round and put the brief context after the offer.
+- The six S1 runs retained the project, progress and Friday date. The three R05 runs kept
+  INV-104, the admitted typo, the correction commitment, scope and dates.
+- 2,782 Python tests and 90 Client Update Writer web tests passed, as did config, architecture
+  and docs validation. The Python retry regression feeds A07 a rephrased duplicate in two
+  fields and verifies that the second attempt returns the complete message in one field.
+
+[Second-round live evidence](any-851-tone-and-reply-order-review-2.evidence.json)

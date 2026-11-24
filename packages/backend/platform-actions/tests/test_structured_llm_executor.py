@@ -476,15 +476,33 @@ def test_structured_llm_executor_owns_validation_retries_for_generate_document(
     assert {row["action_run_id"] for row in rows} == {"action_run_demo"}
 
 
-def test_structured_llm_executor_retries_compose_reply_on_cross_validation_failure() -> None:
-    """A07: caller-supplied constraints.max_length is enforced via cross-validation (the
-    static output schema only bounds text to a fixed maxLength, not the per-call limit), and
-    a violation must get the same semantic retry as a static schema mismatch."""
+@pytest.mark.parametrize(
+    ("input_options", "first_output", "second_output", "expected_output"),
+    [
+        (
+            {"constraints": {"max_length": 10}},
+            '{"text": "This reply is far longer than the ten character limit."}',
+            '{"text": "Short."}',
+            {"text": "Short."},
+        ),
+        (
+            {"output_layout": "single_text"},
+            '{"text": "Пришлите фотографии тренеров.", "call_to_action": "Пришлите фото тренеров."}',
+            '{"text": "Пришлите фотографии тренеров."}',
+            {"text": "Пришлите фотографии тренеров."},
+        ),
+    ],
+    ids=["max-length", "single-text"],
+)
+def test_structured_llm_executor_retries_compose_reply_on_cross_validation_failure(
+    input_options: dict,
+    first_output: str,
+    second_output: str,
+    expected_output: dict,
+) -> None:
+    """Schema-valid replies that violate the selected layout or limit are retried."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = _TwoAttemptSpyGateway(
-        '{"text": "This reply is far longer than the ten character limit."}',
-        '{"text": "Short."}',
-    )
+    spy_gateway = _TwoAttemptSpyGateway(first_output, second_output)
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,
@@ -521,14 +539,14 @@ def test_structured_llm_executor_retries_compose_reply_on_cross_validation_failu
             "situation": "The client asked for a status update on the project.",
             "intent": "Reassure the client and confirm the new delivery date.",
             "tone": "warm",
-            "constraints": {"max_length": 10},
+            **input_options,
         },
     )
     session = object()
 
     response = asyncio.run(executor.execute(request, session=session))
 
-    assert response.structured_output == {"text": "Short."}
+    assert response.structured_output == expected_output
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
         2,

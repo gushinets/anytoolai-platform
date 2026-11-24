@@ -235,9 +235,9 @@ _MODE_HAPPY_PATH_CASES = {
         {
             "text": (
                 "Quick update: the homepage redesign is done and ready for review by Friday. "
-                "Checkout flow work is in progress, no blockers so far."
+                "Checkout flow work is in progress, no blockers so far.\n\n"
+                "Let me know if you'd like any changes to the homepage."
             ),
-            "call_to_action": "Let me know if you'd like any changes to the homepage.",
         },
     ),
     "reply_draft": (

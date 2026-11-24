@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from ._markup import (
     _find_unfilled_placeholder,
@@ -28,6 +29,10 @@ class ComposeReplyCrossValidator:
         text = output.get("text")
         if not isinstance(text, str):
             raise _cross_validation_error("malformed_compose_reply_output")
+        if input_payload.get("output_layout") == "single_text" and "call_to_action" in output:
+            raise _cross_validation_error(
+                "omit_call_to_action_and_include_each_request_once_in_text"
+            )
         call_to_action = output.get("call_to_action")
         constraints = input_payload.get("constraints")
         constraints = constraints if isinstance(constraints, Mapping) else {}
