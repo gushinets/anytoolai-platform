@@ -192,9 +192,10 @@ historical.
 - All ten S2/S7 runs on third-person notes described the missing photos impersonally. All
   six explicit-voice controls retained the speaker number for the wait, including the
   Russian singular and plural forms. Every delay run made one photo request.
-- The six S1 and three R05 regression runs preserved the source facts, deadlines and
-  commitments. All 38 Luna runs used the existing single-text result contract. The saved,
-  displayed and copied message matched.
+- The six S1 runs kept the Friday date. The subsequent review found that two warm S1 runs
+  omitted who would show the first version. The three R05 runs preserved the source facts,
+  deadlines and commitments. All 38 Luna runs used the existing single-text result contract.
+  The saved, displayed and copied message matched.
 - Config, architecture and docs validation passed. The Freelancer Suite and evaluator
   tests passed (1,932 tests).
 
@@ -202,3 +203,37 @@ Terra and Sol each passed the six explicit-voice controls on the final Update pr
 comparative runs used the temporary test worker. Luna remains the default model.
 
 [Third-round live evidence](any-851-tone-and-reply-order-review-3.evidence.json)
+
+## Preserve the actor of each action
+
+The third-round S1 warm replies in Russian and Spanish kept Friday but omitted the freelancer
+as the actor who would show the first version. Both English replies and all three neutral
+replies kept the actor. The two historical PASS labels missed the actor change.
+
+1. Tie speaker number and known actors to each action in the four freelancer-voice prompts.
+   Keep author commitments distinct from unnamed progress status, even within the same notes.
+2. Add an independent S1 criterion for the stated actor of the Friday presentation. Grade the
+   six neutral and warm replies against that criterion and against the existing tone and fact checks.
+3. Recheck S2/S7, including explicit singular and plural waits and client-supplied materials, in
+   Russian, English and Spanish. Preserve the earlier evidence and record corrected verdicts alongside
+   the new results.
+
+### Verification of action ownership
+
+- All six original Luna S1 replies preserved the freelancer's first-person Friday commitment.
+  Neutral and warm kept the same facts and used distinct delivery in each language.
+- All six mixed-actor S1 controls preserved the status of the ready work, the author and designer's
+  Thursday action, the author's Friday commitment and the client's Monday action.
+- All nine Luna S2/S7 replies on the original notes attributed the missing photos to the client,
+  retained the three-day shift and Tuesday date, and asked for the photos once. All six explicit
+  speaker controls kept the source number. The three resolved-material controls kept the original
+  sender in the delay history, reported the arrival and made no request.
+- The three S4 warm spot checks preserved attribution, claim status and the order of the offer.
+  The three R05 controls preserved the freelancer's commitment to send the corrected invoice.
+- Config, architecture and docs validation passed. The Freelancer Suite and evaluator tests passed
+  (1,933 tests).
+
+Terra and Sol each passed the six original S1 cases in a comparison on the same prompt. The
+saved result, browser display and clipboard matched in all 48 runs.
+
+[Fourth-round live evidence](any-851-tone-and-reply-order-review-4.evidence.json)

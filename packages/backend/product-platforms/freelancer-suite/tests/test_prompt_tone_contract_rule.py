@@ -26,15 +26,16 @@ def test_tone_contract_is_present_verbatim(prompt: Path) -> None:
 def test_update_prompt_keeps_client_actions_across_tones() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "`warm` never drops a client action that `firm` states" in text
-    assert "Include each needed client request once in `text`" in text
-    assert "unless the notes say they arrived, are no longer needed" in text
-    assert "state the wait in first person with that same number" in text
+    assert "must explicitly ask the client to send them once in every tone" in text
+    assert "Skip the request only if the notes say the items arrived, are no longer needed" in text
+    assert "retain the client as the sender in the account of the past delay" in text
+    assert "Leave the receiver unspecified when the source does" in text
+    assert "keep that wait in first-person plural" in text
 
 
 def test_warm_update_uses_a_friendly_milestone_when_supported() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "When the notes report good progress, use that friendly clause" in text
-    assert "Keep third-person notes about progress and blockers impersonal in this tone too" in text
 
 
 def test_update_rechecks_project_identity_against_source_notes() -> None:
@@ -42,6 +43,12 @@ def test_update_rechecks_project_identity_against_source_notes() -> None:
     assert "include its client-facing name or full description" in text
     assert "Name the completed parts directly as ready" in text
     assert "Check the finished update against the notes for omissions" in text
+
+
+def test_update_preserves_the_actor_of_commitments_in_every_tone() -> None:
+    text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
+    assert "Keep the actor, action, deliverable and date of a commitment together" in text
+    assert "keep the freelancer as the explicit speaker of that commitment in every tone" in text
 
 
 def test_reply_prompt_orders_acknowledgement_before_explanation() -> None:

@@ -8,6 +8,7 @@
       "criteria": [
         "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
         "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
         "Even businesslike wording: no praise, no emotional words.",
         "No added results, promises or deadlines."
       ]
@@ -20,6 +21,7 @@
       "criteria": [
         "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
         "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
         "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
         "No praise, enthusiasm or promise the input does not support.",
         "No gendered first-person past tense."
@@ -35,7 +37,7 @@
         "Requests the trainer photos, exactly as S2-firm does.",
         "No invented apology, concession or response deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -48,7 +50,7 @@
         "Requests the trainer photos.",
         "Direct wording without courtesy padding; no invented apology or deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -61,7 +63,7 @@
         "Requests the trainer photos, as in S2-warm and S2-firm.",
         "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -72,6 +74,7 @@
       "criteria": [
         "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
         "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
         "Even businesslike wording: no praise, no emotional words.",
         "No added results, promises or deadlines."
       ]
@@ -84,6 +87,7 @@
       "criteria": [
         "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
         "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
         "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
         "No praise, enthusiasm or promise the input does not support.",
         "No gendered first-person past tense."
@@ -99,7 +103,7 @@
         "Requests the trainer photos, exactly as S2-firm-en does.",
         "No invented apology, concession or response deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -112,7 +116,7 @@
         "Requests the trainer photos.",
         "Direct wording without courtesy padding; no invented apology or deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -125,7 +129,7 @@
         "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
         "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -136,6 +140,7 @@
       "criteria": [
         "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
         "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
         "Even businesslike wording: no praise, no emotional words.",
         "No added results, promises or deadlines."
       ]
@@ -148,6 +153,7 @@
       "criteria": [
         "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
         "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
         "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
         "No praise, enthusiasm or promise the input does not support.",
         "No gendered first-person past tense."
@@ -163,7 +169,7 @@
         "Requests the trainer photos, exactly as S2-firm-es does.",
         "No invented apology, concession or response deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -176,7 +182,7 @@
         "Requests the trainer photos.",
         "Direct wording without courtesy padding; no invented apology or deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     },
     {
@@ -189,7 +195,7 @@
         "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
         "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
         "The client sees exactly one request for the trainer photos.",
-        "Keeps the freelancer's speaker number. For these third-person notes, describe the missing photos impersonally without inventing a receiver in the first person."
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
     }
   ],
