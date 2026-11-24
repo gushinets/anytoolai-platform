@@ -164,7 +164,11 @@ Selection order:
 2. otherwise use the last successful step output object.
 
 The selected payload is validated against `workflow.output_schema_ref` before the final artifact is
-persisted and linked through `jobs.result_artifact_id`.
+persisted and linked through `jobs.result_artifact_id`. A workflow output schema may define
+`$defs.publication` for additional constraints on new results. The runner applies that
+subschema in addition to the root schema before storing the artifact. The Result API and
+handoffs revalidate persisted artifacts against the root schema, preserving the read contract
+for results saved before the stricter publication rule.
 
 ## Worker-owned execution
 

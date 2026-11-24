@@ -321,7 +321,7 @@
     ],
     "feasibility": [
       "500 products, customer accounts, payment and 1C must fit tomorrow’s delivery and a budget of 15 000 rubles. Advertising starts Friday; the store launch is undated. Each mention of a date or amount must retain its subject and status.",
-      "Identify the combined feasibility risk and the open revision scope. Ask what work to prioritize or bound, without inventing a commitment or declaring delivery impossible."
+      "Identify the combined feasibility risk and the open revision scope. The answer to a question linked to the combined risk must identify which work is required for tomorrow’s delivery, what can be deferred, or select between explicit scope options. Confirming the priority of the date, budget or scope in general leaves that decision open."
     ],
     "contradiction": [
       "Report both conflicting language requirements with their evidence. Ask the client which language/version to deliver; neither alternative is agreed.",

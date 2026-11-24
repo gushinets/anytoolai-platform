@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from draft_risk_review import scope_questions
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -137,6 +138,7 @@ def authored_fields(output: dict) -> dict[str, str]:
 def review_template(record: dict) -> dict:
     return {
         "evidence_sha256": digest(record),
+        **({"scope_question": None} if record["case"].get("family") == "feasibility" else {}),
         "reviewer": "",
         "fields": {path: None for path in authored_fields(record.get("output") or {})},
         "criteria": {question: None for question in record["case"]["criteria"]},
@@ -238,6 +240,12 @@ def review_status(record: dict, review: dict) -> str:
         or None in decisions
     ):
         return "PENDING"
+    if record["case"].get("family") == "feasibility":
+        eligible = scope_questions(record["output"], record["case"]["expected_language"])
+        if not eligible:
+            return "FAIL"
+        if review.get("scope_question") not in [q["question"] for q in eligible]:
+            return "PENDING"
     return "PASS"
 
 
@@ -339,7 +347,7 @@ def main() -> int:
     run.add_argument("--project", required=True, type=_parse_compose_project)
     run.add_argument("--suite", choices=("language", "draft-risks"), default="language")
     run.add_argument("--scenario", choices=SCENARIOS, required=True)
-    run.add_argument("--family", choices=("basic", "weak", "mixed", "override"))
+    run.add_argument("--family", help="Filter by a family in the selected suite and scenario")
     run.add_argument("--repeats", type=int, default=3)
     run.add_argument("--timeout", type=int, default=240)
     run.add_argument("--out", type=Path, required=True)
@@ -389,14 +397,16 @@ def main() -> int:
         if args.suite == "draft-risks"
         else json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
     )
-    cases = [
-        case
-        for case in cases
-        if case["scenario_id"] == args.scenario
-        and (args.family is None or case["family"] == args.family)
-    ]
+    cases = [case for case in cases if case["scenario_id"] == args.scenario]
     if not cases:
-        parser.error("no cases match the selected suite, scenario and family")
+        parser.error("no cases match the selected suite and scenario")
+    if args.family is not None:
+        families = sorted({case["family"] for case in cases})
+        if args.family not in families:
+            parser.error(
+                f"unknown family for {args.suite}/{args.scenario}; choose from {', '.join(families)}"
+            )
+        cases = [case for case in cases if case["family"] == args.family]
     runs = [f"{case['id']}--{attempt}" for attempt in range(1, args.repeats + 1) for case in cases]
     for key in runs:
         evidence_path(args.out, f"{key}.json")

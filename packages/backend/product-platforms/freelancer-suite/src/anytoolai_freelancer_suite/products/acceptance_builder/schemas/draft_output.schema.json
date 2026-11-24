@@ -368,5 +368,61 @@
     "questions": ["issues"]
   },
   "additionalProperties": false,
-  "$defs": {}
+  "$defs": {
+    "authoredText": {
+      "type": "string",
+      "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+    },
+    "publication": {
+      "properties": {
+        "extracted": {
+          "properties": {
+            "values": {
+              "properties": {
+                "acceptance_criteria": {
+                  "items": {
+                    "$ref": "#/$defs/authoredText"
+                  }
+                },
+                "assumptions": {
+                  "items": {
+                    "$ref": "#/$defs/authoredText"
+                  }
+                },
+                "deliverables": {
+                  "items": {
+                    "$ref": "#/$defs/authoredText"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "issues": {
+          "items": {
+            "properties": {
+              "description": {
+                "$ref": "#/$defs/authoredText"
+              },
+              "evidence": {
+                "$ref": "#/$defs/authoredText"
+              }
+            }
+          }
+        },
+        "questions": {
+          "items": {
+            "properties": {
+              "question": {
+                "$ref": "#/$defs/authoredText"
+              },
+              "rationale": {
+                "$ref": "#/$defs/authoredText"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

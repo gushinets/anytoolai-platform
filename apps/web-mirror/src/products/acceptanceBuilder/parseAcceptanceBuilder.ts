@@ -1,4 +1,5 @@
 import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
+import { trimBackendWhitespace } from "../runtime/fieldValidation";
 import { composeDocument } from "./presentation";
 export { composeCopyText } from "./presentation";
 
@@ -63,14 +64,23 @@ function mapAll<T>(items: unknown, map: (item: unknown) => T | null): T[] | null
   return out;
 }
 
+export function hasAuthoredText(value: string): boolean {
+  return trimBackendWhitespace(value.replaceAll("\ufeff", "")).length > 0;
+}
+
+// A stored Draft v1 used Python's whitespace set, which allowed a BOM on its own.
+function isStoredText(value: unknown): value is string {
+  return typeof value === "string" && trimBackendWhitespace(value).length > 0;
+}
+
 function toIssue(item: unknown): Issue | null {
   if (
     !isRecord(item) ||
     !isOneOf(ISSUE_CATEGORIES, item.category) ||
     !isOneOf(LEVELS, item.severity) ||
     !Object.keys(item).every((key) => ["category", "description", "severity", "evidence"].includes(key)) ||
-    typeof item.description !== "string" || !item.description.trim() ||
-    (item.evidence !== undefined && (typeof item.evidence !== "string" || !item.evidence.trim()))
+    !isStoredText(item.description) ||
+    (item.evidence !== undefined && !isStoredText(item.evidence))
   ) {
     return null;
   }
@@ -82,8 +92,8 @@ function toQuestion(item: unknown): ClarifyingQuestion | null {
     !isRecord(item) ||
     !Object.keys(item).every((key) => ["question", "rationale", "priority", "category", "source_issue_index"].includes(key)) ||
     typeof item.source_issue_index !== "number" || !Number.isInteger(item.source_issue_index) || item.source_issue_index < 0 ||
-    typeof item.question !== "string" || !item.question.trim() ||
-    typeof item.rationale !== "string" || !item.rationale.trim() ||
+    !isStoredText(item.question) ||
+    !isStoredText(item.rationale) ||
     !isOneOf(LEVELS, item.priority) ||
     !isOneOf(ISSUE_CATEGORIES, item.category)
   ) {
@@ -160,7 +170,7 @@ function extract(output: Record<string, unknown>, requireComparison: boolean): A
   // The draft output has no `comparison` (closed schema). An attached `?session=` id is editable, so
   // a check session must not be shown as a draft result with its verdict silently dropped.
   if (!requireComparison) {
-    if (output.comparison !== undefined) {
+    if (output.comparison !== undefined || Object.values(lists).some((items) => !items.every(isStoredText))) {
       return null;
     }
     const data = { lists, missingFields: missing, analysisLanguage: language };
@@ -186,5 +196,5 @@ export const extractCheckResult = (output: Record<string, unknown>) => extract(o
 
 /** Activation for `draft_v1`: first display of a non-empty criteria list (no verdict exists). */
 export function hasCriteria(result: AcceptanceBuilderResult): boolean {
-  return (result.lists.acceptance_criteria?.length ?? 0) > 0;
+  return result.lists.acceptance_criteria?.some(hasAuthoredText) ?? false;
 }

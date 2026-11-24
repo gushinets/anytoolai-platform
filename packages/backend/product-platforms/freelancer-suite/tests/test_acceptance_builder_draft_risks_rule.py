@@ -1,5 +1,6 @@
 """Exercise the same acceptance checks against authored examples and captured live results."""
 
+import hashlib
 import json
 import re
 from copy import deepcopy
@@ -9,16 +10,16 @@ import jsonschema
 import pytest
 from anytoolai_freelancer_suite.bundle import FreelancerSuiteBundle
 
+from scripts.agent.draft_risk_review import scope_questions
+
 ROOT = Path(__file__).resolve().parents[5]
 FIXTURES = ROOT / "tests/fixtures/acceptance_builder_eval"
 PRODUCT = next(p for p in FreelancerSuiteBundle().config_roots() if p.name == "acceptance_builder")
 SCHEMA = json.loads((PRODUCT / "schemas/draft_output.schema.json").read_text(encoding="utf-8"))
-CASES = {
-    case["id"]: case
-    for case in json.loads((FIXTURES / "draft_risks_questions.json").read_text(encoding="utf-8"))[
-        "cases"
-    ]
-}
+SUITE = json.loads((FIXTURES / "draft_risks_questions.json").read_text(encoding="utf-8"))
+CASES = {case["id"]: case for case in SUITE["cases"]}
+SCOPE_REVIEWS = json.loads((FIXTURES / "reviewed_scope_questions.json").read_text(encoding="utf-8"))
+
 
 
 # Each expectation describes this fixture. Free-form source fidelity is also reviewed against
@@ -116,26 +117,14 @@ def check_contradiction(issues, questions, criteria):
     assert not re.search("русск|английск|russian|english|ruso|inglés", criteria)
 
 
-def asks_for_delivery_scope(question):
-    text = question.casefold()
-    if re.search(r"приоритет|границ|первую очередь|важнее|обязательн|priori|must[ -]have", text):
-        return True
-    # The client can select a minimum delivery scope without using the word "priority".
-    return has_all(
-        text,
-        (
-            r"deliver|tomorrow|entreg|mañana|сдач|завтра",
-            (
-                r"как(?:ой|ая|ую|ие) (?:объ[её]м|част[ьи]|работы|функции)\b[^?.!;]*?долж\w*\b|"
-                r"what (?:must|needs to|should) be (?:ready|delivered|included|completed)\b|"
-                r"qué (?:debe|necesita) (?:estar|quedar|entregarse|incluirse|completarse)\b|"
-                r"(?:which|what) (?:parts?|features?|functions?|work|scope)\b[^?.!;]*?"
-                r"(?:must|should|need(?:s)? to|(?:is|are) required)\b|"
-                r"(?:qué|cuáles) (?:partes?|funciones?|elementos?|alcance)\b[^?.!;]*?"
-                r"(?:debe\w*|necesit\w*|son (?:imprescindibles|obligatori\w*))\b"
-            ),
-        ),
-    )
+def scope_review_key(case, output, question):
+    evidence = [
+        case["input"],
+        SUITE["review_rubric"]["feasibility"],
+        output["issues"][question["source_issue_index"]],
+        question,
+    ]
+    return hashlib.sha256(json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
 def check_result(case, output):
@@ -176,26 +165,8 @@ def check_result(case, output):
             "wrong milestone"
         )
 
-        def combined(issue):
-            text = (issue["description"] + " " + issue.get("evidence", "")).lower()
-            return (
-                issue["severity"] == "high"
-                and issue["category"] in {"scope_risk", "timeline_risk", "budget_risk"}
-                and has_all(
-                    text,
-                    (
-                        r"500",
-                        r"15[ .,\u202f\xa0]?000",
-                        deadline,
-                        r"кабинет|account|cuenta",
-                        r"оплат|payment|pago",
-                        r"1[cс]",
-                    ),
-                )
-            )
-
-        feasibility_indexes = {index for index, issue in enumerate(issues) if combined(issue)}
-        assert feasibility_indexes, "missing combined feasibility finding"
+        candidates = scope_questions(output, case["language"])
+        assert candidates, "missing question linked to combined feasibility finding"
         assert any(
             i["category"] == "scope_risk"
             and re.search(
@@ -204,11 +175,14 @@ def check_result(case, output):
             )
             for i in issues
         )
+        decisions = [SCOPE_REVIEWS.get(scope_review_key(case, output, q)) for q in candidates]
         assert any(
-            q["source_issue_index"] in feasibility_indexes
-            and asks_for_delivery_scope(q["question"])
-            for q in questions
-        ), "ask which scope takes priority for the stated milestone"
+            decision and decision["accepted"] and decision["question"] == q["question"]
+            for decision, q in zip(decisions, candidates, strict=True)
+        ), (
+            "FAIL: question does not decide which scope" if all(decisions)
+            else "PENDING: review which scope the answer selects"
+        )
         facts = json.dumps(values, ensure_ascii=False).lower()
         assert has_all(facts, (r"500", r"15[ .,\u202f\xa0]?000", deadline))
         assert not re.search(
@@ -358,6 +332,9 @@ def test_equivalent_language_decision_is_accepted():
         ("ru", "Весь ли магазин готов к сдаче завтра?"),
         ("en", "What time must the shop be ready for delivery tomorrow?"),
         ("en", "What is the cost of the full scope?"),
+        ("en", "Is scope still the priority?"),
+        ("ru", "Объём работ по-прежнему в приоритете?"),
+        ("es", "¿Sigue siendo prioritario el alcance?"),
         ("es", "¿Cuánto cuesta todo el alcance?"),
     ],
 )
@@ -365,7 +342,7 @@ def test_feasibility_status_or_price_question_does_not_choose_scope(language, qu
     case = CASES[f"AB-894-C-{language.upper()}"]
     output = deepcopy(case["canonical"])
     output["questions"][0]["question"] = question
-    with pytest.raises(AssertionError, match="which scope"):
+    with pytest.raises(AssertionError, match="FAIL: question does not decide which scope"):
         check_result(case, output)
 
 
@@ -390,7 +367,7 @@ def test_live_draft_matrix(filename, expect_vague_failure):
     assert len({r["session_id"] for r in runs}) == len(runs) == 36
     for run in runs:
         case = cases[run["case_id"]]
-        rule = {"language": case["language"], "checks": case["family"]}
+        rule = {**case, "checks": case["family"]}
         if expect_vague_failure and case["family"] == "vague":
             with pytest.raises(
                 AssertionError, match="neither acceptance conditions nor project premises"
@@ -398,3 +375,53 @@ def test_live_draft_matrix(filename, expect_vague_failure):
                 check_result(rule, run["output"])
         else:
             check_result(rule, run["output"])
+
+
+@pytest.mark.parametrize(
+    ("lang", "date_only", "scope_choice"),
+    [
+        (
+            "en",
+            "Is delivery tomorrow still the priority?",
+            "Is the priority for tomorrow to deliver the catalogue and defer customer accounts?",
+        ),
+        (
+            "es",
+            "¿Sigue siendo prioritaria la entrega de mañana?",
+            "¿La prioridad para mañana es entregar el catálogo y aplazar las cuentas de cliente?",
+        ),
+        (
+            "ru",
+            "Сдача завтра всё ещё в приоритете?",
+            "В приоритете к завтрашней сдаче каталог, а личный кабинет можно отложить?",
+        ),
+    ],
+)
+def test_scope_decisions_require_reviewed_evidence(lang, date_only, scope_choice):
+    case = CASES[f"AB-894-C-{lang.upper()}"]
+    output = deepcopy(case["canonical"])
+    output["questions"][0]["question"] = date_only
+    with pytest.raises(AssertionError, match="FAIL"):
+        check_result(case, output)
+    output["questions"][0]["question"] = scope_choice
+    check_result(case, output)
+    output["questions"][0]["question"] += "?"
+    with pytest.raises(AssertionError, match="PENDING"):
+        check_result(case, output)
+
+
+def test_fourth_review_outputs_meet_deterministic_product_checks():
+    archive = json.loads(
+        (FIXTURES / "any-894-review-4-live.evidence.json").read_text(encoding="utf-8")
+    )
+    for run in archive["runs"]:
+        record = run["record"]
+        case = record["case"]
+        check_result(
+            {
+                "input": case["input"],
+                "language": case["expected_language"],
+                "checks": case["family"],
+            },
+            record["output"],
+        )

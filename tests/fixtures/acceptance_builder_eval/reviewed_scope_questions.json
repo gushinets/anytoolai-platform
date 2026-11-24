@@ -1,0 +1,218 @@
+{
+  "d452894e47bae22acea2b60daf44df09cf8cced31ac6f3f10ee3616ef807f859": {
+    "question": "Что важнее всего сдать завтра при бюджете 15 000 рублей?",
+    "accepted": true
+  },
+  "69475bba08b8f6a7151ba8086f57a9740c1e0103a6237b1a68e883778d3f040d": {
+    "question": "What takes priority for delivery tomorrow within 15 000 rubles?",
+    "accepted": true
+  },
+  "122b9cfc17ff0bc87e82edc8686d6b13338d8dadc512fe8ff437420e51d7b2cb": {
+    "question": "¿Qué tiene prioridad para la entrega de mañana con 15 000 rublos?",
+    "accepted": true
+  },
+  "ae646f98a9766c76a8f2cf2b4dedf5052a8b0e4adbe1dc89e85be47151fe9318": {
+    "question": "Какие из перечисленных возможностей магазина для вас приоритетны к запуску, если весь объём нельзя выполнить к завтрашней сдаче в рамках 15 000 рублей?",
+    "accepted": true
+  },
+  "37fd570417969cc56799413fd4a6859df8a8db586a77bb2465dbb9182b012282": {
+    "question": "Which parts of the shop should take priority for launch tomorrow within the budget of 15 000 rubles?",
+    "accepted": false
+  },
+  "5a35de91f52c350cedccff9fe144c55f143f0ed4fc36dc1d5f7daa073e40d66c": {
+    "question": "Con la entrega mañana y el presupuesto de 15 000 rublos, ¿qué partes de la tienda tienen prioridad para el lanzamiento si no fuera posible incluir todo lo solicitado?",
+    "accepted": true
+  },
+  "daf637fdeb1d28c1ee4b7299ae12df0f78fd713a4422df5281d445a61688db63": {
+    "question": "Какие работы для вас приоритетны к сдаче завтра в рамках бюджета 15 000 рублей, если выполнить весь заявленный объём к этому сроку не получится?",
+    "accepted": true
+  },
+  "1d3c0c8ae62044ad674e6a26544265c0d6af370be7893ddb4c5c72e319ad4267": {
+    "question": "Which parts of the shop should take priority for launch tomorrow within the budget of 15 000 rubles if the full scope cannot be completed within those limits?",
+    "accepted": false
+  },
+  "efc57e25e8cb52f6c3d1c3f0afd0404e42b93777358b5d7033ad2bb624e2fb84": {
+    "question": "¿Qué partes de la tienda deben tener prioridad para el lanzamiento de mañana dentro del presupuesto de 15 000 rublos?",
+    "accepted": false
+  },
+  "e0c4a95758fffd280350bab097b518547a66ce5c47dcd02c8d4afe6dfb3db9a3": {
+    "question": "Какие работы для запуска магазина вы считаете приоритетными при сдаче завтра и бюджете 15 000 рублей, если весь заявленный объём не удастся выполнить в этих рамках?",
+    "accepted": true
+  },
+  "9adba778fb17667cd2309eb6d45a4d3f1591f97e1c846df100db09d530131287": {
+    "question": "Which parts of the shop should take priority for launch tomorrow within the budget of 15 000 rubles if the full scope cannot be completed within those limits?",
+    "accepted": false
+  },
+  "2ded0e36c3217536b5b1f8a79ef7359cd6e0075e06462996c6b99e2ea31ee421": {
+    "question": "¿Qué funciones y contenidos debemos priorizar para el lanzamiento de mañana dentro del presupuesto de 15 000 rublos?",
+    "accepted": false
+  },
+  "2fda6ee8741f499658ee9fe9f5032bfd801f479a2f6df7d68186930a42a1e144": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: the 500-product catalogue, customer accounts, online payment and 1C integration?",
+    "accepted": true
+  },
+  "4f2e2c89d6c6683bd6f28c7956082ecdc096efc268b54dc8ca2d2a63c049e3d1": {
+    "question": "With the project budget of 15 000 rubles, which parts of the shop must be ready for delivery tomorrow: the 500-product catalog, customer accounts, online payment and 1C integration, given that advertising starts on Friday?",
+    "accepted": true
+  },
+  "99280847bbcaa04443c191df6158c96b3a574bb1b2e72ae749f4d64940e6eab6": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: the 500-product catalogue, customer accounts, online payment and 1C integration?",
+    "accepted": true
+  },
+  "557905543bb4f9fcac90e3532b9bc8ced836390b960527c003c871d18795c4e7": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué partes de la tienda deben estar listas para la entrega de mañana: los 500 productos, las cuentas de cliente, el pago en línea y la integración con 1C?",
+    "accepted": true
+  },
+  "f60b3e7e06b1483aee491074ba4af79e6505c4ab7d4d5bc49be72ca9f9c2a4f6": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué partes de la tienda deben estar terminadas para la entrega de mañana, teniendo en cuenta que la publicidad empieza el viernes?",
+    "accepted": true
+  },
+  "a868716779c0739c042737f137c3dadb4b2d6fce4b077180480f82729f9e5a3b": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué partes de la tienda deben estar listas para la entrega de mañana, teniendo en cuenta que la publicidad empieza el viernes?",
+    "accepted": true
+  },
+  "7cef589c64901ee5c2efa884d3c8a26306234526783d8de6a3724a9812072823": {
+    "question": "Какой объём магазина обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей: что из каталога на 500 товаров, личного кабинета, онлайн-оплаты и интеграции с 1С необходимо включить в эту сдачу?",
+    "accepted": true
+  },
+  "ec25ae4ac64c5de2b2d4432d70b1d60c20b272762c2ecbc63090005b2e66e663": {
+    "question": "Какую часть магазина на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С вы считаете обязательной для сдачи завтра в рамках бюджета 15 000 рублей с учётом запуска рекламы в пятницу?",
+    "accepted": true
+  },
+  "cff0549c08088c6a47bb5a67dd797a18cf7b90825e784de5a378eaca60e938fc": {
+    "question": "Какой объём работ обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей: все 500 товаров, личный кабинет, онлайн-оплата и интеграция с 1С или выбранная вами часть этого объёма?",
+    "accepted": true
+  },
+  "ab234655b143145fbd806f159ef839dcebe9366df8a378ed24a4ad2afd3894bc": {
+    "question": "With advertising starting on Friday, which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: the 500-product catalogue, customer accounts, online payment, 1C integration and the design?",
+    "accepted": true
+  },
+  "9fa853e583890a4b0d532cc67a9d78017715a2e85f576bd1efbca58494d5780e": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles, given that advertising starts on Friday?",
+    "accepted": true
+  },
+  "88301b5baa61f0eea8ba7479bf48b02c3f7fb198259c9b6bb59a33dc018f9c3a": {
+    "question": "Which parts of the shop—500 products, customer accounts, online payment and 1C integration—must be ready for delivery tomorrow within the budget of 15 000 rubles?",
+    "accepted": true
+  },
+  "ed6b46ebe2d3aa3eed13b94af241dc188263592173fcc7f12ac6f9685eaee2a3": {
+    "question": "¿Qué debe estar terminado para la entrega de mañana, con el presupuesto de 15 000 rublos, de la tienda solicitada con 500 productos, cuentas de cliente, pago en línea e integración con 1C, teniendo en cuenta que la publicidad empieza el viernes?",
+    "accepted": true
+  },
+  "25f58a644a3a3b23cc1d73ea84e07754c889b3c9c37e7d630030c934e92f7820": {
+    "question": "De la tienda solicitada —500 productos, cuentas de cliente, pago en línea e integración con 1C—, ¿qué debe estar listo para la entrega de mañana dentro del presupuesto de 15 000 rublos, teniendo en cuenta que la publicidad empieza el viernes?",
+    "accepted": true
+  },
+  "72c688733dd1bd52173663b9a2aa43d35920575ff2b23a75affc0262d116c9b8": {
+    "question": "¿Qué parte de la tienda solicitada debe quedar terminada para la entrega de mañana con el presupuesto de 15 000 rublos?",
+    "accepted": true
+  },
+  "12907bc07768a6e76031b33eb31fadfbf6d1d2d05bc406c9d63de7033251ffac": {
+    "question": "Какой объём из перечисленного — магазин на 500 товаров, личный кабинет, онлайн-оплата и интеграция с 1С — обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая запуск рекламы в пятницу?",
+    "accepted": true
+  },
+  "49e509b54f4f2b6982a21a5a457cce002745469dab003d9ca45257773ffe287c": {
+    "question": "Какой объём магазина на 500 товаров, включая личный кабинет, онлайн-оплату и интеграцию с 1С, обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей?",
+    "accepted": true
+  },
+  "2aeee3e73b9699c176e129d7e1289a8ed9df0d37e07591ee2b0433a262760b50": {
+    "question": "Какой объём магазина должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая, что запуск рекламы запланирован на пятницу?",
+    "accepted": true
+  },
+  "b3b6cda55f996ead31a71593a4b68a5826a1f37bba5e17ebca09acb1bcd1d34d": {
+    "question": "Is the priority for tomorrow to deliver the catalogue and defer customer accounts?",
+    "accepted": true
+  },
+  "c1099443fba6436dc80b65c306b61043a77a810ca58d9298446fbeac0d4e59a5": {
+    "question": "Is delivery tomorrow still the priority?",
+    "accepted": false
+  },
+  "d39d7524ce617b43d263f1034e0c631d56c80ebf1e46d7e77c6659389da8b920": {
+    "question": "¿La prioridad para mañana es entregar el catálogo y aplazar las cuentas de cliente?",
+    "accepted": true
+  },
+  "428fe2420a88ab14de393d633e434152c505ea050e374b29ccdbe45d51781f82": {
+    "question": "¿Sigue siendo prioritaria la entrega de mañana?",
+    "accepted": false
+  },
+  "ae028d2d7a94a38c59793721a012d36a842b558125e1fb46dc3be1f6b48e5195": {
+    "question": "В приоритете к завтрашней сдаче каталог, а личный кабинет можно отложить?",
+    "accepted": true
+  },
+  "3cbf80306fb666b863f002b06165ec7ac30c8ce9756c91c3a5f34816afe5c34d": {
+    "question": "Сдача завтра всё ещё в приоритете?",
+    "accepted": false
+  },
+  "c941d4cdcca2c41abacf0c89fffb16dee38d0b623023766e972885b42aaec853": {
+    "question": "Are all parts of the shop ready for delivery tomorrow?",
+    "accepted": false
+  },
+  "26b4a87d833dff09dde3069348b85706cef269ff41ea1d051138f36ec8daaf9b": {
+    "question": "¿Están listas todas las partes de la tienda para la entrega de mañana?",
+    "accepted": false
+  },
+  "087f385e52551129d832e69d88b2662e1ae577b1ea4fc42ab63d04cfffcb0cc1": {
+    "question": "Весь ли магазин готов к сдаче завтра?",
+    "accepted": false
+  },
+  "56d76ec44b8dbd1e1b6910e6105083312e4e2031308b154e4f33cfcfa67c72b1": {
+    "question": "What time must the shop be ready for delivery tomorrow?",
+    "accepted": false
+  },
+  "527f6e7b0df1fdae92531ce7bfa405e715c842ed915f261c9d7d6120c7be0c1b": {
+    "question": "What is the cost of the full scope?",
+    "accepted": false
+  },
+  "1b5430ef35e6af4bb2140c4e5caa2a093d66e5598179f7d3f2e88fc241d5a65a": {
+    "question": "Is scope still the priority?",
+    "accepted": false
+  },
+  "395f589afacd05331b769478465946aa0e9bade971dedeaff1f699a16db02ea9": {
+    "question": "Объём работ по-прежнему в приоритете?",
+    "accepted": false
+  },
+  "08bff1d8c4c372670ae6b93735c7cc98236c5b6b81ea7254fa61a599067f9fee": {
+    "question": "¿Sigue siendo prioritario el alcance?",
+    "accepted": false
+  },
+  "309ed2396c5ab8a06465600471f8fce8c24ab27f68b94e57a7c6dc5a3b0ab144": {
+    "question": "¿Cuánto cuesta todo el alcance?",
+    "accepted": false
+  },
+  "84f4e9d275aef65cefd94790c82b5b0ff28db320de377bf035262722dd85f136": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: all 500 products, customer accounts, online payment and 1C integration, or a smaller scope you specify?",
+    "accepted": true
+  },
+  "15550a5c4e771eb26b326abcfa98f0748437e71bb77e0764dec7082fd5037015": {
+    "question": "Which parts of the shop—500 products, customer accounts, online payment and 1C integration—must be ready for delivery tomorrow within the budget of 15 000 rubles, ahead of advertising starting on Friday?",
+    "accepted": true
+  },
+  "20da940ffb127bb0f3d6c8cab75939c9c3e0885dd8a689d815df1fa0a470bde4": {
+    "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles, given that advertising starts on Friday?",
+    "accepted": true
+  },
+  "9df43b7abac62701a9e073f79ecd1a170faf9dd8f81dea36d603980b74fa7b8a": {
+    "question": "¿Qué parte de la tienda con 500 productos, cuentas de cliente, pago en línea e integración con 1C debe quedar lista para la entrega de mañana con el presupuesto de 15 000 rublos?",
+    "accepted": true
+  },
+  "273a2382f89234df94c7f1bb260059f16b759c168a42cb48d21b2649a764ebad": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué partes de la tienda deben quedar listas para la entrega de mañana, teniendo en cuenta que la publicidad empieza el viernes?",
+    "accepted": true
+  },
+  "30f77429d646ae51f4f5a531b2a1c5c7b5f66bce99498b7fb125fc535c3756de": {
+    "question": "Con el presupuesto de 15 000 rublos, ¿qué partes de la tienda deben estar listas para la entrega de mañana: los 500 productos, las cuentas de cliente, el pago en línea y la integración con 1C?",
+    "accepted": true
+  },
+  "79e105d31992f145b95cd03abe2f984cb004381f68697b8cf5a00459e4402e60": {
+    "question": "Какие работы по магазину на 500 товаров должны быть обязательно завершены к сдаче завтра в рамках бюджета 15 000 рублей, учитывая запуск рекламы в пятницу?",
+    "accepted": true
+  },
+  "d5e4b1db4d61e8060050dafb478604468f1b906670f055e19c51db6a5916df67": {
+    "question": "Какая часть магазина на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С обязательно должна быть готова к сдаче завтра при бюджете 15 000 рублей?",
+    "accepted": true
+  },
+  "effed6b355609d8ab898465f9e9b69f5513c0d58ec7d111e27b20da6a47d5daa": {
+    "question": "Какой объём работ обязательно должен быть готов к сдаче завтра при бюджете 15 000 рублей, учитывая, что запуск рекламы запланирован на пятницу?",
+    "accepted": true
+  }
+}

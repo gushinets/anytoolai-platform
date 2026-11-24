@@ -560,3 +560,85 @@ def test_draft_risk_suite_covers_all_four_briefs_in_each_language():
         for lang in ("ru", "en", "es")
     }
     assert all(c["scenario_id"] == "acceptance_builder.draft_v1" and c["criteria"] for c in cases)
+
+
+@pytest.mark.parametrize(
+    ("suite", "family", "count"),
+    [
+        ("draft-risks", None, 36),
+        ("draft-risks", "feasibility", 9),
+        ("draft-risks", "basic", 0),
+        ("language", "feasibility", 0),
+    ],
+)
+def test_draft_cli_selects_cases_before_collection(monkeypatch, tmp_path, suite, family, count):
+    out = tmp_path / "results"
+    args = cli_args("run", out)
+    args[args.index("--scenario") + 1] = "acceptance_builder.draft_v1"
+    args[args.index("--repeats") + 1] = "3"
+    args.extend(["--suite", suite])
+    if family:
+        args.extend(["--family", family])
+    snapshot = Mock(return_value="{}")
+    collector = Mock(
+        side_effect=lambda args, case, attempt, snapshot: {
+            "case": case,
+            "error": None,
+            "evidence_error": None,
+        }
+    )
+    monkeypatch.setattr(evaluation, "_docker", snapshot)
+    monkeypatch.setattr(evaluation, "_git_state", lambda: {})
+    monkeypatch.setattr(evaluation, "collect", collector)
+    monkeypatch.setattr(sys, "argv", args)
+    if not count:
+        with pytest.raises(SystemExit) as error:
+            evaluation.main()
+        assert error.value.code == 2
+        snapshot.assert_not_called()
+        collector.assert_not_called()
+        assert not out.exists()
+        return
+    assert evaluation.main() == 0
+    manifest = json.loads((out / "manifest.json").read_text())
+    expected = [c for c in evaluation.draft_risk_cases() if family is None or c["family"] == family]
+    assert manifest["cases"] == expected
+    assert set(manifest["runs"]) == {f"{c['id']}--{n}" for c in expected for n in range(1, 4)}
+    assert collector.call_count == count
+
+
+@pytest.fixture(scope="module")
+def reviewed_drafts():
+    path = ROOT / "tests/fixtures/acceptance_builder_eval/any-894-review-4-live.evidence.json"
+    return json.loads(path.read_text(encoding="utf-8"))["runs"]
+
+
+def test_reviewed_draft_matrix_matches_the_current_cases_and_rubric(reviewed_drafts):
+    cases = {case["id"]: case for case in evaluation.draft_risk_cases()}
+    records = [run["record"] for run in reviewed_drafts]
+    expected = {(key, n) for key in cases for n in (1, 2, 3)}
+    assert {(r["case"]["id"], r["attempt"]) for r in records} == expected
+    assert len({r["session_id"] for r in records}) == len(records) == len(expected)
+    for run in reviewed_drafts:
+        record = run["record"]
+        assert record["case"] == cases[record["case"]["id"]]
+        assert evaluation.review_status(record, run["review"]) == "PASS"
+
+
+def test_feasibility_report_requires_the_reviewed_linked_question(reviewed_drafts):
+    run = next(row for row in reviewed_drafts if row["record"]["case"]["family"] == "feasibility")
+    record, review = run["record"], run["review"]
+    for quote in (
+        None,
+        "Is delivery tomorrow the priority?",
+        record["output"]["questions"][1]["question"],
+    ):
+        assert evaluation.review_status(record, {**review, "scope_question": quote}) == "PENDING"
+    for changed in ("question", "criteria"):
+        altered = deepcopy(record)
+        if changed == "question":
+            altered["output"]["questions"][0]["question"] = "Is delivery tomorrow the priority?"
+        else:
+            altered["case"]["criteria"][0] += " Changed."
+        with pytest.raises(ValueError, match="does not belong"):
+            evaluation.review_status(altered, review)

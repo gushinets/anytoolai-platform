@@ -16,7 +16,7 @@ import {
   VERDICTS,
   extractCheckResult,
   extractDraftResult, composeCopyText, ISSUE_CATEGORIES, LEVELS,
-  hasCriteria,
+  hasAuthoredText, hasCriteria,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
 import {
   errorResponse,
@@ -165,6 +165,32 @@ describe("Acceptance Builder result parsing", () => {
       { issues: [] }, { questions: [{ ...q, extra: true }] }, { issues: undefined },
     ]) expect(extractDraftResult({ ...output, ...mutation })).toBeNull();
     expect(extractCheckResult({ ...checkOutput(), issues: [] })).toBeNull();
+  });
+
+  it("shares the authored text boundary with the producing atoms", () => {
+    const vectors = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/authored_text.json"), "utf8")) as { blank: string[], text: string[] };
+    expect(vectors.blank.some(hasAuthoredText)).toBe(false);
+    expect(vectors.text.every(hasAuthoredText)).toBe(true);
+  });
+
+  it("keeps issue links and list positions when historical text is unavailable", () => {
+    const output = draftOutput(".weak_input");
+    const issues = output.issues as { evidence?: string, description: string }[];
+    const questions = output.questions as { rationale: string, source_issue_index: number }[];
+    issues[0]!.evidence = "\ufeff";
+    questions[0]!.rationale = " \ufeff";
+    const result = extractDraftResult(output)!;
+    expect(result.questions![0]!.sourceIssueIndex).toBe(questions[0]!.source_issue_index);
+    expect(composeCopyText(result)).toContain(issues[0]!.description);
+    expect(result.document.summary).toBe("Incomplete saved draft");
+    const legacy = { extracted: draftOutput().extracted };
+    const values = legacy.extracted.values as { acceptance_criteria: string[] };
+    const criteria = values.acceptance_criteria;
+    criteria[0] = "\u0085\ufeff";
+    expect(composeCopyText(extractDraftResult(legacy)!)).toContain(criteria[1]!);
+    expect(composeCopyText(extractDraftResult(legacy)!)).toContain("Incomplete saved draft");
+    criteria[0] = "\u0085";
+    expect(extractDraftResult(legacy)).toBeNull();
   });
 
   it("restores legacy Draft lists without claiming risks were assessed", () => {
@@ -341,6 +367,22 @@ describe("Acceptance Builder page", () => {
     const narrative = (fixture("draft_document", "") as { summary: string }).summary;
     expect(expected).not.toContain(narrative);
     await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
+  });
+
+  it("shows the surviving text and marks both projections of a saved incomplete draft", async () => {
+    const output = draftOutput(".weak_input");
+    const questions = output.questions as { question: string }[];
+    questions[0]!.question = "\ufeff";
+    await run("draft", output);
+    const recap = await screen.findByText("Structured recap");
+    fireEvent.click(recap);
+    expect(recap.closest("details")?.textContent).toContain("Incomplete saved draft");
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+    const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]![0];
+    expect(copied).toContain("Incomplete saved draft");
+    expect(copied).toContain("1. Text unavailable in the saved draft.");
+    expect(copied).toContain((output.issues as { description: string }[])[0]!.description);
   });
 
   it("shows every missing-information finding in recap and copy with the question limit reached", async () => {

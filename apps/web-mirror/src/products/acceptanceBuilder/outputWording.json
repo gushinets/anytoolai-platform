@@ -39,7 +39,9 @@
       "contradiction": "Contradiction"
     },
     "complete": "The brief states all three lists.",
-    "confirm": "the client should confirm it"
+    "confirm": "the client should confirm it",
+    "partial": "Incomplete saved draft",
+    "unavailable": "Text unavailable in the saved draft."
   },
   "ru": {
     "verdicts": {
@@ -81,7 +83,9 @@
       "contradiction": "Противоречие"
     },
     "complete": "В брифе указаны все три списка.",
-    "confirm": "клиенту следует подтвердить"
+    "confirm": "клиенту следует подтвердить",
+    "partial": "Сохранённый черновик неполон",
+    "unavailable": "Текст отсутствует в сохранённом черновике."
   },
   "es": {
     "verdicts": {
@@ -123,7 +127,9 @@
       "contradiction": "Contradicción"
     },
     "complete": "El encargo especifica las tres listas.",
-    "confirm": "el cliente debe confirmarlo"
+    "confirm": "el cliente debe confirmarlo",
+    "partial": "Borrador guardado incompleto",
+    "unavailable": "Falta texto en el borrador guardado."
   },
   "de": {
     "verdicts": {
@@ -165,7 +171,9 @@
       "contradiction": "Widerspruch"
     },
     "complete": "Das Briefing enthält alle drei Listen.",
-    "confirm": "vom Kunden zu bestätigen"
+    "confirm": "vom Kunden zu bestätigen",
+    "partial": "Gespeicherter Entwurf unvollständig",
+    "unavailable": "Text im gespeicherten Entwurf fehlt."
   },
   "fr": {
     "verdicts": {
@@ -207,7 +215,9 @@
       "contradiction": "Contradiction"
     },
     "complete": "Le brief précise les trois listes.",
-    "confirm": "à confirmer par le client"
+    "confirm": "à confirmer par le client",
+    "partial": "Brouillon enregistré incomplet",
+    "unavailable": "Du texte manque dans le brouillon enregistré."
   },
   "it": {
     "verdicts": {
@@ -249,7 +259,9 @@
       "contradiction": "Contraddizione"
     },
     "complete": "Il brief specifica tutti e tre gli elenchi.",
-    "confirm": "da confermare con il cliente"
+    "confirm": "da confermare con il cliente",
+    "partial": "Bozza salvata incompleta",
+    "unavailable": "Manca del testo nella bozza salvata."
   },
   "pt": {
     "verdicts": {
@@ -291,6 +303,8 @@
       "contradiction": "Contradição"
     },
     "complete": "O briefing especifica as três listas.",
-    "confirm": "a confirmar pelo cliente"
+    "confirm": "a confirmar pelo cliente",
+    "partial": "Rascunho guardado incompleto",
+    "unavailable": "Falta texto no rascunho guardado."
   }
 }

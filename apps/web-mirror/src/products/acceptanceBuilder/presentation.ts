@@ -1,6 +1,7 @@
 import outputWording from "./outputWording.json";
 import {
   LIST_FIELDS,
+  hasAuthoredText,
   type AcceptanceBuilderResult,
   type DeltaCriterion,
   type DeltaStatus,
@@ -20,6 +21,8 @@ type Words = {
   complete: string;
   risks: string;
   questions: string;
+  partial: string;
+  unavailable: string;
   noRisks: string;
   noQuestions: string;
   listsPresent: string;
@@ -59,6 +62,8 @@ const NEUTRAL: Words = {
   missing: "—",
   risks: "issues",
   questions: "questions",
+  partial: "⚠",
+  unavailable: "[…]",
   noRisks: "✓",
   noQuestions: "—",
   listsPresent: "✓",
@@ -81,6 +86,12 @@ export function composeDocument(result: StructuredResult): AcceptanceBuilderResu
   const words = WORDS[result.analysisLanguage.split("-")[0].toLowerCase()] ?? NEUTRAL;
   const sections: { title: string; content: string }[] = [];
   let summary = "";
+  let partial = false;
+  function display(text: string): string {
+    if (result.comparison || hasAuthoredText(text)) return text;
+    partial = true;
+    return words.unavailable;
+  }
   if (result.comparison) {
     const { verdict, deltas, rationale } = result.comparison;
     summary = `${words.verdict}: ${words.verdicts[verdict]}.`;
@@ -92,9 +103,10 @@ export function composeDocument(result: StructuredResult): AcceptanceBuilderResu
   for (const field of LIST_FIELDS) {
     sections.push({
       title: words.lists[field],
-      content: result.lists[field]?.map((item) => `- ${item}`).join("\n") ?? words.missing
+      content: result.lists[field]?.map((item) => `- ${display(item)}`).join("\n") ?? words.missing
     });
   }
+  const listSummary = partial ? words.unavailable : (result.comparison ? words.complete : words.listsPresent);
   const gapLines = result.missingFields.map((field) =>
     `- ${words.lists[field].toLowerCase()}: ${words.confirm}.`
   );
@@ -102,20 +114,27 @@ export function composeDocument(result: StructuredResult): AcceptanceBuilderResu
     const riskLines: string[] = [];
     for (const issue of result.issues) {
       const label = words.categories[issue.category];
-      const evidence = issue.evidence ? `\n  ${words.evidence}: ${issue.evidence}` : "";
-      const line = `- ${label}: ${issue.description}${evidence}`;
+      const evidence = issue.evidence ? `\n  ${words.evidence}: ${display(issue.evidence)}` : "";
+      const line = `- ${label}: ${display(issue.description)}${evidence}`;
       const lines = issue.category === "missing_information" ? gapLines : riskLines;
       lines.push(line);
     }
-    const questions = result.questions.map((item, index) => `${index + 1}. ${item.question}`);
+    const questions = result.questions.map((item, index) => {
+      if (!hasAuthoredText(item.rationale)) partial = true;
+      return `${index + 1}. ${display(item.question)}`;
+    });
     sections.push({ title: words.risks, content: riskLines.join("\n") || words.noRisks });
     sections.push({ title: words.questions, content: questions.join("\n") || words.noQuestions });
     if (riskLines.length) summary = `${words.risks}: ${riskLines.length}`;
     else if (questions.length) summary = `${words.questions}: ${questions.length}`;
   }
-  const gapText = gapLines.join("\n") || (result.comparison ? words.complete : words.listsPresent);
+  const gapText = gapLines.join("\n") || listSummary;
   if (!summary) summary = gapText;
   sections.push({ title: words.gaps, content: gapText });
+  if (partial) {
+    summary = words.partial;
+    sections.unshift({ title: words.partial, content: words.unavailable });
+  }
   return { summary, sections };
 }
 

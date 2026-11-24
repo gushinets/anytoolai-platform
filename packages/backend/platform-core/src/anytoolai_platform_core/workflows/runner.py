@@ -932,6 +932,9 @@ class SequentialWorkflowRunner:
         normalized_schema = normalize_schema_mapping(schema.schema)
         if normalized_schema is None:
             return
+        # A stored artifact keeps its read contract. Products may tighten new publications.
+        if "publication" in normalized_schema.get("$defs", {}):
+            normalized_schema.setdefault("allOf", []).append({"$ref": "#/$defs/publication"})
         try:
             validate_json_schema(instance=payload, schema=normalized_schema)
         except JsonSchemaValidationError as exc:

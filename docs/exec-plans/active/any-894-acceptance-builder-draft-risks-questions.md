@@ -189,3 +189,40 @@ vague drafts and accepts its six previously misclassified feasibility questions.
 In all nine fresh vague drafts the website remains a deliverable and both criteria
 and assumptions are marked missing. The combined-risk questions ask what must be ready
 for delivery. All nine contradiction cases and nine complete controls passed again.
+
+## Fourth review
+
+Keep Draft v1 readable with its stored-artifact schema. Enforce portable nonblank authored
+text during generation and publication, and label incomplete historical text in Recap and Copy.
+Bind the scope decision to the evaluated brief, combined risk, question and review rubric.
+Derive CLI filters from the selected suite. Verify retries, historical reads, review mutations
+and collection manifests, then assess a fresh 36-session RU/EN/ES matrix.
+
+The revised source-based rubric and product checks passed for all 36 fresh sessions on the
+working tree based on `8366fc2a`. Each cell represents three distinct sessions. The API and
+worker used isolated SQLite databases and the live backend policy `sol_text_generation_v1`.
+All 99 calls to `gpt-6.1-sol` succeeded. Each published result was retrieved through the
+Result API and accepted by the browser parser. Recap and Copy retained the findings and questions.
+
+| Brief | RU | EN | ES | Decision checked |
+| --- | --- | --- | --- | --- |
+| Vague website | 3/3 | 3/3 | 3/3 | Website is a deliverable. Design approval and required features are open. |
+| Store feasibility | 3/3 | 3/3 | 3/3 | The linked question asks which work must be ready at delivery tomorrow. Advertising starts Friday. |
+| Conflicting languages | 3/3 | 3/3 | 3/3 | The client chooses Russian-only or bilingual delivery. The email form requirement is preserved. |
+| Complete landing page | 3/3 | 3/3 | 3/3 | Agreed terms survive, including the form test, deadline, budget and revisions. No issues or questions. |
+
+The archive in `tests/fixtures/acceptance_builder_eval/any-894-review-4-live.evidence.json`
+contains the inputs, raw results, session ledgers, runtime fingerprints and digest-bound review
+sheets. The previous 36-session grounding series also passes the updated offline controls.
+
+All 138 focused evaluator and product acceptance checks passed. The API regressions covered
+A01/A04/A05 correction, retry exhaustion, publication rejection and reopening both stored
+shapes. A recovered A05 response was fetched from the API and passed through the actual
+TypeScript Recap and Copy projections. The 36 Acceptance Builder web tests passed.
+
+The local full-check recorded 4,294 backend passes, 12 skips and three environmental failures.
+The two production Compose discovery tests passed against an isolated copy of the candidate
+without local environment files. The activation-marker test requires non-interactive sudo
+to run as nobody, which this host does not provide.
+The complete frontend-check passed, including lint, type checking, 1,145 web-mirror tests,
+the generated API contract check and the production builds.
