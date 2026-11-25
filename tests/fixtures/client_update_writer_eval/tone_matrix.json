@@ -197,6 +197,78 @@
         "The client sees exactly one request for the trainer photos.",
         "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
       ]
+    },
+    {
+      "id": "S2-resolved-ru",
+      "language": "ru",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник. Фотографии тренеров уже получены, повторно запрашивать их не нужно.",
+      "tone": "warm",
+      "criteria": [
+        "Keeps the client's earlier non-send as the cause of the three-day delay.",
+        "States Tuesday as the new date without making it a consequence of the photos arriving.",
+        "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-resolved-en",
+      "language": "en",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday. The trainer photos have since arrived and are no longer needed from the client.",
+      "tone": "warm",
+      "criteria": [
+        "Keeps the client's earlier non-send as the cause of the three-day delay.",
+        "States Tuesday as the new date without making it a consequence of the photos arriving.",
+        "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-resolved-es",
+      "language": "es",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes. Las fotos de los entrenadores ya se recibieron y no hace falta volver a pedírselas al cliente.",
+      "tone": "warm",
+      "criteria": [
+        "Keeps the client's earlier non-send as the cause of the three-day delay.",
+        "States Tuesday as the new date without making it a consequence of the photos arriving.",
+        "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-date-linked-ru",
+      "tone": "warm",
+      "language": "ru",
+      "progress_notes": "Из-за отсутствия фотографий тренеров первая версия была перенесена на пятницу. Дизайнер передал фотографии сегодня утром. Благодаря этому первую версию покажу в четверг вместо пятницы.",
+      "criteria": [
+        "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+        "Keeps the designer as the person who delivered the photos this morning.",
+        "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-date-linked-en",
+      "tone": "warm",
+      "language": "en",
+      "progress_notes": "The first version moved to Friday because the trainer photos were missing. The designer delivered the photos this morning. Because of that, I'll show the first version on Thursday instead of Friday.",
+      "criteria": [
+        "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+        "Keeps the designer as the person who delivered the photos this morning.",
+        "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-date-linked-es",
+      "tone": "warm",
+      "language": "es",
+      "progress_notes": "La primera versión se aplazó hasta el viernes porque faltaban las fotos de los entrenadores. El diseñador entregó las fotos esta mañana. Gracias a eso, mostraré la primera versión el jueves en vez del viernes.",
+      "criteria": [
+        "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+        "Keeps the designer as the person who delivered the photos this morning.",
+        "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+        "Makes no new request for the photos."
+      ]
     }
   ],
   "models": [

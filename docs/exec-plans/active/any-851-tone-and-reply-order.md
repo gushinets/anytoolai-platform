@@ -237,3 +237,34 @@ Terra and Sol each passed the six original S1 cases in a comparison on the same 
 saved result, browser display and clipboard matched in all 48 runs.
 
 [Fourth-round live evidence](any-851-tone-and-reply-order-review-4.evidence.json)
+
+## Preserve participants and relationships when rephrasing
+
+1. In the four freelancer-voice prompts, resolve each statement from its original speaker's
+   perspective. Preserve who made or reported it, each participant's role, its status and the
+   relationships the source actually states. Keep roles local to the event they describe.
+2. In Reply Draft, maintain the participants of a relayed claim independently of its
+   attribution and the freelancer's position. In Update, keep a blocker, its history, its
+   resolution and a revised date separate unless the source links them.
+3. Grade participant fidelity and relationship fidelity separately. Recheck the original
+   multilingual cases, plus controls with a third-party agreement, an explicit cause for a
+   revised date and a resolution with no stated actor. Preserve the raw fourth-round evidence
+   and correct the three historical verdicts in the follow-up.
+
+The [fourth-round evidence](any-851-tone-and-reply-order-review-4.evidence.json) retains the
+original outputs. S4 warm EN and ES fail the participant check. Resolved S2 ES fails both
+the actor and relationship checks. The other checks recorded for those outputs are historical.
+
+The Update tone matrix includes three resolved-material notes with no arrival actor or link
+between arrival and date, and three notes where the designer delivers the photos and that
+arrival explicitly enables an earlier date. For S4, use the original neutral, warm and firm
+inputs, then require an explicit restatement of the client's account in the warm reply after
+the offer. Check a claimed agreement involving the freelancer and a separate claim involving
+only the client and a venue coordinator. In both controls, the author asks to relay the
+client's account without confirming the substance of the agreement.
+
+Config, architecture and docs validation passed. The Freelancer Suite and evaluator tests
+passed before the main merge (1,934 tests) and after it (1,979 tests).
+The isolated browser launched both workflows and the provider rejected
+generation with HTTP 401 under both locally configured credentials. The semantic matrix and
+model comparison still require a successful provider run.

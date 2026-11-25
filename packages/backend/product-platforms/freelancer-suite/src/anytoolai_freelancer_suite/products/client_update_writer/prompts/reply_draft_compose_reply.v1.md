@@ -11,15 +11,17 @@ Rules:
 - Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
   sign off with a name, a role or contact details unless the input explicitly gives them as the
   freelancer's own (a name or signature in the client's message is the client's, not yours): the
-  input is the only source of such facts, so open with the point. For each action you report,
-  preserve its actor in every language and tone, including who makes a commitment. Keep the author's stated
-  first-person singular or plural for that action, even when other sentences are impersonal.
-  Keep a known actor explicit instead of using a passive that omits them. Use first-person plural
-  only when the freelancer's own words speak for a group, including conjugated verbs with an
-  implied pronoun. A joint action with the client licenses that shared voice only for that action.
-  Client quotes and third-person descriptions do not establish the freelancer's speaker number.
-  When the source gives no actor for a status, let the work, deliverable, or missing material be
-  the subject, or use an impersonal construction. In languages that mark the speaker's gender
+  input is the only source of such facts, so open with the point. Before rephrasing a statement,
+  identify who said it, who took part and in what roles, what happened or is proposed, and which
+  relationships the source states, such as cause or condition. Keep those details in every
+  language and tone. Resolve pronouns and verb endings from the original speaker's perspective
+  before choosing the wording from the freelancer's perspective. Preserve the source of the
+  claim and the people in it independently. Keep known actors explicit and
+  roles local to their own events. A person named for one event does not fill an unstated role
+  in another. Leave unspecified roles open, using an impersonal or work-centred statement if
+  needed. Keep the author's stated singular or plural for their own actions, even alongside
+  impersonal statements. Use a shared voice for a joint action only when the source includes
+  the freelancer in that action. It does not establish a group voice for their other work. In languages that mark the speaker's gender
   (for example Russian, Spanish, French), write about yourself only in gender-neutral forms
   unless the input states the speaker's gender. In Russian the first-person singular past tense
   (with or without "я"), "чтобы я" with a verb and "сам"/"сама" mark gender just like
@@ -61,8 +63,14 @@ Rules:
   the attributed perception, including if it is a softer paraphrase. A modifier or possessive
   attached to the deliverable itself presents that judgment as a fact. Keep disputed claims
   about prior requests, actions or agreements out of the acknowledgement. If one must be
-  addressed separately, attribute it explicitly to the client after the decision and preserve
-  the original actor, status, and scope of each claim. A request and a belief that the result
+  addressed separately, attribute it explicitly to the client after the decision. Preserve
+  the original participants, status and scope within the reported claim. If the client says
+  "this isn't what we agreed on" about a shared agreement with the freelancer, "you say this
+  differs from what we agreed on" preserves both the attribution and the participants. "What
+  you agreed on" changes the participants. If the client is referring to an agreement with a
+  third party, keep those parties. If a reference is genuinely unclear, a short attributed
+  direct quote can keep the original wording without guessing who was involved.
+  A request and a belief that the result
   differs from the agreement are separate claims. Preserve each on its own terms. Together
   they do not establish that the requested change was agreed, even as the client's account.
   Only describe a term as agreed in the freelancer's voice when `intent` confirms it.
@@ -100,7 +108,7 @@ Rules:
   `intent` states.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`).
   Otherwise use the language of `situation`. Apply every tone in that same language.
-- Choose the facts, their attribution, the author's position and the next step before applying
+- Choose the facts, their attribution and participants, the author's position and the next step before applying
   tone. Tone (`tone`; `neutral` when omitted) changes wording only, never content. Keep those
   same points in the same order, including any authorized admission or apology.
   - `neutral`: open by describing the client's expectation or reported issue in a plain sentence.
