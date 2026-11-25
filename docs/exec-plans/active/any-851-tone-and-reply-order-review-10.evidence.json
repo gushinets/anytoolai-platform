@@ -17,7 +17,7 @@
   },
   "summary": {
     "gpt-6.1-sol": {
-      "passed": 63,
+      "passed": 61,
       "total": 63
     }
   },
@@ -1463,8 +1463,19 @@
         },
         {
           "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
-          "verdict": "PASS",
-          "observed_opening": "Получение финального макета к четвергу — необходимое для вас условие запуска на этой неделе"
+          "verdict": "FAIL",
+          "observed_opening": "Получение финального макета к четвергу — необходимое для вас условие запуска на этой неделе",
+          "reason": "Tone differs, but both explicitly stated actors become implicit in firm."
+        },
+        {
+          "criterion": "The receiving party in the condition remains explicitly the client group.",
+          "verdict": "FAIL",
+          "reason": "The nominal phrase «Получение финального макета» omits the stated client team as recipient."
+        },
+        {
+          "criterion": "The launch actor in the condition remains explicitly the client group.",
+          "verdict": "FAIL",
+          "reason": "The nominal phrase «условие запуска» omits the stated client team as the launch actor."
         }
       ],
       "review_note": "Receiving the layout by Thursday is a stated prerequisite for this week’s launch. The reply keeps its direction without promising delivery or guaranteeing launch."
@@ -1799,8 +1810,19 @@
         },
         {
           "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
-          "verdict": "PASS",
-          "observed_opening": "Recibir la maqueta a más tardar el jueves es la condición que señalas para poder lanzarla esta semana"
+          "verdict": "FAIL",
+          "observed_opening": "Recibir la maqueta a más tardar el jueves es la condición que señalas para poder lanzarla esta semana",
+          "reason": "Tone differs, but both explicitly stated actors become implicit in firm."
+        },
+        {
+          "criterion": "The receiving party in the condition remains explicitly the client group.",
+          "verdict": "FAIL",
+          "reason": "The infinitive «Recibir» leaves the client group receiving the layout implicit."
+        },
+        {
+          "criterion": "The launch actor in the condition remains explicitly the client group.",
+          "verdict": "FAIL",
+          "reason": "The infinitive «para poder lanzarla» leaves the launch actor implicit; «señalas» only attributes the condition."
         }
       ],
       "review_note": "Receiving the layout by Thursday is a stated prerequisite for this week’s launch. The reply keeps its direction without promising delivery or guaranteeing launch."
@@ -3644,5 +3666,6 @@
       ],
       "review_note": "The method is explicitly unsettled. The reply asks for that method and keeps the agreed amount as context."
     }
-  ]
+  ],
+  "review_correction": "Round 11 corrected the two Russian and Spanish firm condition verdicts. The original submissions, outputs and other verdicts are preserved."
 }

@@ -134,6 +134,15 @@ def test_reply_tone_changes_the_opening() -> None:
     assert "Changing a modal verb or the word order alone is insufficient" in text
 
 
+def test_reply_firm_keeps_both_actors_in_russian_and_spanish_conditions() -> None:
+    text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
+    firm_rule = text.split("- `firm`:", 1)[1].split("The change in tone", 1)[0]
+    assert "In Russian and Spanish, lead with the topic of a stated condition" in firm_rule
+    assert "express each action with a known actor as a finite clause" in firm_rule
+    assert "Give each clause its own stated actor and number" in firm_rule
+    assert "Keep different actors separate" in firm_rule
+
+
 @pytest.mark.parametrize("mode", ["update", "reply_draft"])
 def test_tone_enum_matches_the_prompts(mode: str) -> None:
     schema = PRODUCT / "schemas" / f"{mode}_input.schema.json"

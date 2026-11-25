@@ -445,7 +445,7 @@ All 375 focused Python tests passed, including the API layout checks.
 
 ### Round 10 verification
 
-Sol passed 63 browser runs on the final local profile, 21 each in RU, EN and ES. The
+Sol returned 63 browser results on the final local profile, 21 each in RU, EN and ES. The
 matrix reused all 24 round 9 inputs and added 39 controls. The provider ledger confirmed
 Sol for every session, and stored, rendered and copied text matched.
 
@@ -470,3 +470,26 @@ All 2,043 focused Python tests passed, including the Freelancer Suite, evaluator
 deployment configuration and both API layouts.
 
 [Round 10 live evidence](any-851-tone-and-reply-order-review-10.evidence.json)
+
+## Preserve both actors in Russian and Spanish conditions
+
+1. For Russian and Spanish firm replies, keep the issue first while expressing each event
+   in a stated condition with its own known actor.
+2. Compare all three tones on the original launch condition and a control with different
+   actors for receipt and launch. Recheck the unrelated deadline questions and S4 on RU and ES.
+3. Correct the Russian and Spanish round 10 verdicts against the saved outputs.
+
+### Round 11 verification
+
+Round 10's Russian and Spanish firm replies preserved the condition but left the
+recipient and the launch actor implicit. The two corrected verdicts bring the recorded
+round 10 total to 61 of 63 with its other verdicts preserved.
+
+Sol passed 24 browser checks, 12 in Russian and 12 in Spanish. All three tones preserved
+both actors in the original condition. In the control, the individual launched the
+course and the team received the materials. The evidence records the expression for
+each actor independently. The deadline and S4 controls kept the unconfirmed date,
+the order of the reply and the two-option first-round offer. All 381 focused Python
+tests passed.
+
+[Round 11 live evidence](any-851-tone-and-reply-order-review-11.evidence.json)

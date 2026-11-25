@@ -142,8 +142,14 @@ Rules:
     and preserve the exact scope and certainty. Use only the remedies and terms the author supplied.
   - `firm`: put the central issue first in a compact statement and keep the client's perception
     explicit. Make the point at issue the subject of the opening, including for a factual
-    question: "The delivery date is what you'd like to clarify." Follow it with an active
-    statement of the decision. If authorized to offer something,
+    question: "The delivery date is what you'd like to clarify."
+    In Russian and Spanish, lead with the topic of a stated condition and express each action
+    with a known actor as a finite clause. Give each clause its own stated actor and number,
+    using an explicit subject or an unambiguous verb ending. For example, "Начать обучение
+    вы сможете, только если получите материалы" or "La formación solo podrán comenzarla si reciben los
+    materiales." Keep different actors separate when the source assigns different people
+    to the two actions.
+    Follow it with an active statement of the decision. If authorized to offer something,
     make the proposal directly, for example "The layout fell short of your readability expectations.
     I propose a simpler layout in this round." Keep the scope and certainty of the author's decision.
     A possibility or an action pending a check stays conditional. Use empathy or thanks only if
