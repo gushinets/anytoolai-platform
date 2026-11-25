@@ -70,10 +70,10 @@ workflows:
     input_mapping:
       subject_text: scenario.input.deliverable_text
       reference_text: scenario.input.brief_text
-      categories: literal:["meets_expectations","partially_meets","does_not_meet"]
+      categories: literal:["meets_expectations","partially_meets","does_not_meet","insufficient_brief"]
       criteria: literal:[{"id":"scope_coverage","description":"The deliverable covers everything in scope that the brief asks
         for.","weight":3},{"id":"requirement_fit","description":"What was delivered does what the brief says it must do.","weight":3},{"id":"completeness","description":"Every
         deliverable the brief lists is present.","weight":2},{"id":"clarity","description":"The deliverable text states plainly
-        what was done and what was not.","weight":1}]
+        what was delivered. A clear list of completed work satisfies this criterion; the text does not have to list work that was not done.","weight":1}]
     output_mapping:
       context.workflow_output.comparison: steps.compare.output

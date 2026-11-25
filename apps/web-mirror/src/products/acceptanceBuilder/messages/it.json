@@ -34,5 +34,8 @@
   "result": {
     "verdictScope": "Il verdetto si basa su quattro criteri di revisione generali, non voce per voce sui criteri elencati sotto.",
     "recap": "Riepilogo strutturato"
+  },
+  "validation": {
+    "insufficient_brief": "Aggiungi i requisiti del cliente: cosa consegnare, entro quando e come verrà accettato il lavoro. Un saluto o un testo casuale non consente di verificare la consegna."
   }
 }

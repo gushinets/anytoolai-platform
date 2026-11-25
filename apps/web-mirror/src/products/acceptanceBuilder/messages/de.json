@@ -34,5 +34,8 @@
   "result": {
     "verdictScope": "Das Urteil beruht auf vier allgemeinen Prüfkriterien, nicht Punkt für Punkt auf den unten aufgeführten Kriterien.",
     "recap": "Strukturierte Zusammenfassung"
+  },
+  "validation": {
+    "insufficient_brief": "Ergänze die Anforderungen des Kunden: Was soll bis wann geliefert werden und wie erfolgt die Abnahme? Ein Gruß oder zufälliger Text reicht für die Prüfung nicht aus."
   }
 }

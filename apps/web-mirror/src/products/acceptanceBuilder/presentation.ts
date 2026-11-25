@@ -39,7 +39,8 @@ const NEUTRAL: Words = {
   verdicts: {
     meets_expectations: "✓",
     partially_meets: "△",
-    does_not_meet: "✗"
+    does_not_meet: "✗",
+    insufficient_brief: "?"
   },
   statuses: {
     match: "✓",

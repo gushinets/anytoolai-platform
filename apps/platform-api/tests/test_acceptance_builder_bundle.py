@@ -93,7 +93,7 @@ BRIEF_TEXT = (
 DELIVERABLE_TEXT = (
     "The certificate generator is live. Students receive a PDF certificate by email right after "
     "they finish a course. The template uses our brand colors. Certificates work for the 12 "
-    "courses in the new catalog; the 5 legacy courses are not connected yet."
+    "courses in the new catalog."
 )
 WEAK_BRIEF_TEXT = "Need a certificate thing for my courses."
 WEAK_DELIVERABLE_TEXT = "Done, works."
@@ -587,13 +587,41 @@ def test_check_happy_path_composes_the_structured_result(
     assert extract_input["source_text"] == BRIEF_TEXT
     assert compare_input["subject_text"] == DELIVERABLE_TEXT  # the work under review
     assert compare_input["reference_text"] == BRIEF_TEXT  # the expectations
-    assert compare_input["categories"] == ["meets_expectations", "partially_meets", "does_not_meet"]
+    assert compare_input["categories"] == [
+        "meets_expectations",
+        "partially_meets",
+        "does_not_meet",
+        "insufficient_brief",
+    ]
     assert [criterion["id"] for criterion in compare_input["criteria"]] == [
         "scope_coverage",
         "requirement_fit",
         "completeness",
         "clarity",
     ]
+
+
+def test_insufficient_brief_survives_action_validation_and_workflow_composition(
+    app: Any, request_platform_api, session_factory: SessionFactory
+) -> None:
+    suite = REPO_ROOT / "tests/fixtures/acceptance_verdict_eval/cases.json"
+    cases = json.loads(suite.read_text(encoding="utf-8"))["cases"]
+    greeting = next(case for case in cases if case["id"] == "ANY893-HELLO")
+    adapter = RecordingProviderAdapter(
+        FIXTURE_ROOT, variants={EXTRACT: ".insufficient_brief", COMPARE: ".insufficient_brief"}
+    )
+    _, output = _run_to_result(
+        app,
+        request_platform_api,
+        session_factory,
+        CHECK,
+        greeting["input"],
+        adapter,
+    )
+    assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, COMPARE)
+    assert output["comparison"]["verdict"] == "insufficient_brief"
+    clarity = output["comparison"]["deltas"][3]
+    assert (clarity["criterion_id"], clarity["status"]) == ("clarity", "match")
 
 
 def test_weak_input_fixtures_are_reachable_end_to_end(

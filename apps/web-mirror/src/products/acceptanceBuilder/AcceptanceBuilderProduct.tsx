@@ -59,7 +59,7 @@ const briefError = (values: DraftValues) => requiredBackendTrimmedFieldError(val
 
 /** The two scenarios share one product namespace; `draft_v1` (brief -> criteria) counts as
  * activation only when it lists criteria (the draft has no verdict, see `renderer_contract.yaml`),
- * `check_v1` always shows a verdict. Neither scenario has an extra client-side decision. */
+ * `check_v1` requires a meaningful brief before showing a verdict. */
 export const draftDefinition: ProductDefinition<DraftValues, AcceptanceBuilderResult> = {
   productId: "acceptance_builder",
   scenarioId: "acceptance_builder.draft_v1",
@@ -75,6 +75,13 @@ export const draftDefinition: ProductDefinition<DraftValues, AcceptanceBuilderRe
   Result: AcceptanceBuilderResultView,
 };
 
+function normalizeCheckValues(values: CheckValues): CheckValues {
+  return {
+    briefText: trimBackendWhitespace(values.briefText),
+    deliverableText: trimBackendWhitespace(values.deliverableText),
+  };
+}
+
 export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderResult> = {
   productId: "acceptance_builder",
   scenarioId: "acceptance_builder.check_v1",
@@ -87,8 +94,15 @@ export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderRe
       ["briefText", briefError(values)],
       ["deliverableText", requiredBackendTrimmedFieldError(values.deliverableText, TEXT_MAX_LENGTH)],
     ]),
-  toInput: (values) => ({ brief_text: trimBackendWhitespace(values.briefText), deliverable_text: trimBackendWhitespace(values.deliverableText) }),
+  normalizeValues: normalizeCheckValues,
+  toInput: (values) => {
+    const { briefText, deliverableText } = normalizeCheckValues(values);
+    return { brief_text: briefText, deliverable_text: deliverableText };
+  },
   extractResult: extractCheckResult,
+  resultFieldErrors: (result) => result.insufficientBrief
+    ? { briefText: { code: "product", key: "validation.insufficient_brief" } } : {},
+  emitsResultViewed: (result) => !result.insufficientBrief,
   Fields: CheckFields,
   Result: AcceptanceBuilderResultView,
 };

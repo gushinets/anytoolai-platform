@@ -1,0 +1,1225 @@
+{
+  "issue": "ANY-893",
+  "date": "2026-11-23",
+  "source": {
+    "git_sha": "7f06f6a1013a4f291cd33bb73226b702da24522c",
+    "git_dirty": true
+  },
+  "working_tree_note": "Only the tracked execution-plan Markdown had uncommitted changes at collection.",
+  "canonical_source_sha256": "5f484ee36044e35933adeb2f7f8b13a993bb4527233476e2dd9cce1e1515c1b0",
+  "deployment_profile_sha256": "305a552e0e387e1f8570354342f4fc7ac68be27c6e21ad920326c321d8337b34",
+  "worker_snapshot": {
+    "source_sha256": {
+      "configs/kernel/litellm_router.yaml": "dede022d99bc94440ea14f212cc669d939a39b51dbb73e8d0ef83ef5510aa1d2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/action_configs.yaml": "d1813bad6ff02019160b7ce2664acf4d92d36bcd87bec95c3c37a2975a104462",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/frontends.yaml": "5f5eac1312dddf0ab129ccb58108e38aed9cd0c633503ccb91ba4c036f7512bd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/handoffs.yaml": "08d5c5b3717f2b0db972213243a56f0cf98811fd4328105da998f5a3116d49c4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/product.yaml": "247a7d2c45740d6d821231ed73cfa787300b8170d8923f0760c841e8b3d8a66a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/detect_issues.v1.md": "a8b150c1f681ad541aadcf8a2ba6e8340f2e85e813e13ba316b2de0bc70cf37f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/extract_brief.v1.md": "0968f8fcc1762feaf10e86c11fffe41a58b960eceac2b4dda034d56902903c44",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_questions.v1.md": "198c42b2e229ecd26d23d1e92fa6fefe5cf5f38b95b961957f06bda1dbc9e003",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts/generate_summary.v1.md": "b535e867748d970b020218c1b3ebc2a0ff386af100f4331b73cf67754a7376a1",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/prompts.yaml": "03cb35d961dd1d9b1d95a1d1490eb2355e438c239a391b757c5a554473845daf",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/quotas.yaml": "2fcee433e370547ff34d27f8ddfbf9abff01d456586ae2627203ee6745d298ba",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/renderer_contract.yaml": "adf12d7169078704b01b9b1106fdb3982cc08718b2a8b7d651a53cc6021f827f",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/scenarios.yaml": "f352e089e7129c5c2a36c46a147b1a59c3013a13171363f833222bd171529c9c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_input.schema.json": "998b82bde28beb6be77e0fb522a8e0a9871c88d9500b884523912f2d257d8454",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas/decode_output.schema.json": "5a76652a23623ba7a025410a8d0a509e9b8495636f3f6adca8ecb5288610cc0a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/schemas.yaml": "e2038c31be3810ee6a04ac82994f9b7bbcc8cd0d68a74ff90e4e0ad3973188f9",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/brief_decoder/workflows.yaml": "456c649b2f413eced34434383533265f5ef57ca70c1bb71964ee7448cc65353a",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/action_configs.yaml": "e179f207d997d1b6f7c72b085e3346878320e4466b74071168002c2048ff6b48",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/frontends.yaml": "8e43fb844dd43efb59a2c3ba4b9757795c546ea49fd79e837031f58092f5c1e6",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/product.yaml": "cd0a6c49cdfb0f4487e2719fbd04f0faaa2c4defd0c31b111d1fad94afc66905",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/compare.v1.md": "590d2516b396c4424d94119f9c37c26de4764ac99003c05f5a3e2a8e0e06841c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts/extract.v1.md": "0240f368c23ab093f5caffb6828bf7ab6faea9b5e31fdc739eca3839120c23e4",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/prompts.yaml": "3d209f0b965ceb6c8f2b5b373a35cd791db39e7cac6f8e1f4713368f8253e0b2",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/quotas.yaml": "1ed4154065125cf4da02e88015f8112caf11090279f292bebd7dd4534d98df6c",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/renderer_contract.yaml": "20051292952fa89df930053a24805d73163777e490289ff8b0b8139ecdc66c2e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/scenarios.yaml": "43e16f85adfe8a785c4b22878e89677f5e45563f89aba7c025d82e732477d539",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_input.schema.json": "909e70ffbc6b6a7acbf5bc4eb64065a0beb0858be2f200a5b7573e45191def09",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/check_output.schema.json": "ce14623df715d4d33b6030aad11afe202d0075180ec0c84728e7be5c233a6b30",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_input.schema.json": "268d5301b8b8cc610e1f4cc7668878913d2eefb877bb1c4ab2d9ab2118bfba7e",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas/draft_output.schema.json": "ca4558c76b871f4fa808e875056095da7c98ff6a523cce0acc184f9f81498fbd",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/schemas.yaml": "6c32116dcd116268045aeb45cd881c5fba8144ac0e22b5fcb8a1750216f43c1b",
+      "packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products/acceptance_builder/workflows.yaml": "3380c5eaacdd0938c696973c1dea69610c41a9412cf92fb437f2b17418daec75"
+    },
+    "configured_models": [
+      {
+        "model": "openai/gpt-6-luna",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.default_text"
+      },
+      {
+        "model": "openai/gpt-6.1-sol",
+        "reasoning_effort": "medium",
+        "alias": "anytoolai.sol_text"
+      }
+    ]
+  },
+  "suite": "tests/fixtures/acceptance_verdict_eval/cases.json",
+  "suite_sha256": "7115848daee622ab6cf508d33643eb82075b4896d79b1c0d946e5735eefc57e5",
+  "channel": "Local live API runs, followed by Chromium verification of each attached result in the Russian web UI.",
+  "reviewer": "Codex",
+  "cases": [
+    {
+      "id": "ANY893-W1",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "partially_meets with clarity match and no mismatch.",
+        "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed.",
+        "The evidence credits the delivered site on the client's domain, the requested sections including reviews, the responsive layout, email bookings, Figma handoff and two completed revision rounds. Equivalent summaries in the analysis language qualify."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-HELLO",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "привет",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-JUNK",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "asdf ::: 12345 !!!",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-REVIEWS",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря. Блок отзывов не сделан."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming omitted reviews."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-NO-FIGMA",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Исходники макетов в Figma не переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
+      },
+      "criteria": [
+        "does_not_meet with mismatch specifically naming absent Figma sources."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-IRRELEVANT",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Нарисован логотип для кофейни в трёх цветах."
+      },
+      "criteria": [
+        "does_not_meet because the work is unrelated."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY893-FULL",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "verdict",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря. Работы начаты 12 ноября, макеты согласованы с вами лично 18 ноября. Итоговая стоимость — 90 000 рублей. На запущенном сайте использованы тексты и фотографии клиента."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed."
+      ],
+      "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    }
+  ],
+  "runs": [
+    {
+      "id": "ANY893-W1--1",
+      "session_id": "scenario_session_01795423159151516369_0000000002_7f0c21cc990747c2835cf59d2b9e5b6f",
+      "result_id": "artifact_01795423176485665911_0000000023_0c137b77c4e44a43aebe857d4b17a57b",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Тексты и фотографии предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии с обновлённым дизайном на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Сайт представляет собой одну страницу с обновлённым дизайном.",
+              "На сайте есть главный экран, расписание, тренеры, цены, отзывы и форма записи.",
+              "Вёрстка сайта адаптивная.",
+              "Форма записи отправляет заявки на почту студии.",
+              "Работа выполнена за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет составляет 90 000 рублей.",
+              "В работу включены два раунда правок.",
+              "Макеты согласованы лично заказчиком.",
+              "Готовый сайт работает на домене заказчика.",
+              "Исходники макетов переданы в Figma."
+            ]
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "match",
+              "evidence": "Подтверждена сдача одностраничного сайта на домене клиента со всеми шестью разделами: главный экран, расписание, тренеры, цены, отзывы и форма записи. Также подтверждены адаптивная вёрстка, отправка заявок на почту студии и передача макетов в Figma.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "partial",
+              "evidence": "Подтверждены адаптивность, отправка заявок на почту студии и два завершённых раунда правок. Сдача 3 декабря соответствует предельному сроку 10 декабря. Соблюдение трёх недель с начала работ не подтверждено: дата начала не указана. Бюджет 90 000 рублей, личное согласование макетов заказчиком и использование предоставленных им текстов и фотографий в описании сдачи не подтверждены.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "match",
+              "evidence": "Оба итоговых результата, указанных в запросе, подтверждены: рабочий сайт на домене клиента и переданные макеты в Figma. Все обязательные разделы сайта перечислены в составе сданной работы.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Описание сдачи ясно перечисляет разделы сайта, адаптивную вёрстку, работу формы, передачу макетов и завершение двух раундов правок. Также указана дата сдачи — 3 декабря.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "partially_meets",
+          "rationale": "Основной объём и комплект результатов подтверждены, сдача состоялась до 10 декабря. Однако описание не подтверждает соблюдение бюджета, трёхнедельной продолжительности работ, личное согласование макетов и использование материалов заказчика. Явных противоречий запросу нет.",
+          "confidence": 0.94
+        }
+      },
+      "review": {
+        "evidence_sha256": "bf8da51de60997d90189c5f0923d58269c9e28aea579d589d06b2b09cf2ae171",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "partially_meets with clarity match and no mismatch.": true,
+          "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed.": true,
+          "The evidence credits the delivered site on the client's domain, the requested sections including reviews, the responsive layout, email bookings, Figma handoff and two completed revision rounds. Equivalent summaries in the analysis language qualify.": true
+        },
+        "notes": "All six site sections and the concrete handoff are credited. Clarity matches. The absolute deadline is met; the unknown start and personal approval stay unconfirmed."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: частично соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423159563728866_0000000006_804b0d7d02ef445fad98745d7f3664df",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 204,
+          "estimated_cost": 0.005943500000000001
+        },
+        {
+          "id": "provider_call_01795423166299267775_0000000016_edc8c4d0cafb4a60954896614b5cc912",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2180,
+          "output_tokens": 519,
+          "estimated_cost": 0.0106385
+        }
+      ]
+    },
+    {
+      "id": "ANY893-W1--2",
+      "session_id": "scenario_session_01795423178279240477_0000000007_d196812fc13741daae98b4b39c5c2c95",
+      "result_id": "artifact_01795423191119491374_0000000049_f4be68d1e6e74184864b7b646fae71aa",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "У йога-студии есть одностраничный сайт для редизайна.",
+              "Заказчик предоставит тексты и фотографии.",
+              "Для размещения сайта используется домен заказчика."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии с обновлённым дизайном на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Сайт остаётся одностраничным.",
+              "На сайте есть главный экран, расписание, разделы о тренерах, ценах и отзывах, а также форма записи.",
+              "Вёрстка адаптивная.",
+              "Форма записи отправляет заявки на почту студии.",
+              "Работы выполнены за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет составляет 90 000 рублей.",
+              "Включены два раунда правок.",
+              "Макеты согласованы лично с заказчиком.",
+              "Рабочий сайт размещён на домене заказчика.",
+              "Исходники макетов предоставлены в Figma."
+            ]
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "match",
+              "evidence": "Подтверждён весь заявленный объём: одностраничный сайт на домене клиента с главным экраном, расписанием, тренерами, ценами, отзывами и формой записи; адаптивная вёрстка, отправка заявок на почту студии и передача макетов в Figma.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "partial",
+              "evidence": "Подтверждены адаптивность, отправка заявок на почту студии и проведение двух раундов правок. Сдача 3 декабря укладывается в предельную дату 10 декабря. Соблюдение трёхнедельного срока не подтверждено: дата начала работ не указана. Бюджет 90 000 рублей, личное согласование макетов заказчиком и использование предоставленных им текстов и фотографий в описании сдачи не подтверждены.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "match",
+              "evidence": "Оба итоговых результата из задания подтверждены: сайт с перечисленными разделами сдан на домене клиента, макеты в Figma переданы.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Описание сдачи ясно перечисляет готовые разделы сайта, адаптивную вёрстку, работу формы, передачу макетов, завершённые раунды правок и дату сдачи.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "partially_meets",
+          "rationale": "Заявленный объём и итоговые материалы подтверждены, дата сдачи предшествует 10 декабря. Однако соблюдение бюджета, трёхнедельного срока и отдельных условий взаимодействия с заказчиком не подтверждено. Прямых противоречий заданию нет.",
+          "confidence": 0.97
+        }
+      },
+      "review": {
+        "evidence_sha256": "12499120ca07a23df3fc00c2425480a9373bfecca4d082754caedbbc67231687",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/assumptions/1": true,
+          "/extracted/values/assumptions/2": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "partially_meets with clarity match and no mismatch.": true,
+          "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed.": true,
+          "The evidence credits the delivered site on the client's domain, the requested sections including reviews, the responsive layout, email bookings, Figma handoff and two completed revision rounds. Equivalent summaries in the analysis language qualify.": true
+        },
+        "notes": "The scope evidence names all six sections, responsive layout, studio email and Figma. Two revisions and timely delivery are confirmed. The relative deadline and personal approval remain open."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: частично соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423178595195731_0000000032_817e22854c104849b3fd796de10bd1f1",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 237,
+          "estimated_cost": 0.0025319
+        },
+        {
+          "id": "provider_call_01795423183113304983_0000000042_c2319db2bf894edbaf0eb340ef46f933",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2180,
+          "output_tokens": 459,
+          "estimated_cost": 0.004813700000000001
+        }
+      ]
+    },
+    {
+      "id": "ANY893-W1--3",
+      "session_id": "scenario_session_01795423192397130124_0000000012_6f2e0128578f4e1aa30d6b2a5e04584b",
+      "result_id": "artifact_01795423207656334069_0000000075_172fcdcbbd84490d82a9dda35d2d4d25",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "У йога-студии уже есть одностраничный сайт, которому нужен редизайн.",
+              "Заказчик предоставит тексты и фотографии.",
+              "Для размещения сайта будет использован домен заказчика."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии с обновлённым дизайном на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Сайт одностраничный, с обновлённым дизайном.",
+              "На сайте есть главный экран, расписание, тренеры, цены, отзывы и форма записи.",
+              "Вёрстка адаптивная.",
+              "Форма записи отправляет заявки на почту студии.",
+              "Работы выполнены за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет — 90 000 рублей.",
+              "Включено два раунда правок.",
+              "Макеты согласованы лично с заказчиком.",
+              "Рабочий сайт размещён на домене заказчика.",
+              "Исходники макетов переданы в Figma."
+            ]
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "match",
+              "evidence": "Подтверждён весь заявленный объём: одностраничный сайт с главным экраном, расписанием, тренерами, ценами, отзывами и формой записи. Также подтверждены адаптивная вёрстка, отправка заявок на почту студии, размещение на домене клиента, передача макетов в Figma и два завершённых раунда правок.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "partial",
+              "evidence": "Подтверждены требуемые разделы, адаптивность и отправка заявок на почту студии. Сайт на домене клиента сдан 3 декабря, что соответствует предельному сроку 10 декабря. Два раунда правок подтверждены. Соблюдение бюджета 90 000 рублей, использование предоставленных клиентом текстов и фотографий и личное согласование макетов не подтверждены текстом сдачи. Дата начала работ не указана, поэтому соблюдение срока в три недели также не подтверждено.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "match",
+              "evidence": "Оба итоговых результата подтверждены: сдан сайт на домене клиента с перечисленными разделами и работающей отправкой заявок; макеты в Figma переданы.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Текст сдачи ясно перечисляет выполненную работу: разделы сайта, адаптивную вёрстку, отправку заявок, размещение на домене клиента, передачу макетов в Figma и завершение двух раундов правок. Указана дата сдачи — 3 декабря.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "partially_meets",
+          "rationale": "Основной объём и итоговые материалы подтверждены, сайт сдан до 10 декабря. Однако текст сдачи не подтверждает бюджет, срок в три недели от начала работ, использование материалов клиента и личное согласование макетов. Прямых противоречий запросу нет, поэтому соответствие частичное.",
+          "confidence": 0.97
+        }
+      },
+      "review": {
+        "evidence_sha256": "d494f9f22c5d6a8bd79974157a03dc0d7f74a555520d4d270981a3637118c528",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/assumptions/1": true,
+          "/extracted/values/assumptions/2": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "partially_meets with clarity match and no mismatch.": true,
+          "Confirm Dec 3 satisfies Dec 10. Identify start-relative duration and personal approval as unconfirmed.": true,
+          "The evidence credits the delivered site on the client's domain, the requested sections including reviews, the responsive layout, email bookings, Figma handoff and two completed revision rounds. Equivalent summaries in the analysis language qualify.": true
+        },
+        "notes": "Scope credits the domain, all requested blocks, booking email, responsive layout, Figma and revisions. Dec 3 meets Dec 10. No start or personal approval is asserted. Clarity matches."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: частично соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423193208987044_0000000058_1cb9b716e2c94585960028f49d594cdb",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 239,
+          "estimated_cost": 0.0025519
+        },
+        {
+          "id": "provider_call_01795423198271138902_0000000068_cefec3c7701d44daa24f7246e54fdcb0",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2180,
+          "output_tokens": 509,
+          "estimated_cost": 0.005313700000000001
+        }
+      ]
+    },
+    {
+      "id": "ANY893-HELLO--1",
+      "session_id": "scenario_session_01795423208672956321_0000000017_46a5fdf46f08422d9fe250c636508bc8",
+      "result_id": "artifact_01795423216586236330_0000000101_e21e67daf14c482b9a86483e59ebc897",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "ru"
+          },
+          "confidence": {
+            "analysis_language": 1
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions",
+            "deliverables"
+          ]
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "partial",
+              "evidence": "В запросе есть только приветствие «привет»: нет требований, с которыми можно сопоставить объём описанной работы.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "partial",
+              "evidence": "В запросе есть только приветствие «привет»: нет требований, по которым можно проверить соответствие описанного сайта ожиданиям клиента.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "partial",
+              "evidence": "В запросе есть только приветствие «привет»: нет перечня результатов, с которым можно сверить полноту сдачи.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "partial",
+              "evidence": "В запросе есть только приветствие «привет»: он не даёт оснований для проверки этого критерия. В тексте сдачи перечислены сайт, его разделы, работа формы, макеты и проведённые правки.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "insufficient_brief",
+          "rationale": "Запрос содержит только приветствие и не задаёт ни задачи, ни состава результатов, ни сроков. Поэтому сопоставить описанную работу с ожиданиями клиента невозможно; оснований считать её не соответствующей запросу нет.",
+          "confidence": 1
+        }
+      },
+      "review": {
+        "evidence_sha256": "d348897a652c5b2898bc262cfb005ffa899eb09a2d332ec6f78d2825859b0910",
+        "reviewer": "Codex",
+        "fields": {
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work.": true
+        },
+        "notes": "The Russian greeting supplies no requirements. All four deltas explain the absence of a comparison basis."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "hint": "Добавьте бриф с требованиями клиента: что нужно сдать, в какой срок и как принимается работа. Приветствие или случайный текст не позволяют проверить работу.",
+        "field_invalid": true,
+        "copy_visible": false,
+        "verdict_visible": false
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423208724266650_0000000084_59b6f7ddeeff4150bffab02fed785a26",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1434,
+          "output_tokens": 35,
+          "estimated_cost": 0.0039335
+        },
+        {
+          "id": "provider_call_01795423211705540936_0000000094_ace9e52986e3473ba6f6a1b196899249",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2052,
+          "output_tokens": 259,
+          "estimated_cost": 0.0077185000000000005
+        }
+      ]
+    },
+    {
+      "id": "ANY893-JUNK--1",
+      "session_id": "scenario_session_01795423217799293484_0000000022_4efb047ec50f462d8084aa6d4764fac3",
+      "result_id": "artifact_01795423224055906677_0000000127_19f47635bb1842df842639b7ca943045",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions",
+            "deliverables"
+          ]
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "partial",
+              "evidence": "The brief contains only “asdf ::: 12345 !!!” and gives nothing to check scope coverage against.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "partial",
+              "evidence": "The brief contains no identifiable requirements and gives nothing to check requirement fit against.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "partial",
+              "evidence": "The brief lists no deliverables and gives nothing to check completeness against.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "partial",
+              "evidence": "The delivery text lists completed work, but the brief gives nothing to check this criterion against.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "insufficient_brief",
+          "rationale": "The brief consists only of random characters and states no identifiable request or project condition. There is therefore no basis for assessing the delivered work against client expectations.",
+          "confidence": 1
+        }
+      },
+      "review": {
+        "evidence_sha256": "4c24c2a4914ece6e76baa59d95cf388185471cc553f0634160ddffcb1beb6002",
+        "reviewer": "Codex",
+        "fields": {
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work.": true
+        },
+        "notes": "Four partial deltas and the rationale consistently explain that the random characters supply no request. The English fallback for unidentifiable source language matches the fixture."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "hint": "Добавьте бриф с требованиями клиента: что нужно сдать, в какой срок и как принимается работа. Приветствие или случайный текст не позволяют проверить работу.",
+        "field_invalid": true,
+        "copy_visible": false,
+        "verdict_visible": false
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423218684959922_0000000110_34b22926e6f14373a4428b2a07e77ab7",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1438,
+          "output_tokens": 28,
+          "estimated_cost": 0.0038735
+        },
+        {
+          "id": "provider_call_01795423220434675341_0000000120_9f6ead4661014a2b943214c1becb3a57",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2056,
+          "output_tokens": 182,
+          "estimated_cost": 0.006958500000000001
+        }
+      ]
+    },
+    {
+      "id": "ANY893-NO-REVIEWS--1",
+      "session_id": "scenario_session_01795423225683775670_0000000027_95b537dd23a44a579f02d86d45d57836",
+      "result_id": "artifact_01795423238767807095_0000000153_526ef925e29e48faa3bbf9a5c726780b",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Тексты и фотографии предоставляет заказчик.",
+              "Для размещения сайта используется домен заказчика."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Сайт одностраничный, с обновлённым дизайном.",
+              "На сайте есть главный экран.",
+              "На сайте есть расписание.",
+              "На сайте есть раздел с тренерами.",
+              "На сайте есть цены.",
+              "На сайте есть отзывы.",
+              "На сайте есть форма записи.",
+              "Вёрстка адаптивная.",
+              "Форма отправляет заявки на почту студии.",
+              "Работы выполнены за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет составляет 90 000 рублей.",
+              "Включено два раунда правок.",
+              "Макеты согласованы лично заказчиком.",
+              "Рабочий сайт размещён на домене заказчика.",
+              "Исходники макетов предоставлены в Figma."
+            ]
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "mismatch",
+              "evidence": "Подтверждены одностраничный сайт на домене клиента, главный экран, расписание, тренеры, цены, форма записи, адаптивная вёрстка и передача макетов в Figma. Однако обязательный блок отзывов явно исключён: «Блок отзывов не сделан».",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Подтверждены адаптивная вёрстка, отправка заявок на почту студии и два раунда правок. Сдача 3 декабря подтверждает соблюдение крайнего срока 10 декабря. Требование о блоке отзывов нарушено: он прямо назван несделанным. Соблюдение бюджета 90 000 рублей, срока в три недели с начала работ и личное согласование макетов заказчиком текстом сдачи не подтверждены.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Подтверждены сайт на домене клиента и передача макетов в Figma. Комплектность сайта не соответствует запросу: среди обязательных блоков указаны отзывы, а в тексте сдачи прямо сказано, что этот блок не сделан.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Текст сдачи ясно перечисляет готовые разделы сайта, адаптивную вёрстку, отправку заявок на почту, передачу макетов в Figma и проведённые правки. Также прямо указаны дата сдачи и несделанный блок отзывов.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "does_not_meet",
+          "rationale": "Обязательный блок отзывов прямо указан как несделанный, поэтому объём и комплектность работы не соответствуют запросу. Остальные перечисленные разделы и основные функции подтверждены, крайний срок соблюдён. Текст сдачи ясен, но бюджет, длительность работ и личное согласование макетов не подтверждены.",
+          "confidence": 0.98
+        }
+      },
+      "review": {
+        "evidence_sha256": "55a9a005d9adadfc9f01d2678bd8a5149b76402d974b81a034ba2f9f2886dd5e",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/assumptions/1": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/extracted/values/acceptance_criteria/11": true,
+          "/extracted/values/acceptance_criteria/12": true,
+          "/extracted/values/acceptance_criteria/13": true,
+          "/extracted/values/acceptance_criteria/14": true,
+          "/extracted/values/acceptance_criteria/15": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "does_not_meet with mismatch specifically naming omitted reviews.": true
+        },
+        "notes": "Scope and completeness name the explicitly missing reviews block. Other completed features and the absolute deadline retain credit."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: не соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423226131704991_0000000136_1638c978a62e4483aa9ab733f437eec3",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 223,
+          "estimated_cost": 0.0023919
+        },
+        {
+          "id": "provider_call_01795423231301103178_0000000146_286cb3d3be504e64a82333b553d117cc",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2186,
+          "output_tokens": 431,
+          "estimated_cost": 0.009773500000000001
+        }
+      ]
+    },
+    {
+      "id": "ANY893-NO-FIGMA--1",
+      "session_id": "scenario_session_01795423239754548738_0000000032_c5cb21fc73884cb190fb057e8e36f603",
+      "result_id": "artifact_01795423254358251493_0000000179_42cf891a6db545caace49270ac4743fd",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Заказчик предоставит тексты и фотографии.",
+              "У заказчика есть домен для размещения сайта."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Выполнен редизайн одностраничного сайта йога-студии.",
+              "На сайте есть главный экран, расписание, тренеры, цены, отзывы и форма записи.",
+              "Вёрстка сайта адаптивная.",
+              "Форма записи отправляет заявки на почту студии.",
+              "Работы выполнены за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет работ — 90 000 рублей.",
+              "В стоимость включены два раунда правок.",
+              "Макеты согласованы лично с заказчиком.",
+              "Рабочий сайт размещён на домене заказчика.",
+              "Исходники макетов переданы в Figma."
+            ]
+          },
+          "confidence": {
+            "assumptions": 0.99,
+            "deliverables": 1,
+            "analysis_language": 1,
+            "acceptance_criteria": 0.99
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "mismatch",
+              "evidence": "Подтверждены одностраничный сайт на домене клиента, все шесть запрошенных блоков, адаптивная вёрстка, отправка заявок на почту студии и два раунда правок. Однако требование передать исходники макетов в Figma прямо нарушено: «Исходники макетов в Figma не переданы».",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "partial",
+              "evidence": "Подтверждены требуемые блоки, адаптивность, отправка заявок на почту студии и два раунда правок. Сдача 3 декабря соответствует предельному сроку 10 декабря. Соблюдение трёх недель с начала работ не подтверждено: дата начала не указана. Бюджет 90 000 рублей, использование предоставляемых клиентом текстов и фотографий и личное согласование макетов текстом сдачи также не подтверждены.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Сайт на домене клиента со всеми перечисленными блоками подтверждён. Второй обязательный результат — исходники макетов в Figma — прямо указан как не переданный, поэтому комплект результатов неполон.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Текст сдачи ясно перечисляет готовые блоки сайта, размещение на домене клиента, адаптивную вёрстку, отправку заявок, проведённые правки и дату сдачи. Отдельно прямо указано, что исходники макетов в Figma не переданы.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "does_not_meet",
+          "rationale": "Основная часть сайта подтверждена, а сдача 3 декабря укладывается в предельный срок. Однако обязательные исходники Figma прямо не переданы, что нарушает объём и комплектность результата. Часть условий, включая бюджет, срок от начала работ и личное согласование макетов, остаётся неподтверждённой.",
+          "confidence": 0.97
+        }
+      },
+      "review": {
+        "evidence_sha256": "0b5153a8786bed5213a3ad4486b303cb78b16b1eb25eaf7c41ab6906c9491de7",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/assumptions/1": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "does_not_meet with mismatch specifically naming absent Figma sources.": true
+        },
+        "notes": "Scope and completeness cite the explicit failure to hand over Figma sources. Silence concerning timing from the start and personal approval remains unconfirmed."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: не соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423239862301004_0000000162_6d56711f32244bfcba21c3f77b9d4455",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 405,
+          "estimated_cost": 0.0042119
+        },
+        {
+          "id": "provider_call_01795423247520641298_0000000172_db5705f584a948e0b92a4a3cef20012e",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2184,
+          "output_tokens": 509,
+          "estimated_cost": 0.010548500000000002
+        }
+      ]
+    },
+    {
+      "id": "ANY893-IRRELEVANT--1",
+      "session_id": "scenario_session_01795423255801373074_0000000037_42d8c90027794c4f8d23de338dbf062b",
+      "result_id": "artifact_01795423267697395982_0000000205_17732957ac9244749136dfed052881f4",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "Тексты и фотографии предоставляет заказчик.",
+              "У заказчика есть домен для размещения сайта."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии с обновлённым дизайном на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Сайт йога-студии остаётся одностраничным.",
+              "На сайте есть главный экран, расписание, разделы с тренерами, ценами и отзывами, а также форма записи.",
+              "Вёрстка сайта адаптивная.",
+              "Форма записи отправляет заявки на почту студии.",
+              "Работы выполнены за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет работ — 90 000 рублей.",
+              "В работу включены два раунда правок.",
+              "Макеты согласованы лично с заказчиком.",
+              "Рабочий сайт размещён на домене заказчика.",
+              "Исходники макетов переданы в Figma."
+            ]
+          },
+          "confidence": {
+            "assumptions": 0.99,
+            "deliverables": 1,
+            "analysis_language": 1,
+            "acceptance_criteria": 0.99
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "mismatch",
+              "evidence": "В запросе нужен редизайн одностраничного сайта йога-студии с главным экраном, расписанием, тренерами, ценами, отзывами и формой записи. В описании результата подтверждён только логотип для кофейни в трёх цветах — это другая работа, не соответствующая запрошенному объёму.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Вместо сайта йога-студии представлен логотип для кофейни, что противоречит назначению результата. Адаптивная вёрстка, отправка заявок на почту студии, срок три недели с начала работ, запуск не позднее 10 декабря, бюджет 90 000 рублей, два раунда правок и личное согласование макетов в описании результата не упомянуты и не подтверждены.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "mismatch",
+              "evidence": "Запрошены рабочий сайт на домене заказчика и исходники макетов в Figma. Описание результата сообщает о другом результате — логотипе для кофейни, а не о выполнении запрошенного комплекта работ.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Описание ясно указывает, что выполнено: «Нарисован логотип для кофейни в трёх цветах». Несоответствие этой работы запросу не делает описание неясным.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "does_not_meet",
+          "rationale": "Результат не соответствует запросу: вместо редизайна и запуска сайта йога-студии с исходниками в Figma описано создание логотипа для кофейни. При этом само описание выполненной работы ясно.",
+          "confidence": 1
+        }
+      },
+      "review": {
+        "evidence_sha256": "291aa863702cd5fad24d12972423fa496792daa47eb9654663657a0b1a5b2ffc",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/assumptions/1": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "does_not_meet because the work is unrelated.": true
+        },
+        "notes": "The cafe logo is identified as unrelated to the requested yoga studio website. The clear description still earns a clarity match."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: не соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423256438800854_0000000188_d3934b129f1e4281bdbd218a05178317",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 324,
+          "estimated_cost": 0.0034019000000000002
+        },
+        {
+          "id": "provider_call_01795423261817732553_0000000198_716925150dce4aca88fb66846ca01639",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2125,
+          "output_tokens": 394,
+          "estimated_cost": 0.009251
+        }
+      ]
+    },
+    {
+      "id": "ANY893-FULL--1",
+      "session_id": "scenario_session_01795423268682532980_0000000042_801d30d7f97b4b03ae0bcc134cc5fc93",
+      "result_id": "artifact_01795423280363207770_0000000231_333a7c76d9ea481bac5d62204c57f618",
+      "output": {
+        "extracted": {
+          "values": {
+            "assumptions": [
+              "У йога-студии уже есть одностраничный сайт для редизайна.",
+              "Заказчик предоставит тексты и фотографии.",
+              "У заказчика есть собственный домен."
+            ],
+            "deliverables": [
+              "Рабочий одностраничный сайт йога-студии с обновлённым дизайном на домене заказчика.",
+              "Исходники макетов в Figma."
+            ],
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Сайт одностраничный.",
+              "На сайте есть главный экран, расписание, тренеры, цены, отзывы и форма записи.",
+              "Вёрстка адаптивная.",
+              "Форма записи отправляет заявки на почту студии.",
+              "Работы выполнены за три недели с начала работ.",
+              "Сайт запущен не позднее 10 декабря.",
+              "Бюджет — 90 000 рублей.",
+              "Включены два раунда правок.",
+              "Макеты согласованы лично с заказчиком.",
+              "Рабочий сайт размещён на домене заказчика.",
+              "Исходники макетов предоставлены в Figma."
+            ]
+          },
+          "missing_fields": []
+        },
+        "comparison": {
+          "deltas": [
+            {
+              "status": "match",
+              "evidence": "Подтверждён весь заявленный объём: одностраничный сайт на домене клиента с главным экраном, расписанием, тренерами, ценами, отзывами и формой записи. Также подтверждены адаптивная вёрстка, отправка заявок на почту студии и передача макетов в Figma.",
+              "criterion_id": "scope_coverage"
+            },
+            {
+              "status": "match",
+              "evidence": "Подтверждены адаптивность, отправка заявок на почту студии и использование текстов и фотографий клиента. Работы начаты 12 ноября, сайт сдан 3 декабря — через три недели и до предельной даты 10 декабря. Стоимость составляет 90 000 рублей, два раунда правок проведены, макеты согласованы с клиентом лично 18 ноября.",
+              "criterion_id": "requirement_fit"
+            },
+            {
+              "status": "match",
+              "evidence": "Оба итоговых результата, требуемых в запросе, подтверждены: рабочий сайт запущен на домене клиента, макеты в Figma переданы. Все шесть обязательных разделов сайта перечислены в тексте сдачи.",
+              "criterion_id": "completeness"
+            },
+            {
+              "status": "match",
+              "evidence": "Текст сдачи ясно перечисляет выполненные разделы и функции, сообщает о передаче макетов, проведённых правках, личном согласовании, сроках, стоимости и использовании материалов клиента.",
+              "criterion_id": "clarity"
+            }
+          ],
+          "verdict": "meets_expectations",
+          "rationale": "Все требования запроса подтверждены текстом сдачи. Сайт запущен на домене клиента, обязательные разделы и функции реализованы, макеты переданы. Срок в три недели, предельная дата запуска, бюджет и условия согласования соблюдены.",
+          "confidence": 0.99
+        }
+      },
+      "review": {
+        "evidence_sha256": "b560726bfc2cde16e562ef3fc569d146d7a182e914faff74bcfe8a69fe35ab84",
+        "reviewer": "Codex",
+        "fields": {
+          "/extracted/values/assumptions/0": true,
+          "/extracted/values/assumptions/1": true,
+          "/extracted/values/assumptions/2": true,
+          "/extracted/values/deliverables/0": true,
+          "/extracted/values/deliverables/1": true,
+          "/extracted/values/acceptance_criteria/0": true,
+          "/extracted/values/acceptance_criteria/1": true,
+          "/extracted/values/acceptance_criteria/2": true,
+          "/extracted/values/acceptance_criteria/3": true,
+          "/extracted/values/acceptance_criteria/4": true,
+          "/extracted/values/acceptance_criteria/5": true,
+          "/extracted/values/acceptance_criteria/6": true,
+          "/extracted/values/acceptance_criteria/7": true,
+          "/extracted/values/acceptance_criteria/8": true,
+          "/extracted/values/acceptance_criteria/9": true,
+          "/extracted/values/acceptance_criteria/10": true,
+          "/comparison/rationale": true,
+          "/comparison/deltas/0/evidence": true,
+          "/comparison/deltas/1/evidence": true,
+          "/comparison/deltas/2/evidence": true,
+          "/comparison/deltas/3/evidence": true
+        },
+        "criteria": {
+          "meets_expectations with all four criteria confirmed.": true
+        },
+        "notes": "All four criteria match. The evidence covers the deadline, three-week duration, personal approval, cost, supplied assets, Figma, sections, revisions and form."
+      },
+      "report_status": "PASS",
+      "browser": {
+        "verdict_text": "Вердикт: соответствует ожиданиям.",
+        "copy_visible": true,
+        "evidence_visible": true
+      },
+      "provider_calls": [
+        {
+          "id": "provider_call_01795423268784074229_0000000214_dad9b071455643c49dbce64800d154ae",
+          "step_id": "extract",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 1562,
+          "output_tokens": 227,
+          "estimated_cost": 0.0024319000000000003
+        },
+        {
+          "id": "provider_call_01795423273631658171_0000000224_2ded2d84544748b1a6dac39e21cfa701",
+          "step_id": "compare",
+          "status": "succeeded",
+          "model": "gpt-6.1-sol",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "input_tokens": 2223,
+          "output_tokens": 419,
+          "estimated_cost": 0.009746000000000001
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "planned_runs": 9,
+    "passed": 9,
+    "failed": 0,
+    "pending": 0,
+    "estimated_cost_usd": 0.1060338
+  }
+}

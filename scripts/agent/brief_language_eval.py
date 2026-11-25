@@ -22,7 +22,9 @@ from jsonschema import Draft202012Validator
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
 
 ROOT = Path(__file__).resolve().parents[2]
-SUITE = ROOT / "tests/fixtures/brief_language_eval/cases.json"
+DEFAULT_SUITE = "tests/fixtures/brief_language_eval/cases.json"
+VERDICT_SUITE = "tests/fixtures/acceptance_verdict_eval/cases.json"
+SUITE_PATHS = {name: ROOT / name for name in (DEFAULT_SUITE, VERDICT_SUITE)}
 WORKER_PYTHON = "/app/apps/platform-worker/.venv/bin/python"
 PRODUCTS = (
     ROOT / "packages/backend/product-platforms/freelancer-suite/src"
@@ -415,7 +417,7 @@ def main() -> int:
     run = commands.add_parser("run")
     run.add_argument("--api-url", required=True)
     run.add_argument("--project", required=True, type=_parse_compose_project)
-    run.add_argument("--suite", choices=("language", "draft-risks"), default="language")
+    run.add_argument("--suite", choices=("language", "draft-risks", *SUITE_PATHS), default=DEFAULT_SUITE)
     run.add_argument("--scenario", choices=SCENARIOS, required=True)
     run.add_argument("--family", help="Filter by a family in the selected suite and scenario")
     run.add_argument("--repeats", type=int, default=3)
@@ -485,10 +487,11 @@ def main() -> int:
     if args.repeats < 1 or args.timeout < 1:
         parser.error("repeats and timeout must be positive")
     args.api_url = args.api_url.rstrip("/")
+    suite = DEFAULT_SUITE if args.suite == "language" else args.suite
     cases = (
         draft_risk_cases()
         if args.suite == "draft-risks"
-        else json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
+        else json.loads(SUITE_PATHS[suite].read_text(encoding="utf-8"))["cases"]
     )
     cases = [case for case in cases if case["scenario_id"] == args.scenario]
     if not cases:
