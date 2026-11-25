@@ -128,6 +128,9 @@ _VISIBLE_TEXT_ACCEPT_CASES: list[tuple[str | None, str]] = [
 ]
 
 _VISIBLE_TEXT_REJECT_CASES: list[tuple[str | None, str]] = [
+    ("plain_text", "\u200b\u200d"),
+    ("html", "<p>&#8203;</p>"),
+    ("markdown", "**\u3164**"),
     # A browser never renders script/style/template content as text -- a real tag is
     # present (so the html-format check alone passes) but the client would see nothing.
     ("html", "<style>p { color: red; }</style>"),

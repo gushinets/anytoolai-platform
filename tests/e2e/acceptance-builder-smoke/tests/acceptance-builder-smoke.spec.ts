@@ -54,11 +54,11 @@ const BRIEF = "Build a certificate that students receive by email after finishin
 const DELIVERABLE = "We built the certificate template and the PDF generation for 12 courses.";
 const BRIEF_DECODER_BRIEF = "Need a website for my bakery by the holidays, modern but traditional.";
 
-const DRAFT_ACTIONS = ["acceptance_builder.extract_v1"];
+const DRAFT_ACTIONS = ["acceptance_builder.extract_v1", "acceptance_builder.detect_issues_v1"];
 const CHECK_ACTIONS = ["acceptance_builder.extract_v1", "acceptance_builder.compare_v1"];
 
 type Suffix = "" | ".weak_input";
-type Output = { extracted: Extracted; comparison?: Comparison };
+type Output = { extracted: Extracted; comparison?: Comparison; issues?: { category: string; description: string; evidence?: string }[]; questions?: { question: string }[] };
 type Extracted = { values: Partial<Record<ListField, string[]>>; missing_fields: ListField[] };
 type ListField = "acceptance_criteria" | "assumptions" | "deliverables";
 type Comparison = { verdict: string; deltas: { criterion_id: string; status: string; evidence: string }[]; rationale: string };
@@ -72,7 +72,10 @@ function fixture(action: string, suffix: Suffix): Record<string, unknown> {
 function composedOutput(mode: "draft" | "check", suffix: Suffix): Output {
   return {
     extracted: fixture("extract", suffix) as unknown as Extracted,
-    ...(mode === "check" ? { comparison: fixture("compare", suffix) as unknown as Comparison } : {}),
+    ...(mode === "check" ? { comparison: fixture("compare", suffix) as unknown as Comparison } : {
+      issues: fixture("detect_issues", suffix).issues as Output["issues"],
+      questions: suffix ? fixture("generate_questions", suffix).questions as Output["questions"] : [],
+    }),
   };
 }
 
@@ -95,7 +98,7 @@ const LISTS: [ListField, string][] = [
 ];
 
 /** renderer_contract.yaml `copy_text`, written out independently of the renderer under test. */
-function composeCopyText({ extracted, comparison }: Output): string {
+function composeCopyText({ extracted, comparison, issues, questions }: Output): string {
   const blocks: string[] = [];
   if (comparison) {
     const lines = comparison.deltas.map((d) => `${DELTA_LABELS[d.criterion_id]}: ${STATUS_LABELS[d.status]}. ${d.evidence}`);
@@ -105,9 +108,22 @@ function composeCopyText({ extracted, comparison }: Output): string {
     const items = extracted.values[field];
     blocks.push(`${title}\n${items ? items.map((item) => `- ${item}`).join("\n") : "Not specified in the brief."}`);
   }
-  const gaps = extracted.missing_fields.length
-    ? extracted.missing_fields.map((f) => `- ${f.replace("_", " ")}: the client should confirm it.`).join("\n")
-    : "The brief states all three lists.";
+  if (issues && questions) {
+    const risks = issues.filter((issue) => issue.category !== "missing_information")
+      .map((issue) => `- Ambiguity: ${issue.description}\n  From the brief: ${issue.evidence}`);
+    blocks.push(`Risks and contradictions\n${risks.join("\n") || "No risks or contradictions detected in the brief."}`);
+    blocks.push(`Questions for the client\n${questions.map((q, i) => `${i + 1}. ${q.question}`).join("\n") || "No clarifying questions."}`);
+  }
+  const gapLines = extracted.missing_fields.map((f) => `- ${f.replace("_", " ")}: the client should confirm it.`);
+  for (const issue of issues ?? []) {
+    if (issue.category === "missing_information") {
+      const evidence = issue.evidence ? `\n  From the brief: ${issue.evidence}` : "";
+      gapLines.push(`- Missing information: ${issue.description}${evidence}`);
+    }
+  }
+  const gaps = gapLines.join("\n") || (comparison
+    ? "The brief states all three lists."
+    : "Each of the three lists has at least one item in the brief.");
   blocks.push(`Open gaps\n${gaps}`);
   return blocks.join("\n\n");
 }
@@ -129,7 +145,7 @@ test.describe("Acceptance Builder web product", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   });
 
-  test("draft happy path: one action, artifact correlation, copy text from the structured fields, one result_viewed, one copy activation", async ({
+  test("draft happy path: two actions, artifact correlation, copy text from the structured fields, one result_viewed, one copy activation", async ({
     page,
   }) => {
     const run = trackRun(page);
@@ -145,7 +161,7 @@ test.describe("Acceptance Builder web product", () => {
     // The structured recap is display-only and starts collapsed.
     await expect(page.locator("details")).not.toHaveAttribute("open", "");
 
-    await expectCorrelatedRun(run.sessionId(), run.resultArtifactId(), DRAFT_ACTIONS);
+    await expectCorrelatedRun(run.sessionId(), run.resultArtifactId(), DRAFT_ACTIONS, ["acceptance_builder.generate_questions_v1"]);
     await expect.poll(() => countEvents("scenario.completed", run.sessionId()), { timeout: 10_000 }).toBe(1);
     await expect.poll(() => countEvents("web.result_viewed", run.sessionId()), { timeout: 10_000 }).toBe(1);
     await expectCopyActivation(page, run.sessionId(), copyText);
@@ -390,7 +406,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
         expect(types).toContain(expected);
       }
     });
-    await expectCorrelatedRun(targetSessionId, run.resultArtifactId(), DRAFT_ACTIONS);
+    await expectCorrelatedRun(targetSessionId, run.resultArtifactId(), DRAFT_ACTIONS, ["acceptance_builder.generate_questions_v1"]);
     await expect.poll(() => countEvents("scenario.completed", targetSessionId), { timeout: 10_000 }).toBe(1);
     await expect.poll(() => countEvents("web.result_viewed", targetSessionId), { timeout: 10_000 }).toBe(1);
 

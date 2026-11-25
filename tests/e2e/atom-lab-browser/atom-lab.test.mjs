@@ -573,6 +573,16 @@ test("path validation reports nested controls without collapsing false or zero",
   ]);
 });
 
+test("A05 validates issue text as Unicode code points", async () => {
+  const session = createDraftSession(await catalogAtom("A05"));
+  replaceWithExample(session);
+  const path = ["issues", 0, "description"];
+  setDraftPath(session, path, "\u{e0100}");
+  assert.deepEqual(validateDraft(session).map((error) => error.path), ["issues[0].description"]);
+  setDraftPath(session, path, "\u{20000}\u{e0100}");
+  assert.deepEqual(validateDraft(session), []);
+});
+
 test("current uniqueItems contracts reject duplicate array entries by path", async () => {
   const session = createDraftSession(await catalogAtom("A11"));
   replaceWithExample(session);

@@ -54,6 +54,9 @@ Brief Decoder -> Acceptance Builder
 External Task Finder & Fit -> ProposalAI
 ```
 
+Acceptance Builder Draft extracts criteria, assumptions and deliverables, detects risks and
+contradictions, and generates up to five client questions when it finds issues.
+
 Any delivered web handoff uses existing backend tokens, `immediate` target start, and same-tab
 navigation. Deferred continuation is outside the initial validation set.
 

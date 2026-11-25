@@ -886,7 +886,7 @@ function validateValue(value, schema, path, errors) {
   } else if (type === "string") {
     if (schema.minLength !== undefined && value.length < schema.minLength) {
       validationError(errors, path, "Значение слишком короткое.");
-    } else if (schema.pattern && !(new RegExp(schema.pattern)).test(value)) {
+    } else if (schema.pattern && !new RegExp(schema.pattern, "u").test(value)) {
       validationError(errors, path, "Значение не соответствует требуемому формату.");
     }
   } else if (type === "number" || type === "integer") {

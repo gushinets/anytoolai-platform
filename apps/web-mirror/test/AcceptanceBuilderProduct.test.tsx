@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AcceptanceBuilderProduct, checkDefinition, draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
+import { hasAuthoredText } from "../src/products/shared/authoredText";
 import { ACCEPTANCE_BUILDER_MESSAGES } from "../src/products/acceptanceBuilder/messages";
 import {
   DELTA_CRITERIA,
@@ -15,7 +16,7 @@ import {
   LIST_FIELDS,
   VERDICTS,
   extractCheckResult,
-  extractDraftResult,
+  extractDraftResult, composeCopyText, ISSUE_CATEGORIES, LEVELS,
   hasCriteria,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
 import {
@@ -72,6 +73,8 @@ function schema<T>(name: string): T {
 type Suffix = "" | ".weak_input";
 const draftOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
+  issues: fixture("detect_issues", suffix).issues,
+  questions: suffix ? fixture("generate_questions", suffix).questions : [],
 });
 const checkOutput = (suffix: Suffix = "") => ({
   extracted: fixture("extract", suffix),
@@ -151,6 +154,101 @@ describe("Acceptance Builder result parsing", () => {
     expect(weak?.missingFields).toEqual(["acceptance_criteria", "assumptions"]);
     expect(weak?.comparison?.verdict).toBe("does_not_meet");
     expect(weak?.lists.acceptance_criteria).toBeUndefined();
+  });
+
+  it("pins risk enums and rejects invalid question references and shapes", () => {
+    type Fields = Record<"category" | "severity" | "priority", { enum: string[] }>;
+    const { properties } = schema<{ properties: Record<"issues" | "questions", { items: { properties: Fields } }> }>("draft_output.schema.json");
+    expect(ISSUE_CATEGORIES).toEqual(properties.issues.items.properties.category.enum);
+    expect(LEVELS).toEqual(properties.issues.items.properties.severity.enum);
+    expect(LEVELS).toEqual(properties.questions.items.properties.priority.enum);
+    const output = draftOutput(".weak_input");
+    const [q] = output.questions as Record<string, unknown>[];
+    for (const mutation of [
+      { questions: [{ ...q, source_issue_index: 2 }] }, { questions: Array(6).fill(q) },
+      { issues: [] }, { questions: [{ ...q, extra: true }] }, { issues: undefined },
+    ]) expect(extractDraftResult({ ...output, ...mutation })).toBeNull();
+    expect(extractCheckResult({ ...checkOutput(), issues: [] })).toBeNull();
+  });
+
+  it("shares the authored text boundary with the producing atoms", () => {
+    const vectors = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/authored_text.json"), "utf8")) as { blank: string[], text: string[] };
+    expect(vectors.blank.some(hasAuthoredText)).toBe(false);
+    expect(vectors.text.every(hasAuthoredText)).toBe(true);
+  });
+
+  it("matches the pinned Draft schema for every Unicode code point", () => {
+    const { $defs } = schema<{ $defs: { authoredText: { pattern: string } } }>("draft_output.schema.json");
+    const published = new RegExp($defs.authoredText.pattern, "u");
+    for (let code = 0; code <= 0x10ffff; code++) {
+      const character = String.fromCodePoint(code);
+      if (hasAuthoredText(character) !== published.test(character)) {
+        throw new Error(`Authored-text mismatch at U+${code.toString(16)}`);
+      }
+    }
+  });
+
+  it("keeps issue links and list positions when historical text is unavailable", () => {
+    const output = draftOutput(".weak_input");
+    const issues = output.issues as { evidence?: string, description: string }[];
+    const questions = output.questions as { rationale: string, source_issue_index: number }[];
+    issues[0]!.evidence = "\ufeff";
+    questions[0]!.rationale = " \ufeff";
+    const result = extractDraftResult(output)!;
+    expect(result.questions![0]!.sourceIssueIndex).toBe(questions[0]!.source_issue_index);
+    expect(composeCopyText(result)).toContain(issues[0]!.description);
+    expect(result.document.summary).toBe("Incomplete saved draft");
+    const legacy = { extracted: draftOutput().extracted };
+    const values = legacy.extracted.values as { acceptance_criteria: string[] };
+    const criteria = values.acceptance_criteria;
+    criteria[0] = "\u0085\ufeff";
+    expect(composeCopyText(extractDraftResult(legacy)!)).toContain(criteria[1]!);
+    expect(composeCopyText(extractDraftResult(legacy)!)).toContain("Incomplete saved draft");
+    criteria[0] = "\u0085";
+    expect(extractDraftResult(legacy)).toBeNull();
+  });
+
+  it("counts only authored criteria in an otherwise readable saved Draft", () => {
+    const legacy = { extracted: draftOutput().extracted };
+    const values = legacy.extracted.values as { acceptance_criteria: string[] };
+    values.acceptance_criteria = ["\u200b"];
+    const incomplete = extractDraftResult(legacy)!;
+    expect(hasCriteria(incomplete)).toBe(false);
+    expect(incomplete.document.summary).toBe("Incomplete saved draft");
+    expect(composeCopyText(incomplete)).not.toContain("\u200b");
+    values.acceptance_criteria.push("Deliver 👩‍💻");
+    const mixed = extractDraftResult(legacy)!;
+    expect(hasCriteria(mixed)).toBe(true);
+    expect(composeCopyText(mixed)).toContain("Deliver 👩‍💻");
+  });
+
+  it("restores legacy Draft lists without claiming risks were assessed", () => {
+    const old = extractDraftResult({ extracted: draftOutput().extracted });
+    expect(old?.lists.acceptance_criteria).toHaveLength(3);
+    expect(old?.document.sections.map((section) => section.title)).not.toContain("Risks and contradictions");
+  });
+
+  it("renders the two Russian QA briefs from their structured outputs", () => {
+    type DraftCase = {
+      id: string;
+      canonical: { issues: { evidence?: string }[]; questions: { question: string }[] };
+    };
+    const { cases } = JSON.parse(readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/draft_risks_questions.json"), "utf8")) as { cases: DraftCase[] };
+    const vague = cases.find((item) => item.id === "AB-894-B-RU")!.canonical;
+    const vagueResult = extractDraftResult(vague)!;
+    const vagueText = composeCopyText(vagueResult);
+    expect(vagueResult.document.summary).toBe("Вопросы клиенту: 2");
+    expect(vagueText).toContain("Рисков и противоречий в брифе не обнаружено.");
+    expect(vagueText).toContain("2. " + vague.questions[1]!.question);
+    expect(vagueText).toContain("критерии приёмки: клиенту следует подтвердить");
+
+    const risky = cases.find((item) => item.id === "AB-894-C-RU")!.canonical;
+    const riskyResult = extractDraftResult(risky)!;
+    const text = composeCopyText(riskyResult);
+    expect(riskyResult.document.summary).toBe("Риски и противоречия: 2");
+    expect(text).toContain("Из брифа: " + risky.issues[0]!.evidence);
+    expect(text).toContain("15 000 рублей");
+    expect(text).toContain("1. " + risky.questions[0]!.question);
   });
 
   it("requires a comparison for check and none for draft", () => {
@@ -312,7 +410,9 @@ describe("Acceptance Builder page", () => {
       "Acceptance criteria\n- A student who finishes a course automatically receives a PDF certificate\n- The certificate is issued for every existing course\n- The certificate uses the brand colors",
       "Assumptions\n- Course completion data already exists in the database",
       "Deliverables\n- Certificate template in brand colors\n- Automated PDF generation service\n- Email that delivers the certificate",
-      "Open gaps\nThe brief states all three lists.",
+      "Risks and contradictions\nNo risks or contradictions detected in the brief.",
+      "Questions for the client\nNo clarifying questions.",
+      "Open gaps\nEach of the three lists has at least one item in the brief.",
     ].join("\n\n");
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expected));
@@ -321,6 +421,55 @@ describe("Acceptance Builder page", () => {
     const narrative = (fixture("draft_document", "") as { summary: string }).summary;
     expect(expected).not.toContain(narrative);
     await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
+  });
+
+  it("shows the surviving text and marks both projections of a saved incomplete draft", async () => {
+    const output = draftOutput(".weak_input");
+    const questions = output.questions as { question: string }[];
+    questions[0]!.question = "\ufeff";
+    const extracted = draftOutput().extracted;
+    const values = extracted.values as { acceptance_criteria: string[] };
+    values.acceptance_criteria = ["\u200b"];
+    const events: ProductRunEvent[] = [];
+    await run("draft", { ...output, extracted }, events);
+    const recap = await screen.findByText("Structured recap");
+    fireEvent.click(recap);
+    expect(recap.closest("details")?.textContent).toContain("Incomplete saved draft");
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+    const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]![0];
+    expect(copied).toContain("Incomplete saved draft");
+    expect(copied).toContain("1. Text unavailable in the saved draft.");
+    expect(copied).not.toContain("\u200b");
+    expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: false });
+    expect(copied).toContain((output.issues as { description: string }[])[0]!.description);
+  });
+
+  it("shows every missing-information finding in recap and copy with the question limit reached", async () => {
+    type Issue = { category: string; description: string };
+    type Output = { issues: Issue[]; questions: { source_issue_index: number }[] };
+    const raw = readFileSync(resolve(FIXTURE_ROOT, "../../acceptance_builder_eval/any-894-live-acceptance.evidence.json"), "utf8");
+    const { runs } = JSON.parse(raw) as { runs: { case_id: string; run: number; output: Output }[] };
+    const { output } = runs.find((entry) => entry.case_id === "AB-894-C-EN" && entry.run === 1)!;
+    const referenced = new Set(output.questions.map((question) => question.source_issue_index));
+    const missing = output.issues.filter((issue) => issue.category === "missing_information");
+    expect(output.questions).toHaveLength(5);
+    expect(output.issues.length).toBeGreaterThan(output.questions.length);
+    expect(output.issues.some((issue, index) => issue.category === "missing_information" && !referenced.has(index))).toBe(true);
+
+    await run("draft", output);
+    const recap = await screen.findByText("Structured recap");
+    fireEvent.click(recap);
+    const gaps = screen.getByText("Open gaps", { exact: true }).nextElementSibling;
+    expect(recap.closest("details")?.open).toBe(true);
+    for (const { description } of missing) expect(gaps?.textContent).toContain(description);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+    const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]?.[0];
+    const openGaps = copied?.split("\n\n").at(-1);
+    expect(openGaps).toMatch(/^Open gaps\n/);
+    for (const { description } of missing) expect(openGaps).toContain(description);
   });
 
   it("check: leads with the verdict, states its scope and copies verdict lines from the deltas", async () => {
@@ -416,7 +565,7 @@ describe("Acceptance Builder page", () => {
     const result = extractDraftResult(draftOutput())!;
     render(<AcceptanceBuilderResultView result={result} onCopy={() => Promise.resolve(true)} />);
     expect(document.body.textContent).toContain("Acceptance criteria\n- A student");
-    expect(document.body.textContent).toContain("Open gaps\nThe brief states all three lists.");
+    expect(document.body.textContent).toContain("Open gaps\nEach of the three lists has at least one item in the brief.");
     expect(screen.getByText(/Récapitulatif/)).toBeTruthy();
   });
 

@@ -1,0 +1,24 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "missing_information",
+        "severity": "high",
+        "description": "The certificate content is unspecified."
+      },
+      {
+        "category": "ambiguity",
+        "severity": "medium",
+        "description": "The type of certificate deliverable is unclear.",
+        "evidence": "a certificate thing"
+      }
+    ]
+  },
+  "input_tokens": 60,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.detect_issues_v1.weak_input"
+  }
+}

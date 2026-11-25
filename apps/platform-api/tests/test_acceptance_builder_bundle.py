@@ -1,8 +1,7 @@
 """ANY-228 quick-check-covered evidence for the acceptance_builder product bundle.
 
 1. The product loads through anytoolai_platform_api.bootstrap.build_runtime()'s real default
-   bundle set, with exact per-scenario action-type sequences (A01 for draft_v1,
-   A01 -> A11 for check_v1).
+   bundle set, with A01, A04 and conditional A05 for draft_v1 and A01 -> A11 for check_v1.
 2. Its input and composed-output schemas are non-permissive.
 3. A real scenario start + one worker pass runs every step against the fake provider and the
    composed artifact equals the deterministic fixtures -- happy path and weak input, per scenario
@@ -17,6 +16,8 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import re
+from dataclasses import replace
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -25,15 +26,23 @@ import httpx
 import jsonschema
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_actions.structured_llm.cross_validation import extract_structured_fields
 from anytoolai_platform_api.bootstrap import build_runtime
+from anytoolai_platform_core.artifacts.repository import ArtifactRepository
+from anytoolai_platform_core.common.authored_text import has_authored_text
 from anytoolai_platform_core.providers.adapters.fake import FakeProviderAdapter
 from anytoolai_platform_core.scenarios.checkpoints import RESULT_READY_CHECKPOINT_ID
 from anytoolai_platform_core.storage.db import event_log_table, provider_calls_table
 from anytoolai_platform_core.storage.transactions import SessionFactory, transaction_boundary
 from anytoolai_platform_core.structured_output.errors import StructuredOutputSchemaMismatchError
-from anytoolai_platform_core.structured_output.schemas import normalize_schema_mapping
+from anytoolai_platform_core.structured_output.schemas import (
+    normalize_schema_mapping,
+    publication_schema,
+)
 from anytoolai_platform_core.structured_output.validator import validate_structured_output_value
 from anytoolai_platform_core.workflows.models import JobStatus
+from anytoolai_platform_core.workflows.repository import JobRepository
+from anytoolai_platform_core.workflows.runner import SequentialWorkflowRunner
 from anytoolai_platform_worker.composition import build_worker
 
 from tests.support.brief_language import CANONICAL, golden_cases, write_provider_fixtures
@@ -48,12 +57,18 @@ DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
 EXTRACT = "acceptance_builder.extract_v1"
 COMPARE = "acceptance_builder.compare_v1"
+DETECT = "acceptance_builder.detect_issues_v1"
+QUESTIONS = "acceptance_builder.generate_questions_v1"
 STEPS = {
-    DRAFT: (EXTRACT,),
+    DRAFT: (EXTRACT, DETECT, QUESTIONS),
     CHECK: (EXTRACT, COMPARE),
 }
 ACTION_TYPES = {
-    DRAFT: ("text.extract_structured_fields",),
+    DRAFT: (
+        "text.extract_structured_fields",
+        "text.detect_issues_by_taxonomy",
+        "text.generate_clarifying_questions",
+    ),
     CHECK: (
         "text.extract_structured_fields",
         "text.compare_and_classify",
@@ -94,6 +109,9 @@ def _expected_output(scenario_id: str, suffix: str = "") -> dict[str, Any]:
     output: dict[str, Any] = {"extracted": _fixture(EXTRACT + suffix)}
     if scenario_id == CHECK:
         output["comparison"] = _fixture(COMPARE + suffix)
+    else:
+        output.update(_fixture(DETECT + suffix))
+        output["questions"] = _fixture(QUESTIONS + suffix)["questions"] if output["issues"] else []
     return output
 
 
@@ -247,6 +265,13 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes(scenario_id:
     invalid = _shared_invalid_outputs(valid)
     if scenario_id == CHECK:
         invalid.update(_comparison_mutations(valid))
+    else:
+        question = _fixture(QUESTIONS)["questions"][0]
+        jsonschema.validate({"extracted": valid["extracted"]}, schema)
+        invalid["missing_issues"] = _mutated(valid, lambda o: o.pop("issues"))
+        invalid["missing_questions"] = _mutated(valid, lambda o: o.pop("questions"))
+        invalid["unknown_question_key"] = dict(valid, questions=[dict(question, extra=True)])
+        invalid["too_many_questions"] = dict(valid, questions=[question] * 6)
     for name, candidate in invalid.items():
         assert not validator.is_valid(candidate), name
 
@@ -447,8 +472,8 @@ def test_draft_happy_path_composes_the_structured_result(
         app, request_platform_api, session_factory, DRAFT, {"brief_text": BRIEF_TEXT}, adapter
     )
 
-    assert tuple(call.action_config_id for call in adapter.calls) == STEPS[DRAFT]
-    assert tuple(call.step_id for call in adapter.calls) == ("extract",)
+    assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT)
+    assert tuple(call.step_id for call in adapter.calls) == ("extract", "detect_issues")
     assert output == _expected_output(DRAFT)
 
     extract_input = adapter.input_payload(0)
@@ -460,6 +485,12 @@ def test_draft_happy_path_composes_the_structured_result(
         "deliverables",
         "analysis_language",
     ]
+
+    # Verify the Draft-specific policy was actually sent to A01.
+    descriptions = {field["name"]: field["description"] for field in extract_input["fields"]}
+    assert "omit acceptance_criteria from values" in descriptions["acceptance_criteria"]
+    assert "keep the independently checkable conditions" in descriptions["acceptance_criteria"]
+    assert "omit assumptions and list it in missing_fields" in descriptions["assumptions"]
 
     # The one next action this product allows is recorded through the generic endpoint.
     response = asyncio.run(
@@ -487,6 +518,49 @@ def test_draft_happy_path_composes_the_structured_result(
         "checkpoint_id": RESULT_READY_CHECKPOINT_ID,
         "next_action_id": "copy_result",
     }
+
+
+@pytest.mark.parametrize("stored_text", [None, "\ufeff", "\u200b"])
+def test_result_api_reopens_persisted_draft_v1(
+    app: Any, request_platform_api, session_factory: SessionFactory, stored_text: str | None
+) -> None:
+    started, _ = _run_to_result(
+        app,
+        request_platform_api,
+        session_factory,
+        DRAFT,
+        {"brief_text": BRIEF_TEXT},
+        RecordingProviderAdapter(FIXTURE_ROOT),
+    )
+    evidence_path = (
+        REPO_ROOT / "tests/fixtures/acceptance_builder_eval/any-894-pre-fix.evidence.json"
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    legacy_output = evidence["runs"][0]["output"]
+    if stored_text is not None:
+        legacy_output = _expected_output(DRAFT, ".weak_input")
+        legacy_output["questions"][0]["question"] = stored_text
+    with transaction_boundary(session_factory) as session:
+        jobs = JobRepository(session)
+        job = jobs.get(started["job_id"])
+        assert job is not None and job.result_artifact_id is not None
+        assert job.workflow_version == 1
+        artifacts = ArtifactRepository(session)
+        artifact = artifacts.get(job.result_artifact_id)
+        assert artifact is not None
+        artifacts.update(replace(artifact, content_json=legacy_output))
+
+    response = asyncio.run(
+        request_platform_api(
+            app, "GET", f"/v1/results/{artifact.id}", request_id="req_legacy_draft_result"
+        )
+    )
+    assert response.status_code == HTTPStatus.OK, response.text
+    result = response.json()
+    assert result["workflow_version"] == 1
+    assert result["schema_ref"] == OUTPUT_SCHEMA_REFS[DRAFT]
+    assert result["schema_version"] == 1
+    assert result["output"] == legacy_output
 
 
 def test_check_happy_path_composes_the_structured_result(
@@ -557,6 +631,7 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
         {"brief_text": WEAK_BRIEF_TEXT},
         draft_adapter,
     )
+    assert tuple(call.action_config_id for call in draft_adapter.calls) == STEPS[DRAFT]
     assert draft_output == _expected_output(DRAFT, ".weak_input")
     assert draft_output["extracted"]["missing_fields"]  # a vague brief reports gaps, not a failure
 
@@ -573,6 +648,87 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     )
     assert check_output == _expected_output(CHECK, ".weak_input")
     assert check_output["comparison"]["verdict"] == "does_not_meet"
+
+
+@pytest.mark.parametrize(
+    ("action", "field", "invalid", "recover"),
+    [
+        (EXTRACT, "deliverables", [], True),
+        (EXTRACT, "deliverables", ["  "], True),
+        (EXTRACT, "analysis_language", "ru_RU", True),
+        (EXTRACT, "acceptance_criteria", ["\u200b"], True),
+        (DETECT, "evidence", "\u2067\u2069", True),
+        (QUESTIONS, "rationale", "\U000e0100", False),
+        (DETECT, "description", " ", True),
+        (DETECT, "evidence", "\t", True),
+        (QUESTIONS, "question", "\n", True),
+        (QUESTIONS, "rationale", " \t\n", True),
+        (EXTRACT, "deliverables", ["\ufeff"], True),
+        (DETECT, "description", "\ufeff", True),
+        (QUESTIONS, "question", "\ufeff", True),
+        (QUESTIONS, "question", " \ufeff\u0085", False),
+        (QUESTIONS, "question", "  ", False),
+    ],
+)
+def test_draft_retries_invalid_atom_before_publishing(
+    app, request_platform_api, session_factory, action, field, invalid, recover
+):
+    class InvalidOutputAdapter(RecordingProviderAdapter):
+        async def complete(self, request):
+            response = await super().complete(request)
+            if request.action_config_id == action and (
+                request.semantic_attempt_index == 1 or not recover
+            ):
+                output = json.loads(response.output_text)
+                value = (
+                    output["values"]
+                    if action == EXTRACT
+                    else output["issues" if action == DETECT else "questions"][0]
+                )
+                value[field] = invalid
+                return replace(response, output_text=json.dumps(output))
+            return response
+
+    registry = app.state.runtime.config_registry
+    fake = registry.provider_policies["default_fake_provider_v1"]
+    live_retry = registry.provider_policies["sol_text_generation_v1"].retry_policy
+    policies = {
+        **registry.provider_policies,
+        fake.provider_policy_ref: replace(fake, retry_policy=live_retry),
+    }
+    suffix = "" if field == "acceptance_criteria" else ".weak_input"
+    brief = WEAK_BRIEF_TEXT if suffix else BRIEF_TEXT
+    adapter = InvalidOutputAdapter(FIXTURE_ROOT, variants={step: suffix for step in STEPS[DRAFT]})
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        config_registry=replace(registry, provider_policies=policies),
+        provider_adapters={"fake": adapter},
+    )
+    started = _start(app, request_platform_api, DRAFT, {"brief_text": brief}).json()
+    try:
+        job = asyncio.run(worker.process_job(started["job_id"]))
+    finally:
+        worker.dispose()
+    assert [c.semantic_attempt_index for c in adapter.calls if c.action_config_id == action] == [
+        1,
+        2,
+    ]
+    if recover:
+        assert job.status is JobStatus.succeeded
+        response = asyncio.run(
+            request_platform_api(
+                app,
+                "GET",
+                f"/v1/results/{job.result_artifact_id}",
+                request_id="req_recovered_draft",
+            )
+        )
+        assert response.status_code == HTTPStatus.OK
+        assert response.json()["output"] == _expected_output(DRAFT, suffix)
+    else:
+        assert job.status is JobStatus.failed
+        assert job.result_artifact_id is None
 
 
 @pytest.mark.parametrize(
@@ -624,7 +780,9 @@ def test_multilingual_canonical_output_and_original_language_source(
     assert output == expected  # Includes summary, evidence, rationale and every section.
     source = case["input"]["brief_text"]
     assert adapter.input_payload(0)["source_text"] == source
-    if case["scenario_id"] == CHECK:
+    if case["scenario_id"] == DRAFT:
+        assert adapter.input_payload(1)["source_text"] == source
+    else:
         assert adapter.input_payload(1)["reference_text"] == source
         assert adapter.input_payload(1)["subject_text"] == case["input"]["deliverable_text"]
 
@@ -650,3 +808,65 @@ def test_output_rejects_independent_contradictory_recap(language, scenario):
     }
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(output, schema)
+
+
+def test_python_and_published_authored_text_match_for_every_code_point():
+    schema = _schema(OUTPUT_SCHEMA_REFS[DRAFT])
+    pattern = re.compile(schema["$defs"]["authoredText"]["pattern"])
+    for code in range(0x110000):
+        character = chr(code)
+        assert has_authored_text(character) == bool(pattern.search(character)), hex(code)
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "section", "fields"),
+    [
+        ("issue_detection_output", "issues", ("description", "evidence")),
+        ("generate_questions_input", "issues", ("description", "evidence")),
+        ("generate_questions_output", "questions", ("question", "rationale")),
+        ("draft", "questions", ("question", "rationale")),
+    ],
+)
+def test_atom_and_publication_text_contracts_share_the_unicode_boundary(
+    schema_name, section, fields
+):
+    fixture = REPO_ROOT / "tests/fixtures/acceptance_builder_eval/authored_text.json"
+    vectors = json.loads(fixture.read_text(encoding="utf-8"))
+    draft = _expected_output(DRAFT, ".weak_input")
+    if schema_name == "draft":
+        schema = _schema(OUTPUT_SCHEMA_REFS[DRAFT])
+        payload = draft
+    else:
+        path = CONFIG_ROOT / f"schemas/{schema_name}.schema.json"
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        payload = {section: draft[section]}
+        if schema_name == "generate_questions_input":
+            payload.update(context="brief", target_audience="client")
+    validator = jsonschema.Draft202012Validator(publication_schema(schema))
+    first, *rest = payload[section]
+    for kind, samples in vectors.items():
+        expected = kind == "text"
+        for sample in samples:
+            assert extract_structured_fields._nonblank_string(sample) == expected
+            for field in fields:
+                modified = {**payload, section: [{**first, field: sample}, *rest]}
+                assert validator.is_valid(modified) == expected, (field, ascii(sample))
+
+
+def test_workflow_refuses_to_publish_blank_text_from_final_mapping(
+    app, request_platform_api, session_factory, monkeypatch
+):
+    select_output = SequentialWorkflowRunner._select_final_output
+
+    def select_with_blank_text(runner, state):
+        payload, source = select_output(runner, state)
+        payload["extracted"]["values"]["deliverables"][0] = "\u200b"
+        return payload, source
+
+    monkeypatch.setattr(SequentialWorkflowRunner, "_select_final_output", select_with_blank_text)
+    started = _start(app, request_platform_api, DRAFT, {"brief_text": BRIEF_TEXT}).json()
+    job = _run_worker(session_factory, RecordingProviderAdapter(FIXTURE_ROOT))
+    assert job.id == started["job_id"]
+    assert job.status is JobStatus.failed
+    assert job.error_code == "workflow_output_validation_failed"
+    assert job.result_artifact_id is None

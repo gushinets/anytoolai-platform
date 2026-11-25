@@ -1,0 +1,335 @@
+{
+  "description": "Authored acceptance examples for Draft issue detection and questions.",
+  "cases": [
+    {
+      "id": "AB-894-B-RU",
+      "language": "ru",
+      "provenance": "QA brief B",
+      "input": {
+        "brief_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать."
+      },
+      "checks": "vague",
+      "canonical": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса"
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "Не указано, какие страницы и функции нужны."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не определён порядок согласования дизайна."
+          }
+        ],
+        "questions": [
+          {
+            "source_issue_index": 0,
+            "category": "missing_information",
+            "priority": "high",
+            "question": "Какие страницы и функции нужны для сайта?",
+            "rationale": "Ответ определит состав работ."
+          },
+          {
+            "source_issue_index": 1,
+            "category": "missing_information",
+            "priority": "medium",
+            "question": "Как вы будете утверждать дизайн?",
+            "rationale": "Это поможет согласовать условия приёмки."
+          }
+        ]
+      },
+      "translations": {
+        "en": "I need a website for my business. I want it to look beautiful and modern and bring in customers. Get in touch if you can do it.",
+        "es": "Necesito un sitio web para mi negocio. Quiero que sea bonito y moderno y que atraiga clientes. Escríbanme si pueden hacerlo."
+      }
+    },
+    {
+      "id": "AB-894-C-RU",
+      "language": "ru",
+      "provenance": "QA brief C",
+      "input": {
+        "brief_text": "Нужен интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С. Сдача завтра, потому что в пятницу запуск рекламы. Бюджет 15 000 рублей. Правок будет немного, но по ходу всё может поменяться. Дизайн придумайте сами, мне нравится как у больших сайтов."
+      },
+      "checks": "feasibility",
+      "canonical": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Интернет-магазин на 500 товаров",
+              "Личный кабинет, онлайн-оплата и интеграция с 1С",
+              "Сдача завтра при бюджете 15 000 рублей"
+            ],
+            "assumptions": [
+              "Правок будет немного, но по ходу всё может поменяться."
+            ],
+            "deliverables": [
+              "Интернет-магазин на 500 товаров"
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "severity": "high",
+            "description": "Каталог на 500 товаров, личный кабинет, онлайн-оплата и интеграция с 1С создают риск для сдачи завтра при бюджете 15 000 рублей.",
+            "evidence": "Нужен интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С. Сдача завтра, потому что в пятницу запуск рекламы. Бюджет 15 000 рублей."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "medium",
+            "description": "Меняющиеся требования оставляют объём правок открытым.",
+            "evidence": "Правок будет немного, но по ходу всё может поменяться."
+          }
+        ],
+        "questions": [
+          {
+            "source_issue_index": 0,
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "Что важнее всего сдать завтра при бюджете 15 000 рублей?",
+            "rationale": "Ответ определит объём завтрашней сдачи."
+          },
+          {
+            "source_issue_index": 1,
+            "category": "scope_risk",
+            "priority": "medium",
+            "question": "Как вы хотите ограничить объём правок?",
+            "rationale": "Ответ зафиксирует границы работ."
+          }
+        ]
+      }
+    },
+    {
+      "id": "AB-894-C-EN",
+      "language": "en",
+      "provenance": "Synthetic translation of QA brief C",
+      "input": {
+        "brief_text": "We need an online shop with 500 products, customer accounts, online payment and 1C integration. Delivery tomorrow because advertising starts on Friday. Budget: 15 000 rubles. There will be few revisions, but everything may change along the way. Come up with the design yourselves; I like what big sites do."
+      },
+      "checks": "feasibility",
+      "canonical": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Online shop with 500 products",
+              "Customer accounts, online payment and 1C integration",
+              "Delivery tomorrow with a budget of 15 000 rubles"
+            ],
+            "assumptions": [
+              "There will be few revisions, but everything may change along the way."
+            ],
+            "deliverables": [
+              "Online shop with 500 products"
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "severity": "high",
+            "description": "Delivering 500 products, accounts, payment and 1C integration tomorrow within 15 000 rubles puts the launch at risk.",
+            "evidence": "We need an online shop with 500 products, customer accounts, online payment and 1C integration. Delivery tomorrow because advertising starts on Friday. Budget: 15 000 rubles."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "medium",
+            "description": "Changing requirements leave revisions open-ended.",
+            "evidence": "There will be few revisions, but everything may change along the way."
+          }
+        ],
+        "questions": [
+          {
+            "source_issue_index": 0,
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "What takes priority for delivery tomorrow within 15 000 rubles?",
+            "rationale": "This defines the delivery scope."
+          },
+          {
+            "source_issue_index": 1,
+            "category": "scope_risk",
+            "priority": "medium",
+            "question": "What boundaries should apply to revisions?",
+            "rationale": "This sets the limits of the work."
+          }
+        ]
+      }
+    },
+    {
+      "id": "AB-894-C-ES",
+      "language": "es",
+      "provenance": "Synthetic translation of QA brief C",
+      "input": {
+        "brief_text": "Necesitamos una tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C. Entrega mañana porque la publicidad empieza el viernes. Presupuesto: 15 000 rublos. Habrá pocos cambios, pero todo puede cambiar sobre la marcha. Proponed el diseño; me gustan los sitios grandes."
+      },
+      "checks": "feasibility",
+      "canonical": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Tienda en línea con 500 productos",
+              "Cuentas de cliente, pago en línea e integración con 1C",
+              "Entrega mañana con un presupuesto de 15 000 rublos"
+            ],
+            "assumptions": [
+              "Habrá pocos cambios, pero todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Tienda en línea con 500 productos"
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "severity": "high",
+            "description": "Entregar mañana los 500 productos, las cuentas, el pago y la integración con 1C por 15 000 rublos pone en riesgo el lanzamiento.",
+            "evidence": "Necesitamos una tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C. Entrega mañana porque la publicidad empieza el viernes. Presupuesto: 15 000 rublos."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "medium",
+            "description": "Los cambios de requisitos dejan abierto el alcance.",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha."
+          }
+        ],
+        "questions": [
+          {
+            "source_issue_index": 0,
+            "category": "scope_risk",
+            "priority": "high",
+            "question": "¿Qué tiene prioridad para la entrega de mañana con 15 000 rublos?",
+            "rationale": "La respuesta define el alcance de la entrega."
+          },
+          {
+            "source_issue_index": 1,
+            "category": "scope_risk",
+            "priority": "medium",
+            "question": "¿Cómo se limitarán los cambios?",
+            "rationale": "La respuesta delimita las revisiones."
+          }
+        ]
+      }
+    },
+    {
+      "id": "AB-894-CTRL-CONTRADICTION-RU",
+      "language": "ru",
+      "provenance": "Synthetic control",
+      "input": {
+        "brief_text": "Нужен лендинг для курса. Страница должна быть только на русском языке. На странице нужна полная английская версия. Срок — 10 рабочих дней, бюджет 40 000 рублей. Нужна форма заявки с отправкой на почту."
+      },
+      "checks": "contradiction",
+      "canonical": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Форма заявки отправляет заявку на почту."
+            ],
+            "deliverables": [
+              "Лендинг для курса."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "Требование только русского языка противоречит требованию полной английской версии.",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия."
+          }
+        ],
+        "questions": [
+          {
+            "source_issue_index": 0,
+            "category": "contradiction",
+            "priority": "high",
+            "question": "Какая языковая версия должна войти в результат?",
+            "rationale": "Ответ позволит согласовать критерий приёмки."
+          }
+        ]
+      },
+      "translations": {
+        "en": "We need a landing page for a course. The page must be in Russian only. The page needs a full English version. Deadline: 10 business days, budget: 40 000 rubles. We need an application form that sends submissions by email.",
+        "es": "Necesitamos una página de aterrizaje para un curso. La página debe estar solo en ruso. La página necesita una versión completa en inglés. Plazo: 10 días hábiles, presupuesto: 40 000 rublos. Necesitamos un formulario de solicitud que envíe las solicitudes por correo electrónico."
+      }
+    },
+    {
+      "id": "AB-894-CTRL-COMPLETE-RU",
+      "language": "ru",
+      "provenance": "Synthetic control",
+      "input": {
+        "brief_text": "Нужен лендинг для онлайн-школы: 5 блоков (оффер, программа, преподаватель, тарифы, форма заявки). Тексты и фото предоставляем мы. Форма отправляет заявку на почту info@school.example. Адаптив под мобильные. Срок — 14 рабочих дней, бюджет 60 000 рублей, 2 раунда правок включены. Приёмка: все блоки свёрстаны по согласованному макету, форма доставляет тестовую заявку."
+      },
+      "checks": "complete",
+      "canonical": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Пять блоков (оффер, программа, преподаватель, тарифы, форма заявки) свёрстаны по согласованному макету.",
+              "Форма доставляет тестовую заявку на info@school.example.",
+              "Лендинг адаптирован под мобильные устройства.",
+              "Срок — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены два раунда правок."
+            ],
+            "assumptions": [
+              "Заказчик предоставляет тексты и фото."
+            ],
+            "deliverables": [
+              "Лендинг для онлайн-школы."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "translations": {
+        "en": "We need a landing page for an online school with 5 blocks (offer, curriculum, teacher, pricing, application form). We supply the text and photos. The form sends applications to info@school.example. Mobile layout required. Deadline: 14 business days, budget: 60 000 rubles, 2 rounds of revisions included. Acceptance: all blocks follow the approved layout and the form delivers a test application.",
+        "es": "Necesitamos una página de aterrizaje para una escuela en línea con 5 bloques (oferta, programa, docente, tarifas, formulario de solicitud). Nosotros proporcionamos los textos y las fotos. El formulario envía las solicitudes al correo info@school.example. Adaptación para móviles. Plazo: 14 días hábiles, presupuesto: 60 000 rublos, se incluyen 2 rondas de revisiones. Aceptación: todos los bloques siguen el diseño acordado y el formulario entrega una solicitud de prueba."
+      }
+    }
+  ],
+  "review_rubric": {
+    "vague": [
+      "The business website is the only specified deliverable. Style and customer growth are wishes.",
+      "Ask openly for required pages/functions and for the decision that approves the design. No platform, deadline, deliverable or number is presupposed."
+    ],
+    "feasibility": [
+      "500 products, customer accounts, payment and 1C must fit tomorrow’s delivery and a budget of 15 000 rubles. Advertising starts Friday; the store launch is undated. Each mention of a date or amount must retain its subject and status.",
+      "Identify the combined feasibility risk and the open revision scope. The answer to a question linked to the combined risk must identify which work is required for tomorrow’s delivery, what can be deferred, or select between explicit scope options. Confirming the priority of the date, budget or scope in general leaves that decision open."
+    ],
+    "contradiction": [
+      "Report both conflicting language requirements with their evidence. Ask the client which language/version to deliver; neither alternative is agreed.",
+      "Preserve the independent email form requirement."
+    ],
+    "complete": [
+      "Preserve all five named blocks, agreed layout, client-supplied text and photos, test form delivery and recipient, mobile support, 14 business days, 60 000 rubles and two included revision rounds.",
+      "The brief is complete and consistent. No findings or questions."
+    ]
+  }
+}

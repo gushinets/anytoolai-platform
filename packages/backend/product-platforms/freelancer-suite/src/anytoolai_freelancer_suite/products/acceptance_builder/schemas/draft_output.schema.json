@@ -267,11 +267,162 @@
         }
       ],
       "additionalProperties": false
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "severity"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "missing_information",
+              "ambiguity",
+              "scope_risk",
+              "timeline_risk",
+              "budget_risk",
+              "contradiction"
+            ]
+          },
+          "source_issue_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "question",
+          "rationale",
+          "priority",
+          "category",
+          "source_issue_index"
+        ],
+        "additionalProperties": false
+      }
     }
   },
-  "required": [
-    "extracted"
-  ],
+  "required": ["extracted"],
+  "dependentRequired": {
+    "issues": ["questions"],
+    "questions": ["issues"]
+  },
   "additionalProperties": false,
-  "$defs": {}
+  "$defs": {
+    "authoredText": {
+      "type": "string",
+      "pattern": "[^\\u0000-\\u0020\\u007f-\\u00a0\\u00ad\\u034f\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u115f-\\u1160\\u1680\\u17b4-\\u17b5\\u180b-\\u180f\\u2000-\\u200f\\u2028-\\u202f\\u205f-\\u206f\\u3000\\u3164\\ufe00-\\ufe0f\\ufeff\\uffa0\\ufff0-\\ufffb\ud804\udcbd\ud804\udccd\ud80d\udc30-\ud80d\udc3f\ud82f\udca0-\ud82f\udca3\ud834\udd73-\ud834\udd7a\udb40\udc00-\udb43\udfff]"
+    },
+    "publication": {
+      "properties": {
+        "extracted": {
+          "properties": {
+            "values": {
+              "properties": {
+                "acceptance_criteria": {
+                  "items": {
+                    "$ref": "#/$defs/authoredText"
+                  }
+                },
+                "assumptions": {
+                  "items": {
+                    "$ref": "#/$defs/authoredText"
+                  }
+                },
+                "deliverables": {
+                  "items": {
+                    "$ref": "#/$defs/authoredText"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "issues": {
+          "items": {
+            "properties": {
+              "description": {
+                "$ref": "#/$defs/authoredText"
+              },
+              "evidence": {
+                "$ref": "#/$defs/authoredText"
+              }
+            }
+          }
+        },
+        "questions": {
+          "items": {
+            "properties": {
+              "question": {
+                "$ref": "#/$defs/authoredText"
+              },
+              "rationale": {
+                "$ref": "#/$defs/authoredText"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

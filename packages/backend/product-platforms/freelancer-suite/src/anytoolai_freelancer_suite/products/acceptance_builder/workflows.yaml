@@ -8,16 +8,44 @@ workflows:
     action_config_id: acceptance_builder.extract_v1
     input_mapping:
       source_text: scenario.input.brief_text
-      fields: literal:[{"name":"acceptance_criteria","type":"array_of_strings","description":"Conditions the brief says the
-        finished work must satisfy.","required":false},{"name":"assumptions","type":"array_of_strings","description":"Things
-        the brief takes for granted or states as assumed.","required":false},{"name":"deliverables","type":"array_of_strings","description":"Concrete
-        deliverables the client expects.","required":false},{"name":"analysis_language","type":"string","description":"Case-insensitive
+      fields: literal:[{"name":"acceptance_criteria","type":"nonempty_text_list","description":"Include only explicit, verifiable conditions on the delivered work or agreement.
+        For each item identify what the client could inspect or test, or the explicit agreed term they could verify.
+        Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test.
+        A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria.
+        In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently
+        checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in
+        acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers.
+        Keep dates and amounts attached to the event or obligation they qualify.","required":false},{"name":"assumptions","type":"nonempty_text_list","description":"Explicit project premises such as who supplies materials or an external dependency.
+        General background, wishes, and the mere existence of the client or their business are not project premises.
+        If none is stated, omit assumptions and list it in missing_fields.","required":false},{"name":"deliverables","type":"nonempty_text_list","description":"Concrete
+        deliverables the client expects.","required":false},{"name":"analysis_language","type":"language_tag","description":"Case-insensitive
         analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric
         subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it,
         even for a vague brief; it is presentation metadata, not a project requirement.","required":true}]
       strict: literal:true
     output_mapping:
       context.workflow_output.extracted: steps.extract.output
+  - step_id: detect_issues
+    action_config_id: acceptance_builder.detect_issues_v1
+    input_mapping:
+      source_text: scenario.input.brief_text
+      taxonomy: &issue_taxonomy 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction"]'
+    output_mapping:
+      context.workflow_output.issues: steps.detect_issues.output.issues
+      # A05 requires at least one issue; seed the empty default it overrides below.
+      context.workflow_output.questions: 'literal:[]'
+  - step_id: generate_questions
+    action_config_id: acceptance_builder.generate_questions_v1
+    # An empty issues list is falsy: a clean brief skips A05 instead of failing its input.
+    when: steps.detect_issues.output.issues
+    input_mapping:
+      issues: steps.detect_issues.output.issues
+      taxonomy: *issue_taxonomy
+      context: scenario.input.brief_text
+      target_audience: 'literal:"the client who wrote the brief"'
+      max_questions: 'literal:5'
+    output_mapping:
+      context.workflow_output.questions: steps.generate_questions.output.questions
 - workflow_id: acceptance_builder.check_v1
   version: 1
   input_schema_ref: acceptance_builder.check_input_v1

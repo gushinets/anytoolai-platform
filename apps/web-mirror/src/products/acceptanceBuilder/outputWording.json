@@ -1,0 +1,317 @@
+{
+  "en": {
+    "verdicts": {
+      "meets_expectations": "meets expectations",
+      "partially_meets": "partially meets expectations",
+      "does_not_meet": "does not meet expectations",
+      "insufficient_brief": "cannot be checked without requirements"
+    },
+    "statuses": {
+      "match": "confirmed",
+      "partial": "not fully confirmed",
+      "mismatch": "not met"
+    },
+    "criteria": {
+      "scope_coverage": "Scope coverage",
+      "requirement_fit": "Requirement fit",
+      "completeness": "Completeness",
+      "clarity": "Clarity"
+    },
+    "lists": {
+      "acceptance_criteria": "Acceptance criteria",
+      "assumptions": "Assumptions",
+      "deliverables": "Deliverables"
+    },
+    "verdict": "Verdict",
+    "gaps": "Open gaps",
+    "missing": "Not specified in the brief.",
+    "risks": "Risks and contradictions",
+    "questions": "Questions for the client",
+    "noRisks": "No risks or contradictions detected in the brief.",
+    "noQuestions": "No clarifying questions.",
+    "listsPresent": "Each of the three lists has at least one item in the brief.",
+    "evidence": "From the brief",
+    "categories": {
+      "missing_information": "Missing information",
+      "ambiguity": "Ambiguity",
+      "scope_risk": "Scope risk",
+      "timeline_risk": "Timeline risk",
+      "budget_risk": "Budget risk",
+      "contradiction": "Contradiction"
+    },
+    "complete": "The brief states all three lists.",
+    "confirm": "the client should confirm it",
+    "partial": "Incomplete saved draft",
+    "unavailable": "Text unavailable in the saved draft."
+  },
+  "ru": {
+    "verdicts": {
+      "meets_expectations": "соответствует ожиданиям",
+      "partially_meets": "частично соответствует ожиданиям",
+      "does_not_meet": "не соответствует ожиданиям",
+      "insufficient_brief": "проверить нельзя: в брифе нет требований"
+    },
+    "statuses": {
+      "match": "подтверждено",
+      "partial": "подтверждено не полностью",
+      "mismatch": "не выполнено"
+    },
+    "criteria": {
+      "scope_coverage": "Охват объёма работ",
+      "requirement_fit": "Соответствие требованиям",
+      "completeness": "Полнота",
+      "clarity": "Ясность"
+    },
+    "lists": {
+      "acceptance_criteria": "Критерии приёмки",
+      "assumptions": "Допущения",
+      "deliverables": "Результаты работы"
+    },
+    "verdict": "Вердикт",
+    "gaps": "Открытые вопросы",
+    "missing": "Не указано в брифе.",
+    "risks": "Риски и противоречия",
+    "questions": "Вопросы клиенту",
+    "noRisks": "Рисков и противоречий в брифе не обнаружено.",
+    "noQuestions": "Уточняющих вопросов нет.",
+    "listsPresent": "Каждый из трёх списков содержит хотя бы один пункт из брифа.",
+    "evidence": "Из брифа",
+    "categories": {
+      "missing_information": "Не хватает сведений",
+      "ambiguity": "Неоднозначность",
+      "scope_risk": "Риск объёма работ",
+      "timeline_risk": "Риск по срокам",
+      "budget_risk": "Риск по бюджету",
+      "contradiction": "Противоречие"
+    },
+    "complete": "В брифе указаны все три списка.",
+    "confirm": "клиенту следует подтвердить",
+    "partial": "Сохранённый черновик неполон",
+    "unavailable": "Текст отсутствует в сохранённом черновике."
+  },
+  "es": {
+    "verdicts": {
+      "meets_expectations": "cumple las expectativas",
+      "partially_meets": "cumple parcialmente las expectativas",
+      "does_not_meet": "no cumple las expectativas",
+      "insufficient_brief": "no se puede comprobar sin requisitos"
+    },
+    "statuses": {
+      "match": "confirmado",
+      "partial": "no confirmado del todo",
+      "mismatch": "no cumplido"
+    },
+    "criteria": {
+      "scope_coverage": "Cobertura del alcance",
+      "requirement_fit": "Adecuación a los requisitos",
+      "completeness": "Integridad",
+      "clarity": "Claridad"
+    },
+    "lists": {
+      "acceptance_criteria": "Criterios de aceptación",
+      "assumptions": "Supuestos",
+      "deliverables": "Entregables"
+    },
+    "verdict": "Veredicto",
+    "gaps": "Cuestiones pendientes",
+    "missing": "No se especifica en el encargo.",
+    "risks": "Riesgos y contradicciones",
+    "questions": "Preguntas para el cliente",
+    "noRisks": "No se han detectado riesgos ni contradicciones en el encargo.",
+    "noQuestions": "No hay preguntas pendientes de aclaración.",
+    "listsPresent": "Cada lista contiene al menos un elemento del encargo.",
+    "evidence": "Del encargo",
+    "categories": {
+      "missing_information": "Falta de información",
+      "ambiguity": "Ambigüedad",
+      "scope_risk": "Riesgo de alcance",
+      "timeline_risk": "Riesgo de plazo",
+      "budget_risk": "Riesgo presupuestario",
+      "contradiction": "Contradicción"
+    },
+    "complete": "El encargo especifica las tres listas.",
+    "confirm": "el cliente debe confirmarlo",
+    "partial": "Borrador guardado incompleto",
+    "unavailable": "Falta texto en el borrador guardado."
+  },
+  "de": {
+    "verdicts": {
+      "meets_expectations": "erfüllt die Erwartungen",
+      "partially_meets": "erfüllt die Erwartungen teilweise",
+      "does_not_meet": "erfüllt die Erwartungen nicht",
+      "insufficient_brief": "ohne Anforderungen nicht prüfbar"
+    },
+    "statuses": {
+      "match": "bestätigt",
+      "partial": "nicht vollständig bestätigt",
+      "mismatch": "nicht erfüllt"
+    },
+    "criteria": {
+      "scope_coverage": "Umfang",
+      "requirement_fit": "Anforderungserfüllung",
+      "completeness": "Vollständigkeit",
+      "clarity": "Klarheit"
+    },
+    "lists": {
+      "acceptance_criteria": "Abnahmekriterien",
+      "assumptions": "Annahmen",
+      "deliverables": "Liefergegenstände"
+    },
+    "verdict": "Urteil",
+    "gaps": "Offene Fragen",
+    "missing": "Im Briefing nicht angegeben.",
+    "risks": "Risiken und Widersprüche",
+    "questions": "Fragen an den Kunden",
+    "noRisks": "Im Briefing wurden keine Risiken oder Widersprüche erkannt.",
+    "noQuestions": "Keine Rückfragen.",
+    "listsPresent": "Jede der drei Listen enthält mindestens einen Punkt aus dem Briefing.",
+    "evidence": "Aus dem Briefing",
+    "categories": {
+      "missing_information": "Fehlende Angaben",
+      "ambiguity": "Mehrdeutigkeit",
+      "scope_risk": "Umfangsrisiko",
+      "timeline_risk": "Terminrisiko",
+      "budget_risk": "Budgetrisiko",
+      "contradiction": "Widerspruch"
+    },
+    "complete": "Das Briefing enthält alle drei Listen.",
+    "confirm": "vom Kunden zu bestätigen",
+    "partial": "Gespeicherter Entwurf unvollständig",
+    "unavailable": "Text im gespeicherten Entwurf fehlt."
+  },
+  "fr": {
+    "verdicts": {
+      "meets_expectations": "répond aux attentes",
+      "partially_meets": "répond partiellement aux attentes",
+      "does_not_meet": "ne répond pas aux attentes",
+      "insufficient_brief": "vérification impossible sans exigences"
+    },
+    "statuses": {
+      "match": "confirmé",
+      "partial": "pas entièrement confirmé",
+      "mismatch": "non satisfait"
+    },
+    "criteria": {
+      "scope_coverage": "Couverture du périmètre",
+      "requirement_fit": "Conformité aux exigences",
+      "completeness": "Exhaustivité",
+      "clarity": "Clarté"
+    },
+    "lists": {
+      "acceptance_criteria": "Critères d’acceptation",
+      "assumptions": "Hypothèses",
+      "deliverables": "Livrables"
+    },
+    "verdict": "Verdict",
+    "gaps": "Questions ouvertes",
+    "missing": "Non précisé dans le brief.",
+    "risks": "Risques et contradictions",
+    "questions": "Questions au client",
+    "noRisks": "Aucun risque ni aucune contradiction détectés dans le brief.",
+    "noQuestions": "Aucune question à clarifier.",
+    "listsPresent": "Chaque liste contient au moins un élément du brief.",
+    "evidence": "Extrait du brief",
+    "categories": {
+      "missing_information": "Informations manquantes",
+      "ambiguity": "Ambiguïté",
+      "scope_risk": "Risque lié au périmètre",
+      "timeline_risk": "Risque de délai",
+      "budget_risk": "Risque budgétaire",
+      "contradiction": "Contradiction"
+    },
+    "complete": "Le brief précise les trois listes.",
+    "confirm": "à confirmer par le client",
+    "partial": "Brouillon enregistré incomplet",
+    "unavailable": "Du texte manque dans le brouillon enregistré."
+  },
+  "it": {
+    "verdicts": {
+      "meets_expectations": "soddisfa le aspettative",
+      "partially_meets": "soddisfa parzialmente le aspettative",
+      "does_not_meet": "non soddisfa le aspettative",
+      "insufficient_brief": "verifica impossibile senza requisiti"
+    },
+    "statuses": {
+      "match": "confermato",
+      "partial": "non del tutto confermato",
+      "mismatch": "non soddisfatto"
+    },
+    "criteria": {
+      "scope_coverage": "Copertura dell’ambito",
+      "requirement_fit": "Conformità ai requisiti",
+      "completeness": "Completezza",
+      "clarity": "Chiarezza"
+    },
+    "lists": {
+      "acceptance_criteria": "Criteri di accettazione",
+      "assumptions": "Presupposti",
+      "deliverables": "Risultati da consegnare"
+    },
+    "verdict": "Verdetto",
+    "gaps": "Questioni aperte",
+    "missing": "Non specificato nel brief.",
+    "risks": "Rischi e contraddizioni",
+    "questions": "Domande per il cliente",
+    "noRisks": "Nel brief non sono stati rilevati rischi o contraddizioni.",
+    "noQuestions": "Nessuna domanda di chiarimento.",
+    "listsPresent": "Ciascun elenco contiene almeno un elemento del brief.",
+    "evidence": "Dal brief",
+    "categories": {
+      "missing_information": "Informazioni mancanti",
+      "ambiguity": "Ambiguità",
+      "scope_risk": "Rischio relativo all’ambito",
+      "timeline_risk": "Rischio sui tempi",
+      "budget_risk": "Rischio di budget",
+      "contradiction": "Contraddizione"
+    },
+    "complete": "Il brief specifica tutti e tre gli elenchi.",
+    "confirm": "da confermare con il cliente",
+    "partial": "Bozza salvata incompleta",
+    "unavailable": "Manca del testo nella bozza salvata."
+  },
+  "pt": {
+    "verdicts": {
+      "meets_expectations": "cumpre as expectativas",
+      "partially_meets": "cumpre parcialmente as expectativas",
+      "does_not_meet": "não cumpre as expectativas",
+      "insufficient_brief": "não é possível verificar sem requisitos"
+    },
+    "statuses": {
+      "match": "confirmado",
+      "partial": "não totalmente confirmado",
+      "mismatch": "não cumprido"
+    },
+    "criteria": {
+      "scope_coverage": "Cobertura do âmbito",
+      "requirement_fit": "Adequação aos requisitos",
+      "completeness": "Completude",
+      "clarity": "Clareza"
+    },
+    "lists": {
+      "acceptance_criteria": "Critérios de aceitação",
+      "assumptions": "Pressupostos",
+      "deliverables": "Entregáveis"
+    },
+    "verdict": "Veredicto",
+    "gaps": "Questões em aberto",
+    "missing": "Não especificado no briefing.",
+    "risks": "Riscos e contradições",
+    "questions": "Perguntas ao cliente",
+    "noRisks": "Não foram detetados riscos nem contradições no briefing.",
+    "noQuestions": "Não há perguntas de esclarecimento.",
+    "listsPresent": "Cada lista contém pelo menos um elemento do briefing.",
+    "evidence": "Do briefing",
+    "categories": {
+      "missing_information": "Informação em falta",
+      "ambiguity": "Ambiguidade",
+      "scope_risk": "Risco de âmbito",
+      "timeline_risk": "Risco de prazo",
+      "budget_risk": "Risco orçamental",
+      "contradiction": "Contradição"
+    },
+    "complete": "O briefing especifica as três listas.",
+    "confirm": "a confirmar pelo cliente",
+    "partial": "Rascunho guardado incompleto",
+    "unavailable": "Falta texto no rascunho guardado."
+  }
+}
