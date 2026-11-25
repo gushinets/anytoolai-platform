@@ -75,6 +75,13 @@ export const draftDefinition: ProductDefinition<DraftValues, AcceptanceBuilderRe
   Result: AcceptanceBuilderResultView,
 };
 
+function normalizeCheckValues(values: CheckValues): CheckValues {
+  return {
+    briefText: trimBackendWhitespace(values.briefText),
+    deliverableText: trimBackendWhitespace(values.deliverableText),
+  };
+}
+
 export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderResult> = {
   productId: "acceptance_builder",
   scenarioId: "acceptance_builder.check_v1",
@@ -87,7 +94,11 @@ export const checkDefinition: ProductDefinition<CheckValues, AcceptanceBuilderRe
       ["briefText", briefError(values)],
       ["deliverableText", requiredBackendTrimmedFieldError(values.deliverableText, TEXT_MAX_LENGTH)],
     ]),
-  toInput: (values) => ({ brief_text: trimBackendWhitespace(values.briefText), deliverable_text: trimBackendWhitespace(values.deliverableText) }),
+  normalizeValues: normalizeCheckValues,
+  toInput: (values) => {
+    const { briefText, deliverableText } = normalizeCheckValues(values);
+    return { brief_text: briefText, deliverable_text: deliverableText };
+  },
   extractResult: extractCheckResult,
   resultFieldErrors: (result) => result.insufficientBrief
     ? { briefText: { code: "product", key: "validation.insufficient_brief" } } : {},

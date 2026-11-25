@@ -511,11 +511,12 @@ describe("Acceptance Builder page", () => {
       render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" onEvent={onEvent} />);
     } else {
       render(<ProductRunPage definition={checkDefinition} client={made.client} onEvent={onEvent} />);
-      fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "hello" } });
+      fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: " hello" } });
       fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "Delivered a site." } });
       fireEvent.click(screen.getByRole("button", { name: "Check deliverable" }));
     }
-    const hint = await screen.findByText(ACCEPTANCE_BUILDER_MESSAGES.en.validation.insufficient_brief);
+    const hintText = ACCEPTANCE_BUILDER_MESSAGES.en.validation.insufficient_brief;
+    const hint = await screen.findByText(hintText);
     const brief = document.getElementById("acceptance-builder-brief-text")!;
     expect(brief.getAttribute("aria-describedby")?.split(" ")).toContain(hint.id);
     await waitFor(() => expect(document.activeElement).toBe(brief));
@@ -523,12 +524,36 @@ describe("Acceptance Builder page", () => {
     expect(resultText()).not.toContain("Verdict:");
     expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "scenario_completed" }));
     if (!attached) {
+      const form = screen.getByRole("form");
+      const startCalls = () => made.calls.filter((call) => call.key === r.START);
+      for (const value of ["hello ", "\nhello", "hello\u0085"]) {
+        fireEvent.change(brief, { target: { value } });
+        expect((brief as HTMLTextAreaElement).value).toBe(value);
+        expect(brief.getAttribute("aria-describedby")?.split(" ")).toContain(screen.getByText(hintText).id);
+        fireEvent.submit(form);
+        expect(startCalls()).toHaveLength(1);
+      }
+      fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: " Updated delivery.\n" } });
+      fireEvent.submit(form);
+      expect(screen.getByText(hintText)).toBeTruthy();
+      expect(startCalls()).toHaveLength(1);
+
       fireEvent.change(brief, { target: { value: "Deliver a website." } });
+      expect(screen.queryByText(hintText)).toBeNull();
+      fireEvent.change(brief, { target: { value: "hello" } });
+      expect(screen.getByText(hintText)).toBeTruthy();
+      fireEvent.submit(form);
+      expect(startCalls()).toHaveLength(1);
+      fireEvent.change(brief, { target: { value: " Deliver a website.\n" } });
       fireEvent.click(screen.getByRole("button", { name: "Check deliverable" }));
       await screen.findByRole("button", { name: "Copy" });
       expect(resultText()).toContain("Verdict: partially meets expectations.");
-      const starts = made.calls.filter((call) => call.key === r.START);
-      expect(starts).toHaveLength(2);
+      const starts = startCalls();
+      const inputs = starts.map((call) => (JSON.parse(call.init.body as string) as { input: unknown }).input);
+      expect(inputs).toEqual([
+        { brief_text: "hello", deliverable_text: "Delivered a site." },
+        { brief_text: "Deliver a website.", deliverable_text: "Updated delivery." },
+      ]);
       expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
     }
   });

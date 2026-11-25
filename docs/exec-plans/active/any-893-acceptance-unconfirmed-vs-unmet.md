@@ -23,6 +23,8 @@ A check requires at least one identifiable client condition. Drafting criteria r
 4. Exercise new runs, corrections and restored sessions. Record live and deterministic evidence.
 5. After review, preserve every ordinary A11 verdict when A01 omits its lists. Strengthen the
    multilingual controls, restrict suite selection, then repeat the live series on a clean commit.
+6. Keep a rejected brief linked to its field hint until the submitted text changes. Exercise
+   whitespace edits, delivery-only edits, reverting to the rejected brief and a corrected start.
 
 ## Scope
 
@@ -154,3 +156,11 @@ once each, completes the session and publishes the result. Both a new web run an
 session focus the brief field, show the hint and suppress the verdict, Copy and result-view event.
 The HELLO and JUNK evaluation criteria in all three languages now score the explicit verdict
 and its explanation independently of the delta statuses.
+
+### Third review regression, 2026-11-25
+
+Check deliverable compares rejected fields using the same backend whitespace rules it uses
+to prepare a start request. The page test keeps the user's edits visible and counts one
+start after changes to outer whitespace, changes to the delivery alone and a return to the
+rejected text. A corrected brief produces a second start with the corrected payload and a
+fresh idempotency key.
