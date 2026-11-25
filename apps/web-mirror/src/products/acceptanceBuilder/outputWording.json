@@ -3,12 +3,13 @@
     "verdicts": {
       "meets_expectations": "meets expectations",
       "partially_meets": "partially meets expectations",
-      "does_not_meet": "does not meet expectations"
+      "does_not_meet": "does not meet expectations",
+      "insufficient_brief": "cannot be checked without requirements"
     },
     "statuses": {
-      "match": "match",
-      "partial": "partial",
-      "mismatch": "mismatch"
+      "match": "confirmed",
+      "partial": "not fully confirmed",
+      "mismatch": "not met"
     },
     "criteria": {
       "scope_coverage": "Scope coverage",
@@ -47,11 +48,12 @@
     "verdicts": {
       "meets_expectations": "соответствует ожиданиям",
       "partially_meets": "частично соответствует ожиданиям",
-      "does_not_meet": "не соответствует ожиданиям"
+      "does_not_meet": "не соответствует ожиданиям",
+      "insufficient_brief": "проверить нельзя: в брифе нет требований"
     },
     "statuses": {
-      "match": "выполнено",
-      "partial": "частично выполнено",
+      "match": "подтверждено",
+      "partial": "подтверждено не полностью",
       "mismatch": "не выполнено"
     },
     "criteria": {
@@ -91,11 +93,12 @@
     "verdicts": {
       "meets_expectations": "cumple las expectativas",
       "partially_meets": "cumple parcialmente las expectativas",
-      "does_not_meet": "no cumple las expectativas"
+      "does_not_meet": "no cumple las expectativas",
+      "insufficient_brief": "no se puede comprobar sin requisitos"
     },
     "statuses": {
-      "match": "cumplido",
-      "partial": "parcialmente cumplido",
+      "match": "confirmado",
+      "partial": "no confirmado del todo",
       "mismatch": "no cumplido"
     },
     "criteria": {
@@ -135,11 +138,12 @@
     "verdicts": {
       "meets_expectations": "erfüllt die Erwartungen",
       "partially_meets": "erfüllt die Erwartungen teilweise",
-      "does_not_meet": "erfüllt die Erwartungen nicht"
+      "does_not_meet": "erfüllt die Erwartungen nicht",
+      "insufficient_brief": "ohne Anforderungen nicht prüfbar"
     },
     "statuses": {
-      "match": "erfüllt",
-      "partial": "teilweise erfüllt",
+      "match": "bestätigt",
+      "partial": "nicht vollständig bestätigt",
       "mismatch": "nicht erfüllt"
     },
     "criteria": {
@@ -179,11 +183,12 @@
     "verdicts": {
       "meets_expectations": "répond aux attentes",
       "partially_meets": "répond partiellement aux attentes",
-      "does_not_meet": "ne répond pas aux attentes"
+      "does_not_meet": "ne répond pas aux attentes",
+      "insufficient_brief": "vérification impossible sans exigences"
     },
     "statuses": {
-      "match": "satisfait",
-      "partial": "partiellement satisfait",
+      "match": "confirmé",
+      "partial": "pas entièrement confirmé",
       "mismatch": "non satisfait"
     },
     "criteria": {
@@ -223,11 +228,12 @@
     "verdicts": {
       "meets_expectations": "soddisfa le aspettative",
       "partially_meets": "soddisfa parzialmente le aspettative",
-      "does_not_meet": "non soddisfa le aspettative"
+      "does_not_meet": "non soddisfa le aspettative",
+      "insufficient_brief": "verifica impossibile senza requisiti"
     },
     "statuses": {
-      "match": "soddisfatto",
-      "partial": "parzialmente soddisfatto",
+      "match": "confermato",
+      "partial": "non del tutto confermato",
       "mismatch": "non soddisfatto"
     },
     "criteria": {
@@ -267,11 +273,12 @@
     "verdicts": {
       "meets_expectations": "cumpre as expectativas",
       "partially_meets": "cumpre parcialmente as expectativas",
-      "does_not_meet": "não cumpre as expectativas"
+      "does_not_meet": "não cumpre as expectativas",
+      "insufficient_brief": "não é possível verificar sem requisitos"
     },
     "statuses": {
-      "match": "cumprido",
-      "partial": "parcialmente cumprido",
+      "match": "confirmado",
+      "partial": "não totalmente confirmado",
       "mismatch": "não cumprido"
     },
     "criteria": {

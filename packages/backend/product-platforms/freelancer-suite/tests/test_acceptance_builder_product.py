@@ -485,3 +485,50 @@ def test_prompt_and_schema_manifests_point_at_existing_files() -> None:
         assert (PRODUCT_DIR / entry["file_path"]).is_file(), entry["schema_ref"]
     for entry in _load_yaml("action_configs.yaml")["action_configs"]:
         assert entry["prompt_ref"] in prompt_refs, entry["action_config_id"]
+
+
+@pytest.mark.parametrize(
+    ("verdict", "statuses", "valid"),
+    [
+        ("insufficient_brief", ["partial"] * 4, True),
+        ("insufficient_brief", ["partial"] * 3 + ["match"], True),
+        ("insufficient_brief", ["mismatch", "match", "partial", "mismatch"], True),
+        ("insufficient_brief", ["partial"] * 3 + ["unknown"], False),
+        ("partially_meets", ["partial", "partial", "match", "match"], True),
+        ("does_not_meet", ["partial", "partial", "match", "match"], False),
+        ("does_not_meet", ["mismatch", "partial", "match", "match"], True),
+        ("partially_meets", ["mismatch", "partial", "match", "match"], False),
+        ("meets_expectations", ["match"] * 4, True),
+    ],
+)
+def test_delivery_evidence_verdict(verdict: str, statuses: list[str], valid: bool) -> None:
+    comparison = _fixture_response("acceptance_builder.compare_v1")
+    comparison["verdict"] = verdict
+    for delta, status in zip(comparison["deltas"], statuses, strict=True):
+        delta["status"] = status
+    schema = _load_schema(OUTPUT_SCHEMA_REFS[CHECK])
+    validator = jsonschema.validators.validator_for(schema)(schema)
+    assert (
+        validator.is_valid(
+            {
+                "extracted": _fixture_response("acceptance_builder.extract_v1"),
+                "comparison": comparison,
+            }
+        )
+        is valid
+    )
+
+
+def test_clarity_and_comparison_rules_distinguish_silence_from_failure() -> None:
+    criteria = _literal(_steps(CHECK)["compare"]["input_mapping"]["criteria"])
+    clarity = next(item["description"] for item in criteria if item["id"] == "clarity")
+    assert "what was not" not in clarity
+    assert "does not have to list work that was not done" in clarity
+    rules = (PRODUCT_DIR / "prompts/compare.v1.md").read_text(encoding="utf-8")
+    assert "says too little to judge a criterion is a `mismatch`" not in rules
+    for phrase in (
+        "insufficient_brief",
+        "Silence or missing detail is never a `mismatch`",
+        "three weeks from the start",
+    ):
+        assert phrase in rules

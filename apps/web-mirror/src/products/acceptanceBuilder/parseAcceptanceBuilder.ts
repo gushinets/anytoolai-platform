@@ -11,7 +11,7 @@ export { composeCopyText } from "./presentation";
 // test/AcceptanceBuilderProduct.test.tsx against the schema files.
 
 export const LIST_FIELDS = ["acceptance_criteria", "assumptions", "deliverables"] as const;
-export const VERDICTS = ["meets_expectations", "partially_meets", "does_not_meet"] as const;
+export const VERDICTS = ["meets_expectations", "partially_meets", "does_not_meet", "insufficient_brief"] as const;
 export const DELTA_STATUSES = ["match", "partial", "mismatch"] as const;
 // Order is the schema's `prefixItems` order, which the copy text must follow.
 export const DELTA_CRITERIA = ["scope_coverage", "requirement_fit", "completeness", "clarity"] as const;
@@ -47,6 +47,7 @@ export type AcceptanceBuilderResult = {
   document: { sections: { title: string; content: string }[]; summary: string };
   // Present only for `check_v1`.
   comparison?: Comparison;
+  insufficientBrief?: true;
   issues?: Issue[];
   questions?: ClarifyingQuestion[];
 };
@@ -145,6 +146,9 @@ function toComparison(value: unknown): Comparison | null {
   }
   const deltas = toDeltas(value.deltas);
   if (!deltas) return null;
+  if (value.verdict === "insufficient_brief") {
+    return { verdict: value.verdict, deltas, rationale: value.rationale };
+  }
   const expected = deltas.some((delta) => delta.status === "mismatch")
     ? "does_not_meet"
     : deltas.some((delta) => delta.status === "partial") ? "partially_meets" : "meets_expectations";
@@ -184,6 +188,9 @@ function extract(output: Record<string, unknown>, requireComparison: boolean): A
   const comparison = toComparison(output.comparison);
   if (!comparison) return null;
   const data = { lists, missingFields: missing, comparison, analysisLanguage: language };
+  if (comparison.verdict === "insufficient_brief") {
+    return { ...data, insufficientBrief: true, document: { sections: [], summary: "" } };
+  }
   return { ...data, document: composeDocument(data) };
 }
 

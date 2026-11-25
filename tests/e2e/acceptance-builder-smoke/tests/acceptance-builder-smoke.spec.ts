@@ -51,7 +51,7 @@ const SESSION_ROUTE = /\/v1\/scenario-sessions\/([^/?]+)$/;
 const QUOTA_ROUTE = /\/v1\/products\/acceptance_builder\/quota/;
 
 const BRIEF = "Build a certificate that students receive by email after finishing any course, in our brand colors.";
-const DELIVERABLE = "We built the certificate template and the PDF generation for 12 courses; 5 legacy courses are not connected.";
+const DELIVERABLE = "We built the certificate template and the PDF generation for 12 courses.";
 const BRIEF_DECODER_BRIEF = "Need a website for my bakery by the holidays, modern but traditional.";
 
 const DRAFT_ACTIONS = ["acceptance_builder.extract_v1", "acceptance_builder.detect_issues_v1"];
@@ -84,6 +84,7 @@ const VERDICT_WORDS: Record<string, string> = {
   partially_meets: "partially meets expectations",
   does_not_meet: "does not meet expectations",
 };
+const STATUS_LABELS: Record<string, string> = { match: "confirmed", partial: "not fully confirmed", mismatch: "not met" };
 const DELTA_LABELS: Record<string, string> = {
   scope_coverage: "Scope coverage",
   requirement_fit: "Requirement fit",
@@ -100,7 +101,7 @@ const LISTS: [ListField, string][] = [
 function composeCopyText({ extracted, comparison, issues, questions }: Output): string {
   const blocks: string[] = [];
   if (comparison) {
-    const lines = comparison.deltas.map((d) => `${DELTA_LABELS[d.criterion_id]}: ${d.status}. ${d.evidence}`);
+    const lines = comparison.deltas.map((d) => `${DELTA_LABELS[d.criterion_id]}: ${STATUS_LABELS[d.status]}. ${d.evidence}`);
     blocks.push(`Verdict\n${[`Verdict: ${VERDICT_WORDS[comparison.verdict]}.`, ...lines, comparison.rationale].join("\n")}`);
   }
   for (const [field, title] of LISTS) {

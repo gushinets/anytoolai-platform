@@ -461,7 +461,7 @@ def test_run_rejects_all_unsafe_case_ids_before_any_collection(monkeypatch, tmp_
     out = tmp_path / "results"
     docker = Mock(side_effect=AssertionError("must reject before Docker access"))
     collect = Mock(side_effect=AssertionError("must reject before provider access"))
-    monkeypatch.setattr(evaluation, "SUITE", suite)
+    monkeypatch.setitem(evaluation.SUITE_PATHS, evaluation.DEFAULT_SUITE, suite)
     monkeypatch.setattr(evaluation, "_docker", docker)
     monkeypatch.setattr(evaluation, "collect", collect)
     monkeypatch.setattr(sys, "argv", cli_args("run", out))
@@ -489,18 +489,23 @@ def test_report_rejects_unsafe_manifest_keys(monkeypatch, tmp_path, key):
 
 def test_cli_run_and_review_report_round_trip_preserves_json_data(monkeypatch, tmp_path):
     case = deepcopy(record()["case"])
+    case["family"] = "verdict"
     case["input"]["brief_text"] = 'Русский текст: ../../outside, C:\\file, "цитата"'
     suite = tmp_path / "cases.json"
     suite.write_text(json.dumps({"cases": [case]}), encoding="utf-8")
     snapshot = {"source_sha256": {}}
     out = tmp_path / "results"
     run = {**record(), "case": case, "attempt": 1, "snapshot": snapshot, "evidence_error": None}
+    monkeypatch.setitem(evaluation.SUITE_PATHS, evaluation.VERDICT_SUITE, suite)
     collector = Mock(return_value=run)
-    monkeypatch.setattr(evaluation, "SUITE", suite)
     monkeypatch.setattr(evaluation, "_docker", Mock(return_value=json.dumps(snapshot)))
     monkeypatch.setattr(evaluation, "_git_state", lambda: {})
     monkeypatch.setattr(evaluation, "collect", collector)
-    monkeypatch.setattr(sys, "argv", cli_args("run", out))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        cli_args("run", out) + ["--suite", evaluation.VERDICT_SUITE, "--family", "verdict"],
+    )
 
     assert evaluation.main() == 0
     collector.assert_called_once()
@@ -557,6 +562,41 @@ def test_evaluator_uses_the_shared_language_tag_contract():
         assert evaluation.primary_language(tag) == tag.split("-")[0].lower()
     for tag in tags["rejected"]:
         assert evaluation.primary_language(tag) is None
+
+
+def test_verdict_suite_covers_the_ticket_in_three_languages():
+    suite = ROOT / "tests/fixtures/acceptance_verdict_eval/cases.json"
+    cases = json.loads(suite.read_text(encoding="utf-8"))["cases"]
+    families = {"W1", "HELLO", "JUNK", "NO-REVIEWS", "NO-FIGMA", "IRRELEVANT", "FULL"}
+    expected = {f"ANY893-{family}{suffix}" for family in families for suffix in ("", "-EN", "-ES")}
+    assert len(cases) == len(expected)
+    assert {case["id"] for case in cases} == expected
+    for case in cases:
+        assert case["scenario_id"] == "acceptance_builder.check_v1"
+        assert case["family"] == "verdict"
+        assert case["criteria"] and all(
+            case["input"][key] for key in ("brief_text", "deliverable_text")
+        )
+
+
+def test_unknown_suite_is_rejected_during_argument_parsing(monkeypatch, tmp_path, capsys):
+    out = tmp_path / "results"
+    monkeypatch.setattr(sys, "argv", cli_args("run", out) + ["--suite", "unknown.json"])
+    with pytest.raises(SystemExit):
+        evaluation.main()
+    assert "invalid choice" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_empty_suite_selection_stops_before_accessing_worker(monkeypatch, tmp_path, capsys):
+    args = cli_args("run", tmp_path) + ["--family", "verdict"]
+    monkeypatch.setattr(sys, "argv", args)
+    docker = Mock()
+    monkeypatch.setattr(evaluation, "_docker", docker)
+    with pytest.raises(SystemExit):
+        evaluation.main()
+    assert "unknown family" in capsys.readouterr().err
+    docker.assert_not_called()
 
 
 def test_draft_risk_suite_covers_all_four_briefs_in_each_language():

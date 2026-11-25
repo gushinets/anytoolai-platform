@@ -34,5 +34,8 @@
   "result": {
     "verdictScope": "Le verdict repose sur quatre critères de revue généraux, et non sur chacun des critères listés ci-dessous.",
     "recap": "Récapitulatif structuré"
+  },
+  "validation": {
+    "insufficient_brief": "Ajoutez les exigences du client : que faut-il livrer, pour quand et selon quels critères de réception ? Une salutation ou un texte aléatoire ne permet pas de vérifier le travail."
   }
 }

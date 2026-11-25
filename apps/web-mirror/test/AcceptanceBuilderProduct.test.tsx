@@ -22,6 +22,7 @@ import {
 import {
   errorResponse,
   guestIdentityResponse,
+  idempotencyKeyOf,
   makeClientCapturingRequests,
   makeClientWithDeferredRoute,
   makeClientWithDeferredCalls,
@@ -75,10 +76,12 @@ const draftOutput = (suffix: Suffix = "") => ({
   issues: fixture("detect_issues", suffix).issues,
   questions: suffix ? fixture("generate_questions", suffix).questions : [],
 });
-const checkOutput = (suffix: Suffix = "") => ({
+const checkOutput = (suffix: Suffix | ".insufficient_brief" = "") => ({
   extracted: fixture("extract", suffix),
   comparison: fixture("compare", suffix),
 });
+
+const emptyExtraction = { values: { analysis_language: "en" }, missing_fields: [...LIST_FIELDS], confidence: {} };
 
 afterEach(() => {
   cleanup();
@@ -267,6 +270,43 @@ describe("Acceptance Builder result parsing", () => {
     expect(extractCheckResult({ ...check, comparison: { ...comparison, verdict: "great" } })).toBeNull();
   });
 
+  it.each([
+    ["partial", "partial", "partial", "partial"],
+    ["partial", "partial", "partial", "match"],
+    ["mismatch", "match", "partial", "mismatch"],
+  ])("recognizes an insufficient brief with statuses %s/%s/%s/%s", (...statuses) => {
+    const output = checkOutput(".insufficient_brief");
+    const deltas = DELTA_CRITERIA.map((criterion_id, index) => ({
+      criterion_id, status: statuses[index], evidence: "No requirements."
+    }));
+    expect(extractCheckResult({ ...output, comparison: { ...output.comparison, deltas } })?.insufficientBrief).toBe(true);
+  });
+
+  it("requires four valid, ordered deltas even for an insufficient brief", () => {
+    const output = checkOutput(".insufficient_brief");
+    const deltas = output.comparison.deltas as Record<string, unknown>[];
+    for (const invalid of [
+      deltas.slice(1),
+      [...deltas].reverse(),
+      [{ ...deltas[0], status: "unknown" }, ...deltas.slice(1)],
+    ]) {
+      expect(extractCheckResult({ ...output, comparison: { ...output.comparison, deltas: invalid } })).toBeNull();
+    }
+  });
+
+  it.each([
+    ["meets_expectations", "match"],
+    ["partially_meets", "partial"],
+    ["does_not_meet", "mismatch"],
+  ])("preserves %s when the extraction omits all lists", (verdict, status) => {
+    const comparison = { ...fixture("compare", ""), verdict, deltas: DELTA_CRITERIA.map(
+      (criterion_id) => ({ criterion_id, status, evidence: "Delivery evidence." })
+    ) };
+    const result = extractCheckResult({ extracted: emptyExtraction, comparison });
+    expect(result?.comparison?.verdict).toBe(verdict);
+    expect(result?.insufficientBrief).toBeUndefined();
+  });
+
   it("counts a draft as viewed only when it lists criteria", () => {
     expect(hasCriteria(extractDraftResult(draftOutput())!)).toBe(true);
     expect(hasCriteria(extractDraftResult(draftOutput(".weak_input"))!)).toBe(false);
@@ -451,9 +491,100 @@ describe("Acceptance Builder page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
     const copied = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(copied.startsWith("Verdict\nVerdict: partially meets expectations.\nScope coverage: partial. ")).toBe(true);
-    expect(copied).toContain("\nRequirement fit: match. ");
+    expect(copied.startsWith("Verdict\nVerdict: partially meets expectations.\nScope coverage: not fully confirmed. ")).toBe(true);
+    expect(copied).toContain("\nRequirement fit: confirmed. ");
     expect(copied).toContain("\n\nAcceptance criteria\n- ");
+  });
+
+  it.each([false, true])("focuses the brief for an insufficient result, including attachment=%s", async (attached) => {
+    const r = routesFor(IDS.check);
+    const output = checkOutput(".insufficient_brief");
+    const made = makeClientCapturingRequests({
+      ...routes("check", output),
+      [r.RESULT]: [resultResponse(IDS.check, { output }), resultResponse(IDS.check, { output: checkOutput() })],
+      [r.START]: [startResponse(), startResponse()],
+      [r.SESSION]: Array.from({ length: 4 }, () => sessionResponse({ scenario_id: IDS.check.scenarioId })),
+      [r.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS.check)),
+    });
+    const onEvent = vi.fn();
+    if (attached) {
+      render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" onEvent={onEvent} />);
+    } else {
+      render(<ProductRunPage definition={checkDefinition} client={made.client} onEvent={onEvent} />);
+      fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: " hello" } });
+      fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "Delivered a site." } });
+      fireEvent.click(screen.getByRole("button", { name: "Check deliverable" }));
+    }
+    const hintText = ACCEPTANCE_BUILDER_MESSAGES.en.validation.insufficient_brief;
+    const hint = await screen.findByText(hintText);
+    const brief = document.getElementById("acceptance-builder-brief-text")!;
+    expect(brief.getAttribute("aria-describedby")?.split(" ")).toContain(hint.id);
+    await waitFor(() => expect(document.activeElement).toBe(brief));
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+    expect(resultText()).not.toContain("Verdict:");
+    expect(onEvent).not.toHaveBeenCalledWith(expect.objectContaining({ type: "scenario_completed" }));
+    if (!attached) {
+      const form = screen.getByRole("form");
+      const startCalls = () => made.calls.filter((call) => call.key === r.START);
+      for (const value of ["hello ", "\nhello", "hello\u0085"]) {
+        fireEvent.change(brief, { target: { value } });
+        expect((brief as HTMLTextAreaElement).value).toBe(value);
+        expect(brief.getAttribute("aria-describedby")?.split(" ")).toContain(screen.getByText(hintText).id);
+        fireEvent.submit(form);
+        expect(startCalls()).toHaveLength(1);
+      }
+      fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: " Updated delivery.\n" } });
+      fireEvent.submit(form);
+      expect(screen.getByText(hintText)).toBeTruthy();
+      expect(startCalls()).toHaveLength(1);
+
+      fireEvent.change(brief, { target: { value: "Deliver a website." } });
+      expect(screen.queryByText(hintText)).toBeNull();
+      fireEvent.change(brief, { target: { value: "hello" } });
+      expect(screen.getByText(hintText)).toBeTruthy();
+      fireEvent.submit(form);
+      expect(startCalls()).toHaveLength(1);
+      fireEvent.change(brief, { target: { value: " Deliver a website.\n" } });
+      fireEvent.click(screen.getByRole("button", { name: "Check deliverable" }));
+      await screen.findByRole("button", { name: "Copy" });
+      expect(resultText()).toContain("Verdict: partially meets expectations.");
+      const starts = startCalls();
+      const inputs = starts.map((call) => (JSON.parse(call.init.body as string) as { input: unknown }).input);
+      expect(inputs).toEqual([
+        { brief_text: "hello", deliverable_text: "Delivered a site." },
+        { brief_text: "Deliver a website.", deliverable_text: "Updated delivery." },
+      ]);
+      expect(idempotencyKeyOf(starts[0]!)).not.toBe(idempotencyKeyOf(starts[1]!));
+    }
+  });
+
+  it("renders the negative verdict with the explicitly missing item", async () => {
+    const output = checkOutput(".weak_input");
+    const deltas = output.comparison.deltas as { status: string; evidence: string }[];
+    deltas[0] = { ...deltas[0]!, status: "mismatch", evidence: "Required Figma sources were explicitly withheld." };
+    await run("check", output);
+    await screen.findByRole("button", { name: "Copy" });
+    expect(resultText()).toContain("Verdict: does not meet expectations.");
+    expect(resultText()).toContain("Scope coverage: not met. Required Figma sources were explicitly withheld.");
+  });
+
+  it("shows and counts an approval violation even if extraction finds no lists", async () => {
+    const evidence = "The freelancer started without requesting the required approval.";
+    const output = {
+      extracted: emptyExtraction,
+      comparison: {
+        verdict: "does_not_meet", rationale: evidence, confidence: 1,
+        deltas: DELTA_CRITERIA.map((criterion_id) => ({
+          criterion_id, status: criterion_id === "requirement_fit" ? "mismatch" : "partial", evidence,
+        })),
+      },
+    };
+    const events: ProductRunEvent[] = [];
+    await run("check", output, events);
+    await screen.findByRole("button", { name: "Copy" });
+    expect(resultText()).toContain("Verdict: does not meet expectations.");
+    expect(resultText()).toContain(evidence);
+    await waitFor(() => expect(events.find((e) => e.type === "scenario_completed")).toMatchObject({ resultViewed: true }));
   });
 
   it("weak input: renders the documented gaps instead of an error, and does not count a draft as viewed", async () => {
