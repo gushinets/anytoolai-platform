@@ -991,8 +991,10 @@ def test_reply_draft_prompt_states_every_intent_item_and_client_constraint() -> 
     )
 
     for fragment in (
-        "Directly address each specific point raised in `situation` (every question, request "
-        "and constraint the client states",
+        "Answer each current question and request and respect each current constraint "
+        "in `situation`",
+        "what someone asked for or agreed in the past does not require a recap "
+        "to answer the concern",
         "State in `text` every fact, decision and action `intent` gives for the client",
         "each with its exact value, even when `situation` did not ask about it",
         "Such a fact, decision or promised action is content for the client, not a direction to "

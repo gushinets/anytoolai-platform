@@ -8,6 +8,29 @@ Rules:
 
 - Write a ready-to-send update without placeholders such as `[Client Name]`, meta-commentary
   about the update, or chain-of-thought.
+- Build the update from the project status, the stated timeline and the actions still needed.
+  Build each schedule statement around the deliverable, its date and the person committed to
+  the work, when stated. Keep an explicit first-person commitment as a first-person action
+  with its date, even if a blocker was resolved first. When the notes give a cause of a schedule
+  change, connect the cause to that change explicitly and name the stated actor in that cause.
+  Keep a later arrival separate, with only its own named roles. Connect the arrival to a new
+  date only when the notes explicitly make that link, and retain their certainty.
+  For each next action, identify its current status and who is responsible before choosing a tone.
+  Use the current assignment when it supersedes an earlier one.
+  - Report an already arranged handoff as a plan. If the notes say the client will send an item
+    on a stated date, keep that as a statement of their plan. Include a reminder only if the
+    notes call for one. Omit requests for completed or cancelled actions.
+  - Ask the client once for each action still needed from them that they have not already
+    arranged. A required item still missing because the client has not sent it is a pending
+    client action. Include a direct
+    request naming the item in a sentence separate from the status and deadline. A sentence about
+    what the client owes or did not send does not satisfy the request. If the recipient is
+    unspecified, address the client and name only the item: "Please send the site plans",
+    "Пожалуйста, пришлите планы участка", "Por favor, envía los planos". Use no recipient
+    pronoun such as "to me", "мне" or "envíame" and no response deadline unless supplied.
+  - Ownership of an item alone does not assign the handoff. If someone else is responsible,
+    state their next step. If no party is assigned, report the dependency without assigning
+    the action to the client. Naming the person waiting for an item does not identify its sender.
 - Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
   sign off with a name, a role or contact details unless the input explicitly gives them as the
   freelancer's own (a name or signature in the client's message is the client's, not yours): the
@@ -80,15 +103,6 @@ Rules:
   rule below still applies; the freelancer's directions to you are followed, never reported.
   `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
   next step before detail), and the author-direction rule above wins.
-- Determine the current status and responsible party for each next step before applying tone.
-  Use the current assignment when it supersedes an earlier one. Ask the client once
-  for each pending action the notes assign them. A required item the client still has not
-  sent is a pending client handoff even when the notes describe it only as a blocker.
-  Ownership of an item alone does not assign the handoff. If someone else
-  is responsible, state their next step. If no party is assigned, report the dependency without
-  assigning the action to the client. Report an already arranged handoff as a plan and include
-  a reminder only if the notes call for one. Omit requests for completed or cancelled actions.
-  Keep each request within the stated item, deadline and conditions.
 - The completeness rule also covers client-facing commercial terms supplied in `situation`:
   contract or quoted amounts with their currencies, stated agreement/payment status and conditions.
   Keep these terms as context even when the update is not a payment request; this does not mean
@@ -144,10 +158,7 @@ Rules:
   `call_to_action` for a concrete next action, including its supplied link if any, when useful.
   Each request appears once across the output. The `constraints.max_length` limit applies to
   `text`. A separate `call_to_action` has its own 200-character limit.
-- Preserve the timing,
-  reason and stated actors of the original delay even after the blocker has cleared. State
-  the revised date and the resolution independently unless the notes link them. An arrival
-  with no named sender or recipient stays that way, even when the notes say who failed to
-  send the materials earlier. If the notes explicitly tie a new date to the resolution,
-  preserve that link and its stated certainty.
+- Before returning, check that each action that needs a new request has one direct request.
+  Check that an arranged action remains a plan unless the notes ask for a reminder. Check that
+  every named participant and causal link stays with its own event.
 - Do not include chain-of-thought or explanations outside the schema fields.

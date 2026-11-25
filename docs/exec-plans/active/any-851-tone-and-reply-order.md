@@ -6,8 +6,8 @@
 - Owner: agent
 - Linear: ANY-851
 - Created: 2026-11-23
-- Last updated: 2026-11-24
-- Review date: 2026-11-24
+- Last updated: 2026-11-25
+- Review date: 2026-11-25
 - Next action: review the latest regression evidence, then verify the public release.
 - Blocker: none
 
@@ -346,5 +346,57 @@ include the full matrix. The default model remains Luna.
 
 [Final live evidence](any-851-tone-and-reply-order-final-live.evidence.json)
 
-Live generation is available. The semantic acceptance of the current prompts remains
-open due to the recorded failures.
+Live generation was available. The recorded failures left semantic acceptance open on
+that profile.
+
+## Build the reply from required actions and ordered content
+
+1. In Update, decide which actions need a new request before drafting. Give each of those
+   actions a direct request. Keep arranged handoffs as plans and unassigned dependencies
+   as status. Preserve each handoff's participants and keep the delay and any later arrival
+   distinct.
+2. In Reply Draft, make the opening, decision and context distinct. Answer the client's
+   concern and keep disputed history after the decision when it is needed. Keep the
+   client-side requester distinct from any shared agreement.
+3. Recheck the complete multilingual matrix and add controls that require relaying a
+   shared and a third-party agreement, alongside the existing S2/S7 handoff cases.
+4. Compare Terra and Sol on the cases where Luna changes roles or order. Verify all three
+   modes if Client Update Writer moves to a different live model policy.
+
+### Round 8 verification
+
+On an intermediate prompt revision, Terra passed 26 of 27 identical comparison inputs and
+Sol passed 27 of 27. Luna still added requests for scheduled handoffs or assigned materials
+to the client when the notes named only the person waiting. The final Update prompt checks
+whether each action needs a new request. Client Update Writer uses the existing Sol policy
+in its live deployment profile.
+
+The final Sol profile met the assessed acceptance criteria in 66 browser runs, 22 per
+language in RU, EN and ES. The provider ledger confirmed Sol for every session. The
+profile fingerprints matched at the API and worker, and the result, displayed text and
+clipboard agreed for every run.
+
+- **Update.** The nine original S2/S7 cases kept the client as sender and asked once for
+  the photos without adding a recipient. The remaining Update cases verified a cleared
+  blocker, a revised date caused by delivery, designer-only and mixed handoffs, unassigned
+  materials, and first-person singular and plural. All six S1 neutral/warm pairs kept the
+  named actors and Friday commitment, including the mixed-actor controls.
+- **Reply Draft.** All nine S4 replies put the offer of two first-round variants directly
+  after the acknowledgement. Six controls relayed both claims after the offer, retaining
+  the client as requester and the original parties to shared or third-party agreements.
+  Warm differs from firm in all three languages and from neutral in Spanish. Neutral and
+  firm differed only in a short phrase in EN and one word in ES. The three R05 controls kept
+  the invoice admission, identifier and promise to send the corrected invoice.
+- **Prepaid Request.** Three controls retained the agreed amount, currency, due date and
+  start-after-payment condition, with the requested payment and notice of sending.
+
+The focused suite passed all 2,042 Python tests, including both API layouts and the
+deployment policy check. Config, architecture and docs validation passed. Browser
+verification used the local deployment profile.
+
+The broader quick-check exposed three local runner test failures. Two mocks intercept
+the production Compose environment probe before reaching the stack-status check. The
+activation marker test requires passwordless `sudo` to switch to `nobody`. All three
+failures reproduced in isolation.
+
+[Round 8 live evidence](any-851-tone-and-reply-order-review-8.evidence.json)

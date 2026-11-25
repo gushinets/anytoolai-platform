@@ -27,20 +27,28 @@ def test_update_prompt_keeps_client_actions_across_tones() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "`warm` never drops a client action that `firm` states" in text
     assert "Use the current assignment when it supersedes an earlier one" in text
-    assert "Ask the client once for each pending action the notes assign them" in text
-    assert "the client still has not sent is a pending client handoff" in text
+    assert "Ask the client once for each action still needed from them" in text
+    assert "that they have not already arranged" in text
+    assert "still missing because the client has not sent it is a pending client action" in text
+    assert "request naming the item in a sentence separate from the status and deadline" in text
+    assert "what the client owes or did not send does not satisfy the request" in text
+    assert "address the client and name only the item" in text
+    assert '"to me", "мне" or "envíame" and no response deadline unless supplied' in text
     assert "Ownership of an item alone does not assign the handoff" in text
     assert "If someone else is responsible, state their next step" in text
     assert "report the dependency without assigning the action to the client" in text
+    assert "Naming the person waiting for an item does not identify its sender" in text
     assert "Report an already arranged handoff as a plan" in text
     assert "Omit requests for completed or cancelled actions" in text
 
 
 def test_update_preserves_date_and_resolution_relationships() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
-    assert "the revised date and the resolution independently unless the notes link them" in text
-    assert "An arrival with no named sender or recipient stays that way" in text
-    assert "preserve that link and its stated certainty" in text
+    assert "Keep an explicit first-person commitment as a first-person action with its date" in text
+    assert "connect the cause to that change explicitly" in text
+    assert "name the stated actor in that cause" in text
+    assert "Keep a later arrival separate, with only its own named roles" in text
+    assert "explicitly make that link, and retain their certainty" in text
 
 
 def test_warm_update_uses_a_friendly_milestone_when_supported() -> None:
@@ -64,8 +72,10 @@ def test_update_preserves_the_actor_of_commitments_in_every_tone() -> None:
 def test_reply_prompt_orders_acknowledgement_before_explanation() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
     assert "Build the reply in this order" in text
-    assert "Never place the explanation between the acknowledgement and the decision" in text
-    assert "give the brief or scope explanation in a later sentence" in text.lower()
+    assert "very next sentence with the author's actual decision, answer or next step" in text
+    assert "Use that sentence for the decision and its scope and certainty alone" in text
+    assert "Use a new sentence for any context after the decision" in text
+    assert "Disputed history follows the decision" in text
 
 
 def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> None:
@@ -74,7 +84,11 @@ def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> Non
     assert "Put any evaluative adjective inside the attributed perception" in text
     assert "claims about prior requests, actions or agreements out of the acknowledgement" in text
     assert "the original participants, status and scope within the reported claim" in text
-    assert "referring to an agreement with a third party, keep those parties" in text
+    assert "name the client or the client's side for an action they took" in text
+    assert "use wording that includes the freelancer only if they were a participant" in text
+    assert "Keep third parties in their stated roles" in text
+    assert "name known participants when a pronoun would leave their role unclear" in text
+    assert "short attributed direct quote with quotation marks and the original wording" in text
     assert (
         "A request and a belief that the result differs from the agreement are separate claims"
         in text

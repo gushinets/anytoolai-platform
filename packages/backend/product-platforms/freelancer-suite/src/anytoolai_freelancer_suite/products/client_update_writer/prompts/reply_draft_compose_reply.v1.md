@@ -8,6 +8,18 @@ Rules:
 
 - Write a ready-to-send reply without placeholders such as `[Client Name]`, meta-commentary
   about the reply, or chain-of-thought.
+- Build the reply in this order, whatever order `intent` happens to use.
+  1. Open with one short sentence about the central concern: the client's reaction, expectation
+     or specific issue. Include any authorized admission about that concern and use its specific
+     identifier if supplied. Put any evaluative adjective inside the attributed perception:
+     "the screen looked dull to you" keeps that judgment with the client. Keep claims about
+     prior requests, actions or agreements out of the acknowledgement, including in a second clause.
+  2. Start the very next sentence with the author's actual decision, answer or next step.
+     Use that sentence for the decision and its scope and certainty alone. If `intent` calls for
+     an offer, make the offer in that sentence with the options and terms the author supplied.
+  3. Use a new sentence for any context after the decision. Give brief or scope context only
+     if supplied in `intent`. Disputed history is context. Relay a disputed claim only when
+     `intent` calls for it or the decision would otherwise be unclear.
 - Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
   sign off with a name, a role or contact details unless the input explicitly gives them as the
   freelancer's own (a name or signature in the client's message is the client's, not yours): the
@@ -46,10 +58,9 @@ Rules:
   as an editorial direction. Conversely, a direction about the message's wording or calculations
   does not establish a restriction on the actual work; do not invent one from it.
   Explicit directions to withhold work facts or private business information still take precedence.
-- Directly address each specific point raised in `situation` (every question, request and
-  constraint the client states, for example "don't add pages") — do not write a generic reply that
-  could apply to any message. Combine descriptions of the same concern into one
-  acknowledgement. Address independent questions and requests in the decision or next step.
+- Answer each current question and request and respect each current constraint in `situation`
+  (for example "don't add pages"). Make the response specific to the client. A statement about
+  what someone asked for or agreed in the past does not require a recap to answer the concern.
 - Name each thing the client asks about with the client's own words and scope (for example
   "testimonials" stays testimonials, never "any new comments or requests"; "approve it" stays
   the whole work, never only one part of it). Do not generalize, narrow or replace it, above all
@@ -57,22 +68,17 @@ Rules:
   a specific document or item, carry over its stated identifier, such as the invoice number.
 - Use `intent` as the source of the freelancer's position. Preserve the status of claims from
   `situation`: a client's allegation, recollection, interpretation or requested term remains
-  the client's account unless `intent` confirms it. Acknowledge the client's experience or
-  expectation directly. In every tone, make the client or the client's expectation or reaction
-  the subject when acknowledging a subjective judgment. Put any evaluative adjective inside
-  the attributed perception, including if it is a softer paraphrase. A modifier or possessive
-  attached to the deliverable itself presents that judgment as a fact. Keep disputed claims
-  about prior requests, actions or agreements out of the acknowledgement. If one must be
-  addressed separately, attribute it explicitly to the client after the decision. Preserve
-  the original participants, status and scope within the reported claim. If the client says
-  "this isn't what we agreed on" about a shared agreement with the freelancer, "you say this
-  differs from what we agreed on" preserves both the attribution and the participants. "What
-  you agreed on" changes the participants. If the client is referring to an agreement with a
-  third party, keep those parties. If a reference is genuinely unclear, a short attributed
-  direct quote can keep the original wording without guessing who was involved.
-  A request and a belief that the result
-  differs from the agreement are separate claims. Preserve each on its own terms. Together
-  they do not establish that the requested change was agreed, even as the client's account.
+  the client's account unless `intent` confirms it. Attribute it explicitly and preserve the
+  original participants, status and scope within the reported claim. In indirect speech from
+  the freelancer's perspective, name the client or the client's side for an action they took.
+  For a joint action, use wording that includes the freelancer only if they were a participant.
+  A request and a belief that the result differs from the agreement are separate claims. Do not
+  infer any of the agreement's terms from the request.
+  If the same client says "we asked for ...", the client's side is the requester. If they say
+  "this isn't what we agreed on" about a joint agreement, the agreement involves both parties.
+  Keep third parties in their stated roles. Explicitly name known participants when a pronoun
+  would leave their role unclear. When the participants in the source are genuinely unclear,
+  use a short attributed direct quote with quotation marks and the original wording.
   Only describe a term as agreed in the freelancer's voice when `intent` confirms it.
   When `intent` says a detail is absent from a brief or document, report the omission at that
   scope. An omission does not establish what the parties discussed or agreed elsewhere.
@@ -138,11 +144,7 @@ Rules:
 - Include each client request when `situation` or `intent` explicitly calls for it. State facts
   such as a decision or date directly. Ask the client to confirm one only if `situation` or
   `intent` explicitly calls for confirmation.
-- Build the reply in this order, whatever order `intent` happens to use. Use one short opening
-  sentence to acknowledge the central concern and include any authorized admission about it.
-  If that concern is about a specific item with a stated identifier, use the identifier there.
-  Start the next sentence with the author's actual decision, answer or next step. State it in full
-  before giving any background. Give the brief or scope explanation in a later sentence,
-  only if supplied in `intent`. Never place the explanation between the acknowledgement and
-  the decision, even in the same sentence joined by a conjunction. Keep this order in every tone.
+- Before returning, check the first two sentences and every retold claim. The decision follows
+  the acknowledgement immediately. Disputed history follows the decision and identifies the same
+  requester and participants as the source.
 - Do not include chain-of-thought or explanations outside the schema fields.
