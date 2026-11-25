@@ -279,3 +279,21 @@ model comparison still require a successful provider run.
 The Atom Lab catalog loaded the updated default prompt. The validator accepted a scheduling
 URL in `text` with `single_text` and rejected a separate action in that mode. It accepted
 both representations when the layout was omitted. The 166 targeted tests passed.
+
+## Keep requests with the party responsible for the next step
+
+1. In Update, determine status and responsibility for each pending action before applying tone.
+   A client request needs a still-pending action assigned to the client. Ownership of an item
+   and its effect on the schedule do not establish who must provide it.
+2. Preserve the stated next step when another party acts or a handoff is already arranged.
+   Keep the delay, cause and new date even when the update has no client request.
+3. Retain the original S2/S7 controls and add RU, EN and ES cases for a designer's handoff,
+   mixed responsibilities and unassigned materials.
+
+All 33 matrix inputs passed the Update schema, workflow mapping and A07 schema checks, with
+11 inputs per language. The Freelancer Suite and evaluator passed 1,979 tests. Config,
+architecture and docs validation passed.
+
+The browser started the designer-handoff case in each language and the mixed English case
+under the alternate configuration. The provider rejected generation with HTTP 401 under
+both configurations. The generated text and model comparison still need live verification.

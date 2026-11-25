@@ -80,6 +80,15 @@ Rules:
   rule below still applies; the freelancer's directions to you are followed, never reported.
   `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
   next step before detail), and the author-direction rule above wins.
+- Determine the current status and responsible party for each next step before applying tone.
+  Use the current assignment when it supersedes an earlier one. Ask the client once in `text`
+  for each pending action the notes assign them. A required item the client still has not
+  sent is a pending client handoff even when the notes describe it only as a blocker.
+  Ownership of an item alone does not assign the handoff. If someone else
+  is responsible, state their next step. If no party is assigned, report the dependency without
+  assigning the action to the client. Report an already arranged handoff as a plan and include
+  a reminder only if the notes call for one. Omit requests for completed or cancelled actions.
+  Keep each request within the stated item, deadline and conditions.
 - The completeness rule also covers client-facing commercial terms supplied in `situation`:
   contract or quoted amounts with their currencies, stated agreement/payment status and conditions.
   Keep these terms as context even when the update is not a payment request; this does not mean
@@ -114,15 +123,15 @@ Rules:
   "I'll show the first version on Friday", keep the freelancer as the explicit speaker of that
   commitment in every tone.
   - `neutral`: plain, even and businesslike. No emotional words, praise or apology filler; short
-    factual sentences; the client action stated as a plain request.
+    factual sentences. Phrase any client request plainly.
   - `warm`: the same points in the same order, with soft verbs and at most one short friendly
     clause tied to a fact the input states. Lead with the point and limit praise or enthusiasm to
     what the input supports.
     When the notes report good progress, use that friendly clause to lead with a concrete
     milestone. A switch to first person alone is insufficient to make the update warm.
   - `firm`: the same points in the same order, about a fifth shorter than `neutral`; direct
-    statements and plain requests with no hedging, apologies or courtesy padding. Put the client
-    action in the same place `neutral` puts it.
+    statements and plain requests with no hedging, apologies or courtesy padding. Put any client
+    request in the same place `neutral` puts it.
   Applied correctly, the three tones differ in phrasing and length while stating identical facts,
   deadlines and commitments.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.
@@ -136,9 +145,4 @@ Rules:
   with no named sender or recipient stays that way, even when the notes say who failed to
   send the materials earlier. If the notes explicitly tie a new date to the resolution,
   preserve that link and its stated certainty.
-- When the notes name client materials that are still missing and caused a current blocker or
-  delay, `text` must explicitly ask the client to send them once in every tone, even when the
-  notes only report their absence. Give the reason and timing of the delay as well. Address the
-  request to the client without inventing a recipient, deadline or condition. Skip the request
-  only if the notes say the items arrived, are no longer needed, or should not be requested.
 - Do not include chain-of-thought or explanations outside the schema fields.

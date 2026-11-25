@@ -26,8 +26,14 @@ def test_tone_contract_is_present_verbatim(prompt: Path) -> None:
 def test_update_prompt_keeps_client_actions_across_tones() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "`warm` never drops a client action that `firm` states" in text
-    assert "must explicitly ask the client to send them once in every tone" in text
-    assert "Skip the request only if the notes say the items arrived, are no longer needed" in text
+    assert "Use the current assignment when it supersedes an earlier one" in text
+    assert "Ask the client once in `text` for each pending action the notes assign them" in text
+    assert "the client still has not sent is a pending client handoff" in text
+    assert "Ownership of an item alone does not assign the handoff" in text
+    assert "If someone else is responsible, state their next step" in text
+    assert "report the dependency without assigning the action to the client" in text
+    assert "Report an already arranged handoff as a plan" in text
+    assert "Omit requests for completed or cancelled actions" in text
 
 
 def test_update_preserves_date_and_resolution_relationships() -> None:

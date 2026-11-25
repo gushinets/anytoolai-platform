@@ -269,6 +269,144 @@
         "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
         "Makes no new request for the photos."
       ]
+    },
+    {
+      "id": "S2-designer-neutral-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-warm-ru",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-firm-ru",
+      "language": "ru",
+      "tone": "firm",
+      "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-neutral-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-warm-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-firm-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-neutral-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-warm-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-firm-es",
+      "language": "es",
+      "tone": "firm",
+      "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-mixed-ru",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Фотографии тренеров и файл с ценами ещё не получены. Из-за этого срок первой версии сдвигается на три дня, на вторник. Клиент раньше отвечал за отправку фотографий, но теперь их отправит дизайнер в понедельник. Клиенту всё ещё нужно прислать файл с ценами. Биографии тренеров также нужны, их ещё нет и отправитель не назначен. Уже договорились, что клиент пришлёт логотип в понедельник.",
+      "criteria": [
+        "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+        "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+        "Asks the client to provide the pricing sheet once, with no added deadline.",
+        "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+        "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder."
+      ]
+    },
+    {
+      "id": "S2-mixed-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "The trainer photos and the pricing sheet are still missing. Because of that, the first version is delayed by three days, to Tuesday. The client was previously responsible for sending the photos, but the designer took over and will send them on Monday. The client still needs to send the pricing sheet. The trainer bios are also needed and still missing. No sender has been assigned for them. The client is already scheduled to send the logo on Monday.",
+      "criteria": [
+        "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+        "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+        "Asks the client to provide the pricing sheet once, with no added deadline.",
+        "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+        "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder."
+      ]
+    },
+    {
+      "id": "S2-mixed-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Todavía faltan las fotos de los entrenadores y la lista de precios. Por eso la primera versión se retrasa tres días y pasa al martes. Antes el cliente era responsable de enviar las fotos, pero el diseñador asumió esa tarea y las enviará el lunes. El cliente aún tiene que enviar la lista de precios. También hacen falta las biografías de los entrenadores. No se ha asignado a nadie para enviarlas. Ya está acordado que el cliente enviará el logotipo el lunes.",
+      "criteria": [
+        "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+        "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+        "Asks the client to provide the pricing sheet once, with no added deadline.",
+        "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+        "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder."
+      ]
     }
   ],
   "models": [
