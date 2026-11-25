@@ -11,6 +11,7 @@ from anytoolai_platform_api.schemas import (
     AtomLabVersionedSchemaRefResponse,
 )
 from anytoolai_platform_core.config.registry import ConfigRegistry
+from anytoolai_platform_core.structured_output.schemas import publication_schema
 
 ATOM_LAB_METADATA_KEY = "atom_lab"
 EXPECTED_ATOM_IDS = tuple(atom_id.value for atom_id in AtomLabAtomId)
@@ -71,7 +72,7 @@ def build_atom_catalog(registry: ConfigRegistry) -> tuple[AtomLabAtomResponse, .
             prompt=prompt.content,
             prompt_ref=prompt.prompt_ref,
             input_schema=_mutable_json(input_schema.schema),
-            output_schema=_mutable_json(output_schema.schema),
+            output_schema=publication_schema(output_schema.schema),
             schema_refs=AtomLabSchemaRefsResponse(
                 input=AtomLabVersionedSchemaRefResponse(
                     schema_ref=input_schema.schema_ref,

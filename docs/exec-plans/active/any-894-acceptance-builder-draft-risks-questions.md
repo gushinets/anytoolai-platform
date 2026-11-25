@@ -322,3 +322,23 @@ All 175 focused tests passed, including the existing ANY-761 archive CLI tests.
 The original fourth and fifth review matrices each returned 36 PASS, 0 FAIL, and 0
 PENDING in the default report. The report replay used the saved evidence without
 modifying either archive or calling the model.
+
+### Eighth review
+
+Use the runtime publication schema for current acceptance reports and for the output
+schema displayed by the Atom Lab catalog and stored with newly admitted runs. Keep the
+declared registry schema in the execution-definition hash and retain the original
+content of historical snapshots. Replay archived reports under their selected read contract.
+Verify catalog, admission, provider validation and report behavior for both publication modes.
+
+The same bound review is rejected by the current report at the invisible question's
+JSON path and accepted by explicit ANY-761 replay. For A04 and A05, the catalog and
+new run history show matching schemas that accept authored text and reject a space or
+U+200B alone. An existing run with the original snapshot still opens and remains
+compatible with worker execution. Atom Lab's existing client comparison treats a
+historical displayed schema that differs from the catalog as a request for adaptation.
+
+The 176 evaluator and acceptance tests and 475 API, workflow, and Atom Lab tests passed.
+The default report accepted all 72 saved runs, 36 in each archive. Both archives retained
+their original checksums and the report replay made no provider calls. Configuration,
+architecture, and documentation checks passed.

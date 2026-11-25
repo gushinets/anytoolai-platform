@@ -169,6 +169,9 @@ persisted and linked through `jobs.result_artifact_id`. A workflow output schema
 subschema in addition to the root schema before storing the artifact. The Result API and
 handoffs revalidate persisted artifacts against the root schema, preserving the read contract
 for results saved before the stricter publication rule.
+The structured executor, the Atom Lab catalog and new run snapshots, and current acceptance
+reports use the same publication schema resolver. Archived evidence is evaluated under the
+historical contract selected for its replay.
 
 ## Worker-owned execution
 

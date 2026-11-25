@@ -10,6 +10,7 @@ from http import HTTPStatus
 import httpx
 import pytest
 import sqlalchemy as sa
+from anytoolai_platform_api.atom_lab.catalog import get_atom_catalog_entry
 from anytoolai_platform_api.dependencies import (
     get_atom_lab_run_settings,
     get_config_registry,
@@ -20,6 +21,7 @@ from anytoolai_platform_api.settings import Settings
 from anytoolai_platform_core.actions.models import ActionRunRecord, ActionRunStatus
 from anytoolai_platform_core.artifacts.models import ArtifactRecord, ArtifactStatus
 from anytoolai_platform_core.atom_lab.repository import AtomLabRunRepository
+from anytoolai_platform_core.atom_lab.snapshots import load_run_local_action_settings
 from anytoolai_platform_core.common.time import utc_now
 from anytoolai_platform_core.providers.models import ProviderCallRecord, ProviderCallStatus
 from anytoolai_platform_core.storage.db import (
@@ -32,8 +34,18 @@ from anytoolai_platform_core.storage.db import (
     scenario_sessions_table,
 )
 from anytoolai_platform_core.storage.transactions import transaction_boundary
+from anytoolai_platform_core.structured_output.schemas import normalize_mapping
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
-from test_atom_lab_runs import ACCESS_CODE, MODEL_ID, _error, _factory, _payload, _post
+from test_atom_lab_runs import (
+    ACCESS_CODE,
+    MODEL_ID,
+    _error,
+    _expected_contract,
+    _factory,
+    _payload,
+    _post,
+)
 from test_atom_lab_runs import app as app  # noqa: PLC0414 -- register the shared pytest fixture
 
 DIAGNOSTIC_PAGE_SIZE = 100
@@ -61,6 +73,53 @@ def _start(app, key="history-1"):
     assert response.status_code == HTTPStatus.ACCEPTED, response.text
     with transaction_boundary(_factory(app)) as session:
         return AtomLabRunRepository(session).get(response.json()["run_id"])
+
+
+@pytest.mark.parametrize(
+    ("atom_id", "section", "field", "item"),
+    [
+        ("A04", "issues", "description", {"category": "scope", "severity": "high"}),
+        ("A05", "questions", "question", {
+            "category": "scope", "priority": "high", "rationale": "Confirm the scope.",
+            "source_issue_index": 0,
+        }),
+    ],
+)
+def test_new_run_keeps_the_catalog_publication_schema_in_history(
+    app, atom_id, section, field, item
+):
+    registry = app.state.runtime.config_registry
+    atom = get_atom_catalog_entry(registry, atom_id)
+    response = _post(app, _payload(atom_id, expected_contract=_expected_contract(atom)))
+    assert response.status_code == HTTPStatus.ACCEPTED, response.text
+    run_id = response.json()["run_id"]
+    detail = _get(app, f"/{run_id}")
+    assert detail.status_code == HTTPStatus.OK, detail.text
+    snapshot_schema = detail.json()["snapshot"]["schemas"]["output"]["content"]
+    assert snapshot_schema == atom.output_schema
+    declared = registry.get_schema(atom.schema_refs.output.schema_ref)
+    assert declared is not None
+    declared_schema = normalize_mapping(declared.schema)
+    assert snapshot_schema != declared_schema
+    effective_validator = Draft202012Validator(snapshot_schema)
+    stored_validator = Draft202012Validator(declared_schema)
+    assert effective_validator.is_valid({section: [{**item, field: "Confirm delivery."}]})
+    for invisible in (" ", "\u200b"):
+        payload = {section: [{**item, field: invisible}]}
+        assert stored_validator.is_valid(payload)
+        assert not effective_validator.is_valid(payload)
+
+    # Emulate a snapshot saved before diagnostics used the publication schema.
+    with transaction_boundary(_factory(app)) as session:
+        session.execute(
+            sa.update(atom_lab_runs_table).where(atom_lab_runs_table.c.id == run_id)
+            .values(output_schema=declared_schema)
+        )
+        historical = AtomLabRunRepository(session).get(run_id)
+        assert load_run_local_action_settings(registry, historical).run_id == run_id
+    old_detail = _get(app, f"/{run_id}")
+    assert old_detail.status_code == HTTPStatus.OK, old_detail.text
+    assert old_detail.json()["snapshot"]["schemas"]["output"]["content"] == declared_schema
 
 
 def _state(app, run, job_status, scenario_status="running", **updates):

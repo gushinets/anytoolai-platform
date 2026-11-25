@@ -688,6 +688,28 @@ def test_cli_replays_any761_archive_only_with_explicit_opt_in(
     assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
 
 
+def test_current_and_historical_reports_use_different_schema_contracts(
+    monkeypatch, tmp_path, capsys
+):
+    run = ab_record("ANY761-AB-D-RU-weak")
+    run.update(attempt=1, snapshot={})
+    run["output"]["questions"][0]["question"] = "\u200b"
+    (key,) = write_report_inputs(tmp_path, run, historical=True)
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+    args = cli_args("report", tmp_path)
+    monkeypatch.setattr(sys, "argv", args)
+
+    assert evaluation.main() == 1
+    assert capsys.readouterr().out == (
+        f"{key}: FAIL (acceptance_builder.draft_v1 output violates pattern "
+        "at $.questions[0].question)\n"
+    )
+    monkeypatch.setattr(sys, "argv", [*args, "--historical-any-761"])
+    assert evaluation.main() == 0
+    assert capsys.readouterr().out == f"{key}: PASS\n"
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == before
+
+
 @pytest.mark.parametrize("missing", ["document_step", "review_decision"])
 def test_cli_archive_mode_still_requires_ledger_and_review(missing, monkeypatch, tmp_path, capsys):
     run = any761_archive_record("D", document=True, document_step=missing != "document_step")

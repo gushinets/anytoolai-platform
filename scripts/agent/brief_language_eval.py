@@ -16,6 +16,7 @@ from functools import cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from anytoolai_platform_core.structured_output.schemas import publication_schema
 from draft_risk_review import DECISION_FIELDS, decision_questions
 from jsonschema import Draft202012Validator
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
@@ -145,9 +146,10 @@ def authored_fields(output: dict) -> dict[str, str]:
 
 
 @cache
-def _output_validator(scenario: str) -> Draft202012Validator:
+def _output_validator(scenario: str, *, historical: bool = False) -> Draft202012Validator:
     path = PRODUCTS / OUTPUT_SCHEMAS[scenario]
-    return Draft202012Validator(json.loads(path.read_text(encoding="utf-8")))
+    schema = json.loads(path.read_text(encoding="utf-8"))
+    return Draft202012Validator(schema if historical else publication_schema(schema))
 
 
 def output_contract_error(record: dict, *, historical: bool = False) -> str | None:
@@ -162,7 +164,7 @@ def output_contract_error(record: dict, *, historical: bool = False) -> str | No
             return None
         if scenario == DRAFT and not historical and not {"issues", "questions"} <= output.keys():
             return f"{scenario} output requires both issues and questions"
-    error = next(_output_validator(scenario).iter_errors(output), None)
+    error = next(_output_validator(scenario, historical=historical).iter_errors(output), None)
     if error is not None:
         return f"{scenario} output violates {error.validator} at {error.json_path}"
     if "issues" in output:
