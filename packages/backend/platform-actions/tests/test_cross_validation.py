@@ -705,6 +705,21 @@ class TestComposeReplyCrossValidator:
     def setup_method(self) -> None:
         self.validator = ComposeReplyCrossValidator()
 
+    def test_scheduling_request_respects_output_layout(self) -> None:
+        separate_action = {
+            "text": "Thanks for your interest in a call.",
+            "call_to_action": "Choose a time at https://example.com/schedule.",
+        }
+        single_text = {"text": "Choose a time at https://example.com/schedule."}
+
+        self.validator.validate(input_payload={}, output=separate_action)
+        self.validator.validate(input_payload={}, output=single_text)
+        self.validator.validate(input_payload={"output_layout": "single_text"}, output=single_text)
+        with pytest.raises(StructuredOutputValidationError):
+            self.validator.validate(
+                input_payload={"output_layout": "single_text"}, output=separate_action
+            )
+
     @pytest.mark.parametrize(
         ("input_payload", "output"),
         [

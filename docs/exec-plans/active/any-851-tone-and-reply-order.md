@@ -268,3 +268,14 @@ passed before the main merge (1,934 tests) and after it (1,979 tests).
 The isolated browser launched both workflows and the provider rejected
 generation with HTTP 401 under both locally configured credentials. The semantic matrix and
 model comparison still require a successful provider run.
+
+## Honor the selected layout in the default A07 prompt
+
+1. Make the default Atom Lab prompt put the complete request and any supplied URL in
+   `text` when the caller selects `single_text`.
+2. Verify the Atom Lab prompt binding and both validator paths. With the layout omitted,
+   an optional separate action remains valid when it adds a useful next step.
+
+The Atom Lab catalog loaded the updated default prompt. The validator accepted a scheduling
+URL in `text` with `single_text` and rejected a separate action in that mode. It accepted
+both representations when the layout was omitted. The 166 targeted tests passed.
