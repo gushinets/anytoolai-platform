@@ -15,7 +15,7 @@
   },
   "summary": {
     "gpt-6.1-sol": {
-      "passed": 24,
+      "passed": 21,
       "total": 24
     }
   },
@@ -93,7 +93,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -157,7 +157,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -221,7 +221,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -282,10 +282,11 @@
         },
         {
           "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
-          "verdict": "PASS"
+          "verdict": "FAIL",
+          "reason": "Esperaban, les and ofrecerles address a group, although esperaba is singular in the source and the group is only the earlier requester."
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -307,6 +308,11 @@
         {
           "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
           "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the individual sender as the person with the expectation and the addressee. The earlier group request keeps its separate actors.",
+          "verdict": "FAIL",
+          "reason": "Esperaban, les and ofrecerles address a group, although esperaba is singular in the source and the group is only the earlier requester."
         }
       ],
       "review_note": "Neutral opens with «Esperabas» and presents an option with «Puedo ofrecerte». Firm opens with the screen as the point at issue and makes a direct offer with «Te ofrezco». Warm starts with «Entiendo». All three keep both versions inside the first revision round and mention the brief only after the offer."
@@ -349,7 +355,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -413,7 +419,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -477,7 +483,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -526,7 +532,8 @@
       "criteria": [
         {
           "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
-          "verdict": "PASS"
+          "verdict": "FAIL",
+          "reason": "The wording attributes disappointment to the client while taking the screen looking dull as a premise."
         },
         {
           "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
@@ -541,7 +548,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -563,6 +570,11 @@
         {
           "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
           "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the assessment that the screen looks dull explicitly attributed to the client, including when expressing empathy.",
+          "verdict": "FAIL",
+          "reason": "The wording attributes disappointment to the client while taking the screen looking dull as a premise."
         }
       ],
       "review_note": "Neutral opens with what the client expected and presents an available option. Firm opens with the main screen and makes a direct proposal. Warm acknowledges the experience personally. All three retain the first-round scope and put brief context last."
@@ -605,7 +617,7 @@
           "verdict": "PASS"
         },
         {
-          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement. All tones retain the same facts, order, offer and limits.",
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
           "verdict": "PASS"
         },
         {
@@ -787,6 +799,11 @@
         {
           "criterion": "Replies in the language of the source.",
           "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the separate delivery question and launch planning concern without adding a dependency.",
+          "verdict": "FAIL",
+          "reason": "Says the launch depends on Thursday delivery. The source states no such prerequisite."
         }
       ],
       "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
@@ -1363,5 +1380,6 @@
       ],
       "review_note": "The scoped offer precedes disputed history. The request stays with the client side, and the alleged agreement stays with the client and the venue coordinator."
     }
-  ]
+  ],
+  "review_correction": "Round 10 corrected the three source-fidelity verdicts without altering the saved inputs or outputs."
 }

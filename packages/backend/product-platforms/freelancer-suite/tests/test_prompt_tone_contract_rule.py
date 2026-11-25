@@ -72,6 +72,8 @@ def test_update_preserves_the_actor_of_commitments_in_every_tone() -> None:
 def test_reply_prompt_orders_acknowledgement_before_explanation() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
     assert "Build the reply in this order" in text
+    assert "one short acknowledgement drawn from the client's message" in text
+    assert "keep the author's answer for the next sentence" in text
     assert "very next sentence with the author's actual decision, answer or next step" in text
     assert "Use that sentence for the decision and its scope and certainty alone" in text
     assert "Use a new sentence for any context after the decision" in text
@@ -81,7 +83,6 @@ def test_reply_prompt_orders_acknowledgement_before_explanation() -> None:
 def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
     assert "remains the client's account unless `intent` confirms it" in text
-    assert "Put any evaluative adjective inside the attributed perception" in text
     assert "claims about prior requests, actions or agreements out of the acknowledgement" in text
     assert "the original participants, status and scope within the reported claim" in text
     assert "name the client or the client's side for an action they took" in text
@@ -103,16 +104,31 @@ def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> Non
     assert "carry over its stated identifier" in text
 
 
+def test_reply_preserves_source_meaning_before_applying_tone() -> None:
+    text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
+    source_rule = "Select the client's stated concern and the author's authorized answer"
+    assert text.index(source_rule) < text.index("Build the reply in this order")
+    assert "Keep the participants and their number local to each statement" in text
+    assert "Use the singular address in the reply to that individual" in text
+    assert "Preserve a group's expectation when the source states it" in text
+    assert "An expression of empathy also needs to attribute the evaluation itself" in text
+    assert "Use a cause or condition only where the source states it" in text
+    assert "with the same direction and degree of certainty" in text
+
+
 def test_reply_tone_changes_the_opening() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
     assert "free of first-person empathy, thanks and appreciation" in text
-    assert "start the first clause with what the client expected or felt" in text
+    assert "Start the first clause with what the client expected, felt or asked" in text
     assert "the client as that clause's grammatical subject" in text
     assert "Present an authorized offer as the option the author can offer" in text
     assert "`warm`: open with a short first-person expression of empathy" in text
     assert "put the central issue first in a compact statement" in text
     assert "keep the client's perception explicit" in text
-    assert "make the point at issue the subject of the opening" in text
+    assert (
+        "Make the point at issue the subject of the opening, including for a factual question"
+        in text
+    )
     assert "make the proposal directly" in text
     assert "A possibility or an action pending a check stays conditional" in text
     assert "Changing a modal verb or the word order alone is insufficient" in text

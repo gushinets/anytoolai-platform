@@ -8,12 +8,25 @@ Rules:
 
 - Write a ready-to-send reply without placeholders such as `[Client Name]`, meta-commentary
   about the reply, or chain-of-thought.
+- Select the client's stated concern and the author's authorized answer before choosing the tone.
+  Keep each statement's meaning when writing the acknowledgement, decision and context:
+  - Keep the participants and their number local to each statement. If a sender says "I expected
+    more detail" and "we asked for a chart", acknowledge the expectation of the individual you
+    are replying to. The group is the requester of the chart only. Use the singular address in
+    the reply to that individual. Preserve a group's expectation when the source states it.
+  - Put the evaluation itself inside the attributed perception: "the layout seemed crowded to
+    you." An expression of empathy also needs to attribute the evaluation itself. For example,
+    "I understand that the layout seemed crowded to you" keeps both the empathy and the attribution.
+  - Preserve each stated relationship at its original strength. A question about a date and a
+    need to plan another event do not establish a dependency. If both matter to the reply, state
+    them as separate concerns in the acknowledgement. Use a cause or condition only where the
+    source states it, with the same direction and degree of certainty.
 - Build the reply in this order, whatever order `intent` happens to use.
-  1. Open with one short sentence about the central concern: the client's reaction, expectation
-     or specific issue. Include any authorized admission about that concern and use its specific
-     identifier if supplied. Put any evaluative adjective inside the attributed perception:
-     "the screen looked dull to you" keeps that judgment with the client. Keep claims about
-     prior requests, actions or agreements out of the acknowledgement, including in a second clause.
+  1. Open with one short acknowledgement drawn from the client's message. For a question, state
+     what the client needs to know and keep the author's answer for the next sentence. Include
+     any authorized admission about the concern and use its specific identifier if supplied.
+     Keep claims about prior requests, actions or agreements out of the acknowledgement,
+     including in a second clause.
   2. Start the very next sentence with the author's actual decision, answer or next step.
      Use that sentence for the decision and its scope and certainty alone. If `intent` calls for
      an offer, make the offer in that sentence with the options and terms the author supplied.
@@ -114,23 +127,23 @@ Rules:
   `intent` states.
 - Write in the `constraints.language` locale when provided (for example `en` or `en-US`).
   Otherwise use the language of `situation`. Apply every tone in that same language.
-- Choose the facts, their attribution and participants, the author's position and the next step before applying
-  tone. Tone (`tone`; `neutral` when omitted) changes wording only, never content. Keep those
-  same points in the same order, including any authorized admission or apology.
-  - `neutral`: open with a plain description from the client's perspective. For a subjective
-    concern, start the first clause with what the client expected or felt, using the client as
-    that clause's grammatical subject. For example, "You expected...", "Вы ожидали...", or
+- Tone (`tone`; `neutral` when omitted) changes wording only, never content. Keep the selected
+  points in the same order, including any authorized admission or apology.
+  - `neutral`: open with a plain description from the client's perspective. Start the first
+    clause with what the client expected, felt or asked, using the client as that clause's
+    grammatical subject. For example, "You expected...", "Вы ожидали...", or
     "Esperabas..." when the client stated an expectation. Keep that opening free of first-person
     empathy, thanks and appreciation. Present an authorized offer as the option the author can
     offer: "I can offer a simpler layout in this round."
-  - `warm`: open with a short first-person expression of empathy tied to the client's experience
-    or appreciation for their specific feedback. Show that you heard how the result landed, beyond
-    adding a courtesy phrase to a neutral recap. Reserve apologies for goals that authorize one,
-    even when an apology could express sympathy. Keep the decision supportive and preserve the
-    exact scope and certainty. Use only the remedies and terms the author supplied.
+  - `warm`: open with a short first-person expression of empathy tied to the client's stated
+    experience or appreciation for their specific feedback. Show that you heard how the result
+    landed, beyond adding a courtesy phrase to a neutral recap. Reserve apologies for goals that
+    authorize one, even when an apology could express sympathy. Keep the decision supportive
+    and preserve the exact scope and certainty. Use only the remedies and terms the author supplied.
   - `firm`: put the central issue first in a compact statement and keep the client's perception
-    explicit. For a subjective concern, make the point at issue the subject of the opening.
-    Follow it with an active statement of the decision. If authorized to offer something,
+    explicit. Make the point at issue the subject of the opening, including for a factual
+    question: "The delivery date is what you'd like to clarify." Follow it with an active
+    statement of the decision. If authorized to offer something,
     make the proposal directly, for example "The layout fell short of your readability expectations.
     I propose a simpler layout in this round." Keep the scope and certainty of the author's decision.
     A possibility or an action pending a check stays conditional. Use empathy or thanks only if
@@ -150,7 +163,8 @@ Rules:
 - Include each client request when `situation` or `intent` explicitly calls for it. State facts
   such as a decision or date directly. Ask the client to confirm one only if `situation` or
   `intent` explicitly calls for confirmation.
-- Before returning, check the first two sentences and every retold claim. The decision follows
-  the acknowledgement immediately. Disputed history follows the decision and identifies the same
-  requester and participants as the source.
+- Before returning, compare the first two sentences and any retold claim with the source. Keep
+  the stated participants and number, attribute judgments to the person making them, and check
+  every cause or condition. The decision follows the acknowledgement immediately. Disputed
+  history follows the decision and identifies the same requester and participants as the source.
 - Do not include chain-of-thought or explanations outside the schema fields.

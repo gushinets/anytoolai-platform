@@ -410,7 +410,7 @@ failures reproduced in isolation.
 
 ### Round 9 verification
 
-The Sol profile passed 24 browser runs, eight each in RU, EN and ES. The nine original
+The Sol profile returned 24 browser results, eight each in RU, EN and ES. The nine original
 S4 replies distinguished the tones on identical inputs and kept two variants within the
 first revision round. Neutral led with the client's expectation and presented the available
 option. Firm led with the attributed issue and made the offer directly. Warm acknowledged
@@ -422,6 +422,51 @@ Six tentative-date controls kept Thursday unconfirmed and the Tuesday workload c
 Three R05 controls kept the admission and promised invoice correction. The provider
 ledger confirmed Sol for all sessions, and the API, display and clipboard text matched.
 
+The next review corrected three verdicts. Spanish S4 warm widened the individual
+expectation to a group. English S4 warm took the client's judgment as a premise. English
+firm added Thursday as a launch dependency. The saved results and corrected grades are
+in the evidence below.
+
 All 375 focused Python tests passed, including the API layout checks.
 
 [Round 9 live evidence](any-851-tone-and-reply-order-review-9.evidence.json)
+
+## Preserve the source before choosing tone
+
+1. Build the Reply Draft from the client's stated concern and the author's authorized
+   answer. Keep the experiencer, speaker number, assessment and stated relationships
+   attached to each statement before choosing the opening and delivery.
+   Apply the neutral and firm distinction to factual questions as well as evaluations.
+2. Reassess the three round 9 findings against the saved outputs. Record separate verdicts
+   for source attribution, number and unstated dependencies in the new runs.
+3. Recheck RU, EN and ES across all three tones. Include individual and team perspectives,
+   dated requests with and without an explicit prerequisite, S4's disputed claims, R05 and
+   adjacent Update and Prepaid Request controls.
+
+### Round 10 verification
+
+Sol passed 63 browser runs on the final local profile, 21 each in RU, EN and ES. The
+matrix reused all 24 round 9 inputs and added 39 controls. The provider ledger confirmed
+Sol for every session, and stored, rendered and copied text matched.
+
+- **Reply Draft.** The individual expectation and offer addressee stayed singular in S4.
+  Team controls retained the collective perspective. Each assessment stayed with the
+  client, including in warm acknowledgements. The two-option first-round offer followed
+  the concern and preceded brief context. Six retelling controls kept the original
+  roles in shared and third-party claims. Nine R05 replies kept the admission and the
+  correction commitment.
+- **Dates and tone.** Nine cases kept launch planning separate from the Thursday
+  question. Nine controls preserved Thursday as a prerequisite where the client stated
+  it. In both sets Thursday remained unconfirmed and the Tuesday workload check stayed
+  with the freelancer. Neutral and firm also differed on these factual questions.
+- **Adjacent modes.** Three Update checks retained the single pricing-sheet request
+  and the separate handoffs. Nine Prepaid Request checks covered direct requests,
+  payment details arriving later and an explicitly unsettled method. An intermediate
+  run on the ambiguous English note about missing payment instructions asked to confirm
+  the method. The final run requested payment. The evidence includes that variation and
+  both unambiguous controls.
+
+All 2,043 focused Python tests passed, including the Freelancer Suite, evaluator,
+deployment configuration and both API layouts.
+
+[Round 10 live evidence](any-851-tone-and-reply-order-review-10.evidence.json)
