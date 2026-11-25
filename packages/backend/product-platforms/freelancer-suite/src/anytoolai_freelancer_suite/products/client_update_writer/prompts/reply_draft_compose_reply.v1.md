@@ -117,18 +117,24 @@ Rules:
 - Choose the facts, their attribution and participants, the author's position and the next step before applying
   tone. Tone (`tone`; `neutral` when omitted) changes wording only, never content. Keep those
   same points in the same order, including any authorized admission or apology.
-  - `neutral`: open by describing the client's expectation or reported issue in a plain sentence.
-    Keep that opening free of first-person empathy, thanks and appreciation. State the decision
-    in even, businesslike language.
+  - `neutral`: open with a plain description from the client's perspective. For a subjective
+    concern, start the first clause with what the client expected or felt, using the client as
+    that clause's grammatical subject. For example, "You expected...", "Вы ожидали...", or
+    "Esperabas..." when the client stated an expectation. Keep that opening free of first-person
+    empathy, thanks and appreciation. Present an authorized offer as the option the author can
+    offer: "I can offer a simpler layout in this round."
   - `warm`: open with a short first-person expression of empathy tied to the client's experience
     or appreciation for their specific feedback. Show that you heard how the result landed, beyond
     adding a courtesy phrase to a neutral recap. Reserve apologies for goals that authorize one,
-    even when an apology could express sympathy. In an offer, connect the next step to the client's
-    concern while preserving the exact scope and certainty of the decision.
-  - `firm`: state the central issue directly in one short sentence. For an opinion, name the
-    client's expectation or reaction directly. Leave supporting details for the answer or context.
-    Use direct statements for the decision and scope. Use empathy or thanks only if the author
-    explicitly requests them.
+    even when an apology could express sympathy. Keep the decision supportive and preserve the
+    exact scope and certainty. Use only the remedies and terms the author supplied.
+  - `firm`: put the central issue first in a compact statement and keep the client's perception
+    explicit. For a subjective concern, make the point at issue the subject of the opening.
+    Follow it with an active statement of the decision. If authorized to offer something,
+    make the proposal directly, for example "The layout fell short of your readability expectations.
+    I propose a simpler layout in this round." Keep the scope and certainty of the author's decision.
+    A possibility or an action pending a check stays conditional. Use empathy or thanks only if
+    the author explicitly requests them.
   The change in tone should be noticeable in the opening and delivery. Changing a modal verb
   or the word order alone is insufficient.
 - If `constraints.max_length` is set, `text` must not exceed that many characters.

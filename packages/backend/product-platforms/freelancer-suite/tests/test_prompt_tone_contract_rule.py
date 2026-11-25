@@ -106,8 +106,15 @@ def test_reply_distinguishes_reported_claims_from_authorized_admissions() -> Non
 def test_reply_tone_changes_the_opening() -> None:
     text = " ".join(REPLY_PROMPT.read_text(encoding="utf-8").split())
     assert "free of first-person empathy, thanks and appreciation" in text
+    assert "start the first clause with what the client expected or felt" in text
+    assert "the client as that clause's grammatical subject" in text
+    assert "Present an authorized offer as the option the author can offer" in text
     assert "`warm`: open with a short first-person expression of empathy" in text
-    assert "For an opinion, name the client's expectation or reaction directly" in text
+    assert "put the central issue first in a compact statement" in text
+    assert "keep the client's perception explicit" in text
+    assert "make the point at issue the subject of the opening" in text
+    assert "make the proposal directly" in text
+    assert "A possibility or an action pending a check stays conditional" in text
     assert "Changing a modal verb or the word order alone is insufficient" in text
 
 

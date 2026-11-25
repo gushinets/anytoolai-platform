@@ -400,3 +400,28 @@ activation marker test requires passwordless `sudo` to switch to `nobody`. All t
 failures reproduced in isolation.
 
 [Round 8 live evidence](any-851-tone-and-reply-order-review-8.evidence.json)
+
+## Distinguish neutral and firm replies
+
+1. Give Reply Draft a distinct firm opening and a direct way to make an authorized offer.
+   Preserve the author's scope, commitment and stated uncertainty in every tone.
+2. Compare the S4 tones on identical inputs in RU, EN and ES. Recheck the order of the
+   reply, the parties to reported claims, R05's admission and a tentative decision.
+
+### Round 9 verification
+
+The Sol profile passed 24 browser runs, eight each in RU, EN and ES. The nine original
+S4 replies distinguished the tones on identical inputs and kept two variants within the
+first revision round. Neutral led with the client's expectation and presented the available
+option. Firm led with the attributed issue and made the offer directly. Warm acknowledged
+the client's reaction without adding a remedy. Brief context followed the offer in every
+case.
+
+Six controls kept the requesting party and the participants in a disputed agreement.
+Six tentative-date controls kept Thursday unconfirmed and the Tuesday workload check.
+Three R05 controls kept the admission and promised invoice correction. The provider
+ledger confirmed Sol for all sessions, and the API, display and clipboard text matched.
+
+All 375 focused Python tests passed, including the API layout checks.
+
+[Round 9 live evidence](any-851-tone-and-reply-order-review-9.evidence.json)
