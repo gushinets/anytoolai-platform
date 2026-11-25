@@ -491,8 +491,9 @@ def test_prompt_and_schema_manifests_point_at_existing_files() -> None:
     ("verdict", "statuses", "valid"),
     [
         ("insufficient_brief", ["partial"] * 4, True),
-        ("insufficient_brief", ["partial"] * 3 + ["mismatch"], False),
-        ("insufficient_brief", ["partial"] * 3 + ["match"], False),
+        ("insufficient_brief", ["partial"] * 3 + ["match"], True),
+        ("insufficient_brief", ["mismatch", "match", "partial", "mismatch"], True),
+        ("insufficient_brief", ["partial"] * 3 + ["unknown"], False),
         ("partially_meets", ["partial", "partial", "match", "match"], True),
         ("does_not_meet", ["partial", "partial", "match", "match"], False),
         ("does_not_meet", ["mismatch", "partial", "match", "match"], True),

@@ -5,8 +5,8 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-20
-- Last updated: 2026-11-23
-- Review date: 2026-11-23
+- Last updated: 2026-11-25
+- Review date: 2026-11-25
 - Next action: owner acceptance of the verified ticket cases.
 - Blocker: none for the Linear acceptance criteria.
 
@@ -39,8 +39,9 @@ The former prompt classified missing detail as mismatch, and clarity required li
 Keep the kernel A11 status enum. Match requires confirmation, partial covers unconfirmed or partial
 delivery, and mismatch requires affirmative evidence of a violation. A clear list satisfies clarity.
 For meaningful briefs, any mismatch fails, any remaining partial gives partial agreement, and all
-matches pass. An insufficient brief requires four partial deltas. Only an explicit insufficient brief
-returns the user to the brief field without copy or activation.
+matches pass. An explicit insufficient brief returns the user to the brief field without copy or
+activation for any combination of the four valid delta statuses. The prompt still requests four
+partial deltas when the brief contains no requirements.
 Keep prompt v1, quota charging on completed runs, existing dependencies and the two provider calls.
 The model still judges dates and evidence from prose.
 
@@ -144,3 +145,12 @@ The earlier 63-run authentication failure is retained as a separate historical a
 The nine-run series covers the Linear ticket examples on this build.
 
 [Inputs, reviewed outputs, browser checks and provider call ledger](any-893-acceptance-unconfirmed-vs-unmet.ru-live-20261123.json)
+
+### Second review regression, 2026-11-25
+
+The API and worker regression replays the recorded greeting and W1 delivery with one change
+to the comparison output. Clarity is `match`. The worker calls extraction and comparison
+once each, completes the session and publishes the result. Both a new web run and a restored
+session focus the brief field, show the hint and suppress the verdict, Copy and result-view event.
+The HELLO and JUNK evaluation criteria in all three languages now score the explicit verdict
+and its explanation independently of the delta statuses.

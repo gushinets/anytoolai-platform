@@ -1,0 +1,15 @@
+{
+  "response_json": {
+    "values": {
+      "analysis_language": "ru"
+    },
+    "confidence": {
+      "analysis_language": 1
+    },
+    "missing_fields": [
+      "acceptance_criteria",
+      "assumptions",
+      "deliverables"
+    ]
+  }
+}

@@ -411,28 +411,6 @@
               }
             }
           }
-        },
-        {
-          "if": {
-            "properties": {
-              "verdict": {
-                "const": "insufficient_brief"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "deltas": {
-                "items": {
-                  "properties": {
-                    "status": {
-                      "const": "partial"
-                    }
-                  }
-                }
-              }
-            }
-          }
         }
       ]
     }

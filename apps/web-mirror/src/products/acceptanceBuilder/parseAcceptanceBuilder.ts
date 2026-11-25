@@ -147,8 +147,7 @@ function toComparison(value: unknown): Comparison | null {
   const deltas = toDeltas(value.deltas);
   if (!deltas) return null;
   if (value.verdict === "insufficient_brief") {
-    return deltas.every((delta) => delta.status === "partial")
-      ? { verdict: value.verdict, deltas, rationale: value.rationale } : null;
+    return { verdict: value.verdict, deltas, rationale: value.rationale };
   }
   const expected = deltas.some((delta) => delta.status === "mismatch")
     ? "does_not_meet"

@@ -1,30 +1,30 @@
 {
   "response_json": {
     "verdict": "insufficient_brief",
-    "confidence": 0.78,
+    "confidence": 1,
     "deltas": [
       {
         "criterion_id": "scope_coverage",
         "status": "partial",
-        "evidence": "The brief gives no requirements to check this criterion against."
+        "evidence": "В запросе есть только приветствие «привет»: нет требований, с которыми можно сопоставить объём описанной работы."
       },
       {
         "criterion_id": "requirement_fit",
         "status": "partial",
-        "evidence": "The brief gives no requirements to check this criterion against."
+        "evidence": "В запросе есть только приветствие «привет»: нет требований, по которым можно проверить соответствие описанного сайта ожиданиям клиента."
       },
       {
         "criterion_id": "completeness",
         "status": "partial",
-        "evidence": "The brief gives no requirements to check this criterion against."
+        "evidence": "В запросе есть только приветствие «привет»: нет перечня результатов, с которым можно сверить полноту сдачи."
       },
       {
         "criterion_id": "clarity",
-        "status": "partial",
-        "evidence": "The brief gives no requirements to check this criterion against."
+        "status": "match",
+        "evidence": "В запросе есть только приветствие «привет»: он не даёт оснований для проверки этого критерия. В тексте сдачи перечислены сайт, его разделы, работа формы, макеты и проведённые правки."
       }
     ],
-    "rationale": "The greeting gives no requirements to check."
+    "rationale": "Запрос содержит только приветствие и не задаёт ни задачи, ни состава результатов, ни сроков. Поэтому сопоставить описанную работу с ожиданиями клиента невозможно; оснований считать её не соответствующей запросу нет."
   },
   "input_tokens": 420,
   "output_tokens": 160,

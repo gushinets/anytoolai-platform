@@ -76,7 +76,7 @@ const draftOutput = (suffix: Suffix = "") => ({
   issues: fixture("detect_issues", suffix).issues,
   questions: suffix ? fixture("generate_questions", suffix).questions : [],
 });
-const checkOutput = (suffix: Suffix = "") => ({
+const checkOutput = (suffix: Suffix | ".insufficient_brief" = "") => ({
   extracted: fixture("extract", suffix),
   comparison: fixture("compare", suffix),
 });
@@ -270,15 +270,27 @@ describe("Acceptance Builder result parsing", () => {
     expect(extractCheckResult({ ...check, comparison: { ...comparison, verdict: "great" } })).toBeNull();
   });
 
-  it("requires partial deltas for an insufficient brief", () => {
-    const normal = checkOutput();
-    const comparison = fixture("compare", ".insufficient_brief");
-    expect(extractCheckResult({ ...normal, comparison })?.insufficientBrief).toBe(true);
-    for (const status of ["match", "mismatch"]) {
-      const deltas = DELTA_CRITERIA.map((criterion_id, i) => ({
-        criterion_id, status: i === 3 ? status : "partial", evidence: "No requirements."
-      }));
-      expect(extractCheckResult({ ...normal, comparison: { ...comparison, deltas } })).toBeNull();
+  it.each([
+    ["partial", "partial", "partial", "partial"],
+    ["partial", "partial", "partial", "match"],
+    ["mismatch", "match", "partial", "mismatch"],
+  ])("recognizes an insufficient brief with statuses %s/%s/%s/%s", (...statuses) => {
+    const output = checkOutput(".insufficient_brief");
+    const deltas = DELTA_CRITERIA.map((criterion_id, index) => ({
+      criterion_id, status: statuses[index], evidence: "No requirements."
+    }));
+    expect(extractCheckResult({ ...output, comparison: { ...output.comparison, deltas } })?.insufficientBrief).toBe(true);
+  });
+
+  it("requires four valid, ordered deltas even for an insufficient brief", () => {
+    const output = checkOutput(".insufficient_brief");
+    const deltas = output.comparison.deltas as Record<string, unknown>[];
+    for (const invalid of [
+      deltas.slice(1),
+      [...deltas].reverse(),
+      [{ ...deltas[0], status: "unknown" }, ...deltas.slice(1)],
+    ]) {
+      expect(extractCheckResult({ ...output, comparison: { ...output.comparison, deltas: invalid } })).toBeNull();
     }
   });
 
@@ -486,7 +498,7 @@ describe("Acceptance Builder page", () => {
 
   it.each([false, true])("focuses the brief for an insufficient result, including attachment=%s", async (attached) => {
     const r = routesFor(IDS.check);
-    const output = { ...checkOutput(), comparison: fixture("compare", ".insufficient_brief") };
+    const output = checkOutput(".insufficient_brief");
     const made = makeClientCapturingRequests({
       ...routes("check", output),
       [r.RESULT]: [resultResponse(IDS.check, { output }), resultResponse(IDS.check, { output: checkOutput() })],

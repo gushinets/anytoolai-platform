@@ -27,7 +27,7 @@ renderer_contract:
         with `status` and `evidence`. The verdict is judged on those four general criteria only, NOT item
         by item on the extracted acceptance criteria; the renderer must not label it a check of the extracted
         list. A match confirms the criterion, partial means incomplete confirmation, and mismatch means a
-        contradiction or explicit failure. For insufficient_brief,
+        contradiction or explicit failure. For insufficient_brief, regardless of the four delta statuses,
         the client asks for requirements at the brief field and shows no verdict, copy text or result view.'
     - part_id: acceptance_criteria
       field: extracted.values.acceptance_criteria

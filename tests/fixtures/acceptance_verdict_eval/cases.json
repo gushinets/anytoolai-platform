@@ -28,7 +28,7 @@
         "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
       },
       "criteria": [
-        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+        "The comparison returns insufficient_brief and explains that the brief provides no requirements for assessing the work. Score this outcome independently of the four delta statuses."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
     },
@@ -43,7 +43,7 @@
         "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря."
       },
       "criteria": [
-        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+        "The comparison returns insufficient_brief and explains that the brief provides no requirements for assessing the work. Score this outcome independently of the four delta statuses."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
     },
@@ -135,7 +135,7 @@
         "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3."
       },
       "criteria": [
-        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+        "The comparison returns insufficient_brief and explains that the brief provides no requirements for assessing the work. Score this outcome independently of the four delta statuses."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
     },
@@ -150,7 +150,7 @@
         "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3."
       },
       "criteria": [
-        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+        "The comparison returns insufficient_brief and explains that the brief provides no requirements for assessing the work. Score this outcome independently of the four delta statuses."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
     },
@@ -242,7 +242,7 @@
         "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre."
       },
       "criteria": [
-        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+        "The comparison returns insufficient_brief and explains that the brief provides no requirements for assessing the work. Score this outcome independently of the four delta statuses."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
     },
@@ -257,7 +257,7 @@
         "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre."
       },
       "criteria": [
-        "The comparison returns insufficient_brief with four partial deltas and explains that the brief provides no requirements for assessing the work."
+        "The comparison returns insufficient_brief and explains that the brief provides no requirements for assessing the work. Score this outcome independently of the four delta statuses."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
     },
