@@ -463,7 +463,7 @@ def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: st
     reply_step = next(step for step in workflow["steps"] if step["step_id"] == "compose_reply")
 
     assert reply_step["input_mapping"]["constraints"] == "?scenario.input.constraints"
-    assert reply_step["input_mapping"]["output_layout"] == 'literal:"single_text"'
+    assert reply_step["input_mapping"]["output_layout"] == "?scenario.input.output_layout"
 
 
 # The E2E test's amount/due_date assertion doesn't protect the *other* grounded facts the billing
@@ -747,7 +747,7 @@ def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() ->
 
     # This pins the instruction; generated-text completeness requires live acceptance (ANY-624).
     for fragment in (
-        "Include in `text` every client-relevant result, blocker, request "
+        "Include in the update every client-relevant result, blocker, request "
         "to the client and next step mentioned in `situation`",
         "including raw progress notes not phrased as a message to the client",
         "A notes format does not make progress facts private",
@@ -1023,5 +1023,12 @@ def test_reply_draft_prompt_keeps_the_client_subject_and_scope() -> None:
 def test_compose_reply_prompt_states_each_client_request_once(prompt_ref: str) -> None:
     prompt = " ".join(_load_prompt_template(prompt_ref).split())
 
-    assert "Put the complete copy-ready message in `text`" in prompt
-    assert "omit `call_to_action`" in prompt
+    assert (
+        "When `output_layout` is `single_text`, put the complete copy-ready message in "
+        "`text` and omit `call_to_action`" in prompt
+    )
+    assert (
+        "Otherwise keep the main message in `text` and use the optional `call_to_action`" in prompt
+    )
+    assert "Each request appears once across the output" in prompt
+    assert "A separate `call_to_action` has its own 200-character limit" in prompt

@@ -10,7 +10,7 @@ workflows:
           situation: scenario.input.progress_notes
           intent: 'literal:"Give the client a clear, concrete update on project progress and next steps."'
           tone: scenario.input.tone
-          output_layout: 'literal:"single_text"'
+          output_layout: '?scenario.input.output_layout'
           constraints: '?scenario.input.constraints'
 
   - workflow_id: client_update_writer.reply_draft_v1
@@ -24,7 +24,7 @@ workflows:
           situation: scenario.input.client_message
           intent: scenario.input.reply_goal
           tone: scenario.input.tone
-          output_layout: 'literal:"single_text"'
+          output_layout: '?scenario.input.output_layout'
           constraints: '?scenario.input.constraints'
 
   - workflow_id: client_update_writer.prepaid_request_v1

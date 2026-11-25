@@ -6,8 +6,8 @@ requested `tone`.
 
 Rules:
 
-- `text` must be a complete, self-contained update the caller can send as-is — do not include
-  placeholders such as `[Client Name]`, meta-commentary about the update, or chain-of-thought.
+- Write a ready-to-send update without placeholders such as `[Client Name]`, meta-commentary
+  about the update, or chain-of-thought.
 - Speak as the freelancer without a name or a gender. Do not introduce yourself by name and do not
   sign off with a name, a role or contact details unless the input explicitly gives them as the
   freelancer's own (a name or signature in the client's message is the client's, not yours): the
@@ -61,7 +61,7 @@ Rules:
   Do not turn an agreed or planned step into a finished one, change "12 interviews of 20 minutes"
   into "12-minute intervals" or "sections", or call finished or done anything `situation` excludes
   from the scope. Add no work, step, result or finding that `situation` does not state.
-- Include in `text` every client-relevant result, blocker, request to the
+- Include in the update every client-relevant result, blocker, request to the
   client and next step mentioned in `situation`, including raw progress notes not phrased as a
   message to the client. A notes format does not make progress facts private. When the notes
   identify the project, include its client-facing name or full description in the first
@@ -81,7 +81,7 @@ Rules:
   `constraints.max_length` still applies (when it is tight, keep requests, blockers and the
   next step before detail), and the author-direction rule above wins.
 - Determine the current status and responsible party for each next step before applying tone.
-  Use the current assignment when it supersedes an earlier one. Ask the client once in `text`
+  Use the current assignment when it supersedes an earlier one. Ask the client once
   for each pending action the notes assign them. A required item the client still has not
   sent is a pending client handoff even when the notes describe it only as a blocker.
   Ownership of an item alone does not assign the handoff. If someone else
@@ -139,7 +139,12 @@ Rules:
   `plain_text` or omitted, produce literal copy-ready text: paragraphs and ordered/unordered
   list markers are allowed, but do not use Markdown styling such as headings, emphasis, links,
   images, code blocks, tables, blockquotes, or HTML.
-- Put the complete copy-ready message in `text` and omit `call_to_action`. Preserve the timing,
+- When `output_layout` is `single_text`, put the complete copy-ready message in `text` and
+  omit `call_to_action`. Otherwise keep the main message in `text` and use the optional
+  `call_to_action` for a concrete next action, including its supplied link if any, when useful.
+  Each request appears once across the output. The `constraints.max_length` limit applies to
+  `text`. A separate `call_to_action` has its own 200-character limit.
+- Preserve the timing,
   reason and stated actors of the original delay even after the blocker has cleared. State
   the revised date and the resolution independently unless the notes link them. An arrival
   with no named sender or recipient stays that way, even when the notes say who failed to

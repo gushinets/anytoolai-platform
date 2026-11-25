@@ -578,6 +578,83 @@ def test_prepaid_request_step_receives_the_whole_billing_context() -> None:
     assert resolved["context"] == billing
 
 
+@pytest.mark.parametrize("mode", ["update", "reply_draft"])
+@pytest.mark.parametrize("single_text", [False, True], ids=["legacy", "single-text"])
+def test_reply_layout_preserves_api_length_contract(
+    app: Any,
+    request_platform_api,
+    session_factory: SessionFactory,
+    tmp_path: Path,
+    mode: str,
+    single_text: bool,
+) -> None:
+    legacy_max_length = 50
+    url = "https://example.com/scheduling/homepage-review/choose-a-time"
+    action = f"Please schedule the review at {url}"
+    assert len(url) > legacy_max_length
+    notes = f"The homepage is ready. {action}"
+    start_input = (
+        {"progress_notes": notes}
+        if mode == "update"
+        else {"client_message": "Is the homepage ready?", "reply_goal": notes}
+    )
+    start_input.update(
+        tone="neutral", constraints={"max_length": 200 if single_text else legacy_max_length}
+    )
+    expected_output = {"text": "The homepage is ready."}
+    if single_text:
+        start_input["output_layout"] = "single_text"
+        expected_output["text"] += f" {action}"
+    else:
+        expected_output["call_to_action"] = action
+
+    (tmp_path / f"client_update_writer.{mode}_compose_reply_v1.json").write_text(
+        json.dumps(
+            {
+                "response_json": expected_output,
+                "input_tokens": 20,
+                "output_tokens": 20,
+                "latency_ms": 1,
+                "estimated_cost": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    response = asyncio.run(
+        request_platform_api(
+            app,
+            "POST",
+            f"/v1/products/client_update_writer/scenarios/client_update_writer.{mode}_v1/start",
+            json={"frontend_id": "web_mirror", "guest_id": GUEST_ID, "input": start_input},
+            request_id=REQUEST_ID,
+        )
+    )
+    assert response.status_code == HTTPStatus.OK, response.text
+
+    worker = build_worker(
+        session_factory=session_factory,
+        config_root=CONFIG_ROOT,
+        provider_adapters={"fake": FakeProviderAdapter(tmp_path)},
+    )
+    try:
+        processed = asyncio.run(worker.process_next_job())
+    finally:
+        worker.dispose()
+
+    assert processed is not None
+    assert processed.status is JobStatus.succeeded, processed.error_code
+    result = asyncio.run(
+        request_platform_api(
+            app,
+            "GET",
+            f"/v1/results/{processed.result_artifact_id}",
+            request_id=REQUEST_ID,
+        )
+    )
+    assert result.status_code == HTTPStatus.OK
+    assert result.json()["output"] == expected_output
+
+
 def test_prepaid_request_start_rejects_schema_invalid_input_before_any_job_or_quota(
     app: Any,
     request_platform_api,

@@ -27,7 +27,7 @@ def test_update_prompt_keeps_client_actions_across_tones() -> None:
     text = " ".join(UPDATE_PROMPT.read_text(encoding="utf-8").split())
     assert "`warm` never drops a client action that `firm` states" in text
     assert "Use the current assignment when it supersedes an earlier one" in text
-    assert "Ask the client once in `text` for each pending action the notes assign them" in text
+    assert "Ask the client once for each pending action the notes assign them" in text
     assert "the client still has not sent is a pending client handoff" in text
     assert "Ownership of an item alone does not assign the handoff" in text
     assert "If someone else is responsible, state their next step" in text

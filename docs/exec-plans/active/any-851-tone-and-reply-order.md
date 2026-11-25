@@ -297,3 +297,54 @@ architecture and docs validation passed.
 The browser started the designer-handoff case in each language and the mixed English case
 under the alternate configuration. The provider rejected generation with HTTP 401 under
 both configurations. The generated text and model comparison still need live verification.
+
+## Preserve the API length contract
+
+1. Make `single_text` an explicit opt-in in both Update and Reply Draft. The web form selects
+   it for its copy-ready result. API requests that omit it retain a separate optional action
+   and apply `constraints.max_length` to `text`.
+2. Give both prompts the corresponding layout rules. Exercise a scheduling URL longer than
+   the body budget through the normal API and A07 workflow, and verify the web payloads.
+3. Retry the provider-backed S1, S2/S7 and S4 acceptance cases against the final prompt
+   fingerprints. Record the outcome of the provider check and keep semantic acceptance open
+   if generation cannot run.
+
+The API and worker tests passed for both modes. With a 50-character limit and a scheduling
+URL longer than 50 characters, the default layout returned a short body and a separate action.
+With explicit `single_text` and sufficient space, it returned the whole request in `text`.
+All 19 API bundle tests, 1,991 Freelancer Suite and evaluator tests, and 90 web tests passed.
+Config, architecture, docs and generated-doc checks passed, as did the web type check.
+
+All 42 acceptance inputs passed scenario and A07 schema and mapping checks, with 14 inputs
+per language. The browser submitted `single_text` for S1 warm RU, S4 firm EN and S2 firm ES
+on the main local configuration, and for S4 warm ES on the alternate configuration. Both
+configurations reached the provider and returned HTTP 401. Final-prompt semantic acceptance
+still requires successful runs with the exact inputs, tones and full results.
+
+### Live results after provider access was restored
+
+The browser returned a successful single-text result for all 42 Luna cases, with 14 inputs
+each in RU, EN and ES. The verified provider ledger matched the model and session. The
+deployed Update and Reply Draft prompts matched the current prompt files. The stored,
+displayed and copied text also matched on every run.
+
+- **S1.** All six runs kept the first-person Friday commitment and showed a distinct
+  neutral and warm delivery.
+- **S2/S7.** Three Russian runs omitted the photo request. The remaining six original
+  delay runs asked once, with some changing the sender or supplying an unstated recipient.
+  All nine designer-handoff runs kept the designer responsible and made no request to the
+  client. One had an ambiguous cause connector. The mixed Spanish case reported the
+  client's pricing-sheet responsibility without asking for the sheet.
+- **S4.** All nine runs kept the two-option offer in the first revision round before brief
+  context. Some restated disputed claims before the offer or changed or obscured who asked
+  for brightness. Only the English warm and firm runs met every assessed S4 criterion.
+
+In all, 25 of 42 Luna runs met every assessed criterion. The 18 comparison runs used nine
+of the same inputs per model. On the six original S2/S7 cases in that sample, Terra asked
+for the photos in 6 of 6 runs, Sol in 5 of 6, and Luna in 4 of 6. The comparison did not
+include the full matrix. The default model remains Luna.
+
+[Final live evidence](any-851-tone-and-reply-order-final-live.evidence.json)
+
+Live generation is available. The semantic acceptance of the current prompts remains
+open due to the recorded failures.

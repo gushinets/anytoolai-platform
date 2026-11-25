@@ -11,6 +11,11 @@
       "type": "string",
       "enum": ["neutral", "warm", "firm"]
     },
+    "output_layout": {
+      "type": "string",
+      "enum": ["single_text"],
+      "description": "Put the full message in text. When omitted, a separate call_to_action is optional."
+    },
     "constraints": {
       "type": "object",
       "properties": {
