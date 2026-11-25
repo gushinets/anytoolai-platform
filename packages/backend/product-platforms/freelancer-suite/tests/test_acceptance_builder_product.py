@@ -32,7 +32,11 @@ FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "provider" / "fake_provider_ou
 DRAFT = "acceptance_builder.draft_v1"
 CHECK = "acceptance_builder.check_v1"
 STEP_ACTION_TYPES = {
-    DRAFT: ("text.extract_structured_fields",),
+    DRAFT: (
+        "text.extract_structured_fields",
+        "text.detect_issues_by_taxonomy",
+        "text.generate_clarifying_questions",
+    ),
     CHECK: (
         "text.extract_structured_fields",
         "text.compare_and_classify",
@@ -45,6 +49,8 @@ OUTPUT_SCHEMA_REFS = {
 # fixture stem -> kernel schema its response_json must satisfy (the atom's own output schema)
 FIXTURE_KERNEL_SCHEMAS = {
     "acceptance_builder.extract_v1": "kernel.schemas.extract_output_v1",
+    "acceptance_builder.detect_issues_v1": "kernel.schemas.issue_detection_output_v1",
+    "acceptance_builder.generate_questions_v1": "kernel.schemas.generate_questions_output_v1",
     "acceptance_builder.compare_v1": "kernel.schemas.compare_classify_output_v1",
     "acceptance_builder.draft_document_v1": "kernel.schemas.generate_document_output_v1",
     "acceptance_builder.check_document_v1": "kernel.schemas.generate_document_output_v1",
@@ -162,7 +168,10 @@ def test_no_mapping_path_uses_brackets_or_numeric_segments() -> None:
                     paths.append(target)
                     if not source.startswith("literal:"):
                         paths.append(source.removeprefix("?"))
-            assert "when" not in step  # branching lives in the scenario split, not in `when`
+            if workflow["workflow_id"] == DRAFT and step["step_id"] == "generate_questions":
+                assert step["when"] == "steps.detect_issues.output.issues"
+            else:
+                assert "when" not in step
 
     assert paths
     for path in paths:
@@ -177,8 +186,19 @@ def test_every_step_writes_its_own_key_of_the_composed_workflow_output(workflow_
 
     assert all(t.startswith("context.workflow_output.") for t in targets)  # never the whole output
     keys = {t.removeprefix("context.workflow_output.") for t in targets}
-    assert len(keys) == len(targets)
-    assert keys == set(schema["properties"]) == set(schema["required"])
+    if workflow_id == DRAFT:
+        target = "context.workflow_output.questions"
+        assert targets.count(target) == 2
+        assert _steps(DRAFT)["detect_issues"]["output_mapping"][target] == "literal:[]"
+        assert len(keys) == len(targets) - 1
+    else:
+        assert len(keys) == len(targets)
+    assert keys == set(schema["properties"])
+    if workflow_id == DRAFT:
+        assert schema["required"] == ["extracted"]
+        assert schema["dependentRequired"] == {"issues": ["questions"], "questions": ["issues"]}
+    else:
+        assert keys == set(schema["required"])
 
 
 def test_config_owned_literals_agree_with_the_output_schemas() -> None:
@@ -189,7 +209,10 @@ def test_config_owned_literals_agree_with_the_output_schemas() -> None:
         fields = _literal(extract["fields"])
         assert _literal(extract["strict"]) is True
         assert [f["name"] for f in fields] == EXTRACTED_FIELDS + ["analysis_language"]
-        assert {f["type"] for f in fields} == {"array_of_strings", "string"}
+        list_type, language_type = (
+            ("nonempty_text_list", "language_tag") if workflow_id == DRAFT else ("array_of_strings", "string")
+        )
+        assert [f["type"] for f in fields] == [list_type] * len(EXTRACTED_FIELDS) + [language_type]
         extracted = _load_schema(OUTPUT_SCHEMA_REFS[workflow_id])["properties"]["extracted"][
             "properties"
         ]
@@ -242,7 +265,7 @@ def test_a01_field_invariants_hold_for_every_configured_field(state: str) -> Non
     complete = _fixture_response("acceptance_builder.extract_v1")
 
     def output(extracted: dict[str, Any]) -> dict[str, Any]:
-        return {"extracted": extracted}
+        return {"extracted": extracted, "issues": [], "questions": []}
 
     assert validator.is_valid(output(complete))  # control: every field present, none missing
     for name in EXTRACTED_FIELDS:
@@ -302,6 +325,21 @@ def test_inlined_kernel_atom_output_copies_stay_in_sync_with_the_kernel_schemas(
     draft = _load_schema(OUTPUT_SCHEMA_REFS[DRAFT])
     kernel_extract = _load_schema("kernel.schemas.extract_output_v1")
     kernel_compare = _load_schema("kernel.schemas.compare_classify_output_v1")
+
+    steps = _steps(DRAFT)
+    props = draft["properties"]
+    taxonomy = _literal(steps["detect_issues"]["input_mapping"]["taxonomy"])
+    assert _literal(steps["generate_questions"]["input_mapping"]["taxonomy"]) == taxonomy
+    for field, atom in (("issues", "issue_detection"), ("questions", "generate_questions")):
+        item = props[field]["items"]
+        kernel = _load_schema(f"kernel.schemas.{atom}_output_v1")
+        _assert_same_shape(item, kernel["properties"][field]["items"], field)
+        assert item["properties"]["category"]["enum"] == taxonomy
+    assert (
+        _literal(steps["generate_questions"]["input_mapping"]["max_questions"])
+        == props["questions"]["maxItems"]
+        == 5
+    )
 
     # The extract copy is identical in both product schemas.
     assert draft["properties"]["extracted"] == check["properties"]["extracted"]
@@ -373,6 +411,8 @@ def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document
         "acceptance_criteria",
         "assumptions",
         "deliverables",
+        "risks",
+        "client_questions",
         "open_gaps",
     ]
     for block in blocks.values():
@@ -384,7 +424,10 @@ def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document
                 assert _resolves(schemas[scenario_id], path), (scenario_id, path)
     # The verdict block exists only where there is a comparison.
     assert blocks["verdict"]["scenarios"] == [CHECK]
-    assert all("scenarios" not in b for b in copy_text["blocks"] if b["block_id"] != "verdict")
+    for key in ("risks", "client_questions"):
+        assert blocks[key]["scenarios"] == [DRAFT]
+    for key in (*EXTRACTED_FIELDS, "open_gaps"):
+        assert "scenarios" not in blocks[key]
     # Every list block's absent-list text is the one the output schemas pin for the document.
     for block_id in ("acceptance_criteria", "assumptions", "deliverables"):
         assert blocks[block_id]["when_absent"] == "analysis_language.missing"
@@ -402,7 +445,8 @@ def test_copy_text_is_derived_from_structured_fields_never_from_the_a10_document
     assert "when_empty" in blocks["open_gaps"] and "when_absent" not in blocks["open_gaps"]
     complete = _fixture_response("acceptance_builder.extract_v1")
     assert complete["missing_fields"] == []  # the normal no-gap case is empty, not absent
-    assert blocks["open_gaps"]["when_empty"] == "analysis_language.complete"
+    assert blocks["open_gaps"]["when_empty"] == "analysis_language.lists_present"
+    assert blocks["open_gaps"]["when_empty_check"] == "analysis_language.complete"
     # Each block's source is also a rendered part, so the page and the copy agree on the authority.
     part_fields = {part["field"] for part in contract["parts"]}
     assert {block["source"] for block in copy_text["blocks"]} - {

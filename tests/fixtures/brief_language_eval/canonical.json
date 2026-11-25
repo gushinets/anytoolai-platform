@@ -111,7 +111,9 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    }
+    },
+    "issues": [],
+    "questions": []
   },
   "ANY761-AB-C-RU-basic": {
     "extracted": {
@@ -277,7 +279,9 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    }
+    },
+    "issues": [],
+    "questions": []
   },
   "ANY761-AB-C-EN-basic": {
     "extracted": {
@@ -443,7 +447,9 @@
         "assumptions": 0.95,
         "deliverables": 0.95
       }
-    }
+    },
+    "issues": [],
+    "questions": []
   },
   "ANY761-AB-C-ES-basic": {
     "extracted": {
@@ -570,7 +576,23 @@
         "deliverables"
       ],
       "confidence": {}
-    }
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "severity": "high",
+        "description": "Не указан ожидаемый результат."
+      }
+    ],
+    "questions": [
+      {
+        "source_issue_index": 0,
+        "category": "missing_information",
+        "priority": "high",
+        "question": "Что вы хотите получить в итоге?",
+        "rationale": "Ответ определит результат работы."
+      }
+    ]
   },
   "ANY761-AB-C-RU-weak": {
     "extracted": {
@@ -685,7 +707,23 @@
         "deliverables"
       ],
       "confidence": {}
-    }
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "severity": "high",
+        "description": "The expected deliverable is unspecified."
+      }
+    ],
+    "questions": [
+      {
+        "source_issue_index": 0,
+        "category": "missing_information",
+        "priority": "high",
+        "question": "What would you like to receive?",
+        "rationale": "This identifies the deliverable."
+      }
+    ]
   },
   "ANY761-AB-C-EN-weak": {
     "extracted": {
@@ -800,7 +838,23 @@
         "deliverables"
       ],
       "confidence": {}
-    }
+    },
+    "issues": [
+      {
+        "category": "missing_information",
+        "severity": "high",
+        "description": "No se especifica el entregable."
+      }
+    ],
+    "questions": [
+      {
+        "source_issue_index": 0,
+        "category": "missing_information",
+        "priority": "high",
+        "question": "¿Qué resultado espera recibir?",
+        "rationale": "La respuesta define el entregable."
+      }
+    ]
   },
   "ANY761-AB-C-ES-weak": {
     "extracted": {

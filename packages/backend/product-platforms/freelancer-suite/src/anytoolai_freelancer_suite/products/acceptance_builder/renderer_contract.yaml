@@ -6,6 +6,8 @@ renderer_contract:
         - acceptance_criteria
         - assumptions
         - deliverables
+        - risks
+        - client_questions
         - open_gaps
         - analysis_language
     - scenario_id: acceptance_builder.check_v1
@@ -35,10 +37,15 @@ renderer_contract:
     - part_id: deliverables
       field: extracted.values.deliverables
       description: Same absent-list rule as `acceptance_criteria`.
+    - part_id: risks
+      field: issues
+      description: Risks, contradictions and ambiguities with supporting evidence when present.
+    - part_id: client_questions
+      field: questions
+      description: Up to five clarifying questions in priority order.
     - part_id: open_gaps
       field: extracted.missing_fields
-      description: The lists the brief does not state, by name. Empty means the brief states all three
-        lists.
+      description: The lists absent from the brief, plus every missing-information finding for Draft.
     - part_id: analysis_language
       field: extracted.values.analysis_language
       description: Case-insensitive analysis language selected from original brief, including explicit
@@ -76,11 +83,28 @@ renderer_contract:
         source: extracted.values.deliverables
         body: One "- <item>" line per item, in array order.
         when_absent: analysis_language.missing
+      - block_id: risks
+        scenarios:
+          - acceptance_builder.draft_v1
+        title: Risks and contradictions
+        source: issues
+        body: Localized category and description for each issue except missing_information, with indented evidence when present.
+        when_empty: analysis_language.no_risks
+      - block_id: client_questions
+        scenarios:
+          - acceptance_builder.draft_v1
+        title: Questions for the client
+        source: questions
+        body: Numbered questions in array order.
+        when_empty: analysis_language.no_questions
       - block_id: open_gaps
         title: Open gaps
         source: extracted.missing_fields
-        body: Localized name and confirmation request for each missing list; determined only by missing_fields.
-        when_empty: analysis_language.complete
+        body: Localized name and confirmation request for each missing list. Draft also includes each
+          missing_information issue description and evidence from issues, in issue order, regardless
+          of whether a question references it.
+        when_empty: analysis_language.lists_present
+        when_empty_check: analysis_language.complete
     language_source: extracted.values.analysis_language
     supported_wording_languages:
       - en

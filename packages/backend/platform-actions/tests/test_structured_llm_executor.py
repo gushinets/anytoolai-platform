@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import tomllib
 from dataclasses import replace
 from pathlib import Path
@@ -58,6 +59,8 @@ from anytoolai_platform_core.structured_output.errors import (
     STRUCTURED_OUTPUT_VALIDATION_SAFE_MESSAGE,
     StructuredOutputValidationError,
 )
+from anytoolai_platform_core.structured_output.schemas import normalize_mapping
+
 from tests.db_support import provision_database
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -344,9 +347,9 @@ def test_structured_llm_executor_routes_calls_through_provider_gateway() -> None
     assert provider_request.correlation_id == "corr-456"
     assert provider_request.semantic_attempt_index == 1
     assert "Budget and timeline details" in provider_request.prompt
-    assert provider_request.response_schema == registry.get_schema(
-        "kernel.schemas.extract_output_v1"
-    ).schema
+    assert provider_request.response_schema == normalize_mapping(
+        registry.get_schema("kernel.schemas.extract_output_v1").schema
+    )
 
 
 def test_structured_llm_executor_owns_validation_retries_through_gateway_dtos() -> None:
@@ -720,17 +723,32 @@ def test_structured_llm_executor_retries_generate_gap_rewrites_on_cross_validati
     ]
 
 
-def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_validation_failure() -> (
-    None
-):
-    """A05 out-of-bounds source_issue_index must get the same semantic retry as any other
-    cross-validation failure, with deterministic physical provider-call accounting."""
+@pytest.mark.parametrize(
+    ("invalid_question_fields", "taxonomy"),
+    [
+        pytest.param({"source_issue_index": 5}, {}, id="out-of-bounds-index"),
+        pytest.param(
+            {"category": "certificate_content"},
+            {"taxonomy": ["timeline", "scope"]},
+            id="unknown-taxonomy-category",
+        ),
+    ],
+)
+def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_validation_failure(
+    invalid_question_fields: dict[str, Any], taxonomy: dict[str, list[str]]
+) -> None:
+    """A05 retries invalid fields before publishing the action's structured output."""
     registry = build_config_registry(CONFIG_ROOT)
+    question = {
+        "question": "q",
+        "rationale": "r",
+        "priority": "high",
+        "category": "timeline",
+        "source_issue_index": 0,
+    }
     spy_gateway = _TwoAttemptSpyGateway(
-        '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
-        '"category": "timeline", "source_issue_index": 5}]}',
-        '{"questions": [{"question": "q", "rationale": "r", "priority": "high", '
-        '"category": "timeline", "source_issue_index": 0}]}',
+        json.dumps({"questions": [{**question, **invalid_question_fields}]}),
+        json.dumps({"questions": [question]}),
     )
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
@@ -768,23 +786,14 @@ def test_structured_llm_executor_retries_on_generate_clarifying_questions_cross_
             "issues": [{"category": "timeline", "description": "d", "severity": "high"}],
             "context": "context",
             "target_audience": "audience",
+            **taxonomy,
         },
     )
     session = object()
 
     response = asyncio.run(executor.execute(request, session=session))
 
-    assert response.structured_output == {
-        "questions": [
-            {
-                "question": "q",
-                "rationale": "r",
-                "priority": "high",
-                "category": "timeline",
-                "source_issue_index": 0,
-            }
-        ]
-    }
+    assert response.structured_output == {"questions": [question]}
     assert [gateway_request.semantic_attempt_index for gateway_request in spy_gateway.requests] == [
         1,
         2,
@@ -936,7 +945,12 @@ def test_structured_llm_executor_retries_on_invalid_date_with_actionable_feedbac
     )
 
 
-def test_structured_llm_executor_finalize_cross_validation_uses_resolved_action_type() -> None:
+@pytest.mark.parametrize(
+    ("category", "description"),
+    [("not_in_taxonomy", "d"), ("timeline", "\u200b")],
+    ids=["taxonomy", "publication-schema"],
+)
+def test_structured_llm_executor_finalize_rejects_exhausted_output(category, description) -> None:
     """ANY-251 regression: the retry loop resolves the cross-validator via
     `action_config.action_type`, but `_finalize_response` used to look it up via
     `request.action_type` instead -- a different field that direct executor callers are not
@@ -945,10 +959,9 @@ def test_structured_llm_executor_finalize_cross_validation_uses_resolved_action_
     validator resolved from the action config, not silently skip it and let an already-exhausted,
     taxonomy-violating response be accepted as a successful final output."""
     registry = build_config_registry(CONFIG_ROOT)
-    spy_gateway = _FixedResponseSpyGateway(
-        '{"issues": [{"category": "not_in_taxonomy", '
-        '"description": "d", "severity": "high"}]}'
-    )
+    spy_gateway = _FixedResponseSpyGateway(json.dumps({
+        "issues": [{"category": category, "description": description, "severity": "high"}]
+    }))
     executor = StructuredLlmActionExecutor(
         config_registry=registry,
         provider_gateway=spy_gateway,

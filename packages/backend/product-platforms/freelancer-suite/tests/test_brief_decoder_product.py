@@ -217,8 +217,12 @@ def test_a05_is_guarded_and_a10_reads_its_output_optionally() -> None:
 # `brief.values`. Code review finding (round #1, finding #8): a names-only comparison would miss
 # e.g. `target_audience` silently changing from `string` to `array_of_strings` in the literal.
 _A01_TYPE_TO_JSON_SCHEMA_TYPE = {
-    "string": {"type": "string"},
-    "array_of_strings": {"type": "array", "items": {"type": "string"}},
+    "nonblank_string": {"type": "string", "minLength": 1, "pattern": r"\S"},
+    "nonempty_text_list": {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string", "minLength": 1, "pattern": r"\S"},
+    },
 }
 
 
@@ -229,6 +233,7 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     steps = _steps()
     fields = _literal(steps["extract"]["input_mapping"]["fields"])
     taxonomy = _literal(steps["detect_issues"]["input_mapping"]["taxonomy"])
+    assert _literal(steps["generate_questions"]["input_mapping"]["taxonomy"]) == taxonomy
     schema = _load_schema("brief_decoder.decode_output_v1")["properties"]
     value_properties = schema["brief"]["properties"]["values"]["properties"]
 
@@ -237,9 +242,6 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     assert set(schema["brief"]["properties"]["missing_fields"]["items"]["enum"]) == set(field_names)
     assert set(schema["brief"]["properties"]["confidence"]["properties"]) == set(field_names)
     assert set(schema["issues"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
-    # Code review finding (me #1): A05's questions[].category reuses its source issue's
-    # category (generate_questions.v1.md) -- it must be closed over the same taxonomy, not left
-    # an open string the A05 cross-validator never checks.
     assert set(schema["questions"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
     assert _literal(steps["extract"]["input_mapping"]["strict"]) is False
     # Code review finding (me #7): the canonical schema's question cap must equal what A05 is
@@ -251,11 +253,7 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     for field in fields:
         expected_shape = _A01_TYPE_TO_JSON_SCHEMA_TYPE[field["type"]]
         declared_property = value_properties[field["name"]]
-        assert declared_property["type"] == expected_shape["type"], field["name"]
-        if expected_shape["type"] == "array":
-            assert declared_property["items"]["type"] == expected_shape["items"]["type"], (
-                field["name"]
-            )
+        assert declared_property == expected_shape, field["name"]
 
 
 @pytest.mark.parametrize("state", ["present_and_missing", "absent_from_both", "confidence_only"])

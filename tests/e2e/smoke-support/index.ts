@@ -102,7 +102,7 @@ export async function overrideResult(page: Page, output: unknown): Promise<void>
 }
 
 /** The backend's own rows for one session: job, ordered action runs, provider calls. */
-export async function expectCorrelatedRun(sessionId: string, resultArtifactId: string, actionIds: string[]): Promise<void> {
+export async function expectCorrelatedRun(sessionId: string, resultArtifactId: string, actionIds: string[], skippedActionIds: string[] = []): Promise<void> {
   expect(sessionId).toBeTruthy();
   await withDb(async (db) => {
     const job = await db.query<{ id: string; status: string; result_artifact_id: string }>(
@@ -117,14 +117,17 @@ export async function expectCorrelatedRun(sessionId: string, resultArtifactId: s
       "SELECT id, action_config_id, status::text AS status FROM platform.action_runs WHERE scenario_session_id = $1 AND job_id = $2 ORDER BY created_at, id",
       [sessionId, job.rows[0].id],
     );
-    expect(actions.rows.map((row) => row.action_config_id)).toEqual(actionIds);
-    expect(actions.rows.map((row) => row.status)).toEqual(actionIds.map(() => "succeeded"));
+    const performed = actions.rows.filter((row) => row.status !== "skipped");
+    const skipped = actions.rows.filter((row) => row.status === "skipped");
+    expect(skipped.map((row) => row.action_config_id)).toEqual(skippedActionIds);
+    expect(performed.map((row) => row.action_config_id)).toEqual(actionIds);
+    expect(performed.map((row) => row.status)).toEqual(actionIds.map(() => "succeeded"));
 
     const calls = await db.query<{ action_run_id: string; status: string }>(
       "SELECT action_run_id, status::text AS status FROM platform.provider_calls WHERE scenario_session_id = $1 AND job_id = $2 ORDER BY created_at, id",
       [sessionId, job.rows[0].id],
     );
-    expect(calls.rows.map((row) => row.action_run_id)).toEqual(actions.rows.map((row) => row.id));
+    expect(calls.rows.map((row) => row.action_run_id)).toEqual(performed.map((row) => row.id));
     expect(calls.rows.map((row) => row.status)).toEqual(actionIds.map(() => "succeeded"));
   });
 }

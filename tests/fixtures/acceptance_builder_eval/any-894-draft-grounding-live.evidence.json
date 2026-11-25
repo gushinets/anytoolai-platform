@@ -1,0 +1,3993 @@
+{
+  "date": "2026-11-24",
+  "base_commit": "6ebfcfb3fde92e53e0d3f99a79bed30355ff318d",
+  "working_tree_changes": true,
+  "workflow": "acceptance_builder.draft_v1",
+  "workflow_version": 1,
+  "provider_policy": "sol_text_generation_v1",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "medium",
+  "execution": "Local API and worker with isolated SQLite per session, generated live deployment profile, real provider, saved result fetched via GET /v1/results/{id}.",
+  "product_source_fingerprint": "fe7999d1d7c0fae346d5f04f5778f778142fb568dabd4440ed74ea17d69a6f9d",
+  "profile_fingerprint": "554eda550a17e7ce774ad8b27b1a599549627e763f99fec0e8627ed35169d15b",
+  "runtime_files_sha256": {
+    "configs/kernel/schemas/extract_input.schema.json": "2a071c3486670f07cb37a4be5b063d2052ba846c650daa1a6ba79f7210f2cde0",
+    "configs/kernel/schemas/extract_output.schema.json": "41355987226e757eec3bddcd4c3c209e71482d9feecd2bfc7bf5aa4267f55d39",
+    "configs/kernel/schemas/generate_questions_input.schema.json": "bd8a8822e4b915ea9ae73d002952634c54bca1a78b3c5b13461783701a80e728",
+    "configs/kernel/schemas/generate_questions_output.schema.json": "5c05a55030cb9d0a53ef85135fb6951dea24a146ec1dc5bb50a2909cf037be24",
+    "configs/kernel/schemas/issue_detection_input.schema.json": "c9417173e1aab40cc7f96658fb99dcad3be0f005c65488941664bbaaf7468913",
+    "configs/kernel/schemas/issue_detection_output.schema.json": "2ea21cf076765c24c4e4140f985f2b3ee1e8c4c6e83943b0cad3cca61b11c5b4",
+    "configs/kernel/litellm_router.yaml": "dede022d99bc94440ea14f212cc669d939a39b51dbb73e8d0ef83ef5510aa1d2",
+    "configs/kernel/provider_policies.yaml": "1adb1ed1fd916f68580410d3afda2ceb15fe596390bf60c7292190f3a84096cf",
+    "packages/backend/platform-actions/src/anytoolai_platform_actions/structured_llm/cross_validation/extract_structured_fields.py": "d5eaf4c62b5bcf117235ef5edf46ef2e64cbc4f8ff0dd02850de3a2326d09c3f"
+  },
+  "cases": {
+    "AB-894-B-RU": {
+      "family": "vague",
+      "language": "ru",
+      "input": {
+        "brief_text": "Нужен сайт для моего бизнеса. Хочется красиво и современно, чтобы клиенты шли. Пишите, кто может сделать."
+      }
+    },
+    "AB-894-B-EN": {
+      "family": "vague",
+      "language": "en",
+      "input": {
+        "brief_text": "I need a website for my business. I want it to look beautiful and modern and bring in customers. Get in touch if you can do it."
+      }
+    },
+    "AB-894-B-ES": {
+      "family": "vague",
+      "language": "es",
+      "input": {
+        "brief_text": "Necesito un sitio web para mi negocio. Quiero que sea bonito y moderno y que atraiga clientes. Escríbanme si pueden hacerlo."
+      }
+    },
+    "AB-894-C-RU": {
+      "family": "feasibility",
+      "language": "ru",
+      "input": {
+        "brief_text": "Нужен интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С. Сдача завтра, потому что в пятницу запуск рекламы. Бюджет 15 000 рублей. Правок будет немного, но по ходу всё может поменяться. Дизайн придумайте сами, мне нравится как у больших сайтов."
+      }
+    },
+    "AB-894-C-EN": {
+      "family": "feasibility",
+      "language": "en",
+      "input": {
+        "brief_text": "We need an online shop with 500 products, customer accounts, online payment and 1C integration. Delivery tomorrow because advertising starts on Friday. Budget: 15 000 rubles. There will be few revisions, but everything may change along the way. Come up with the design yourselves; I like what big sites do."
+      }
+    },
+    "AB-894-C-ES": {
+      "family": "feasibility",
+      "language": "es",
+      "input": {
+        "brief_text": "Necesitamos una tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C. Entrega mañana porque la publicidad empieza el viernes. Presupuesto: 15 000 rublos. Habrá pocos cambios, pero todo puede cambiar sobre la marcha. Proponed el diseño; me gustan los sitios grandes."
+      }
+    },
+    "AB-894-CTRL-CONTRADICTION-RU": {
+      "family": "contradiction",
+      "language": "ru",
+      "input": {
+        "brief_text": "Нужен лендинг для курса. Страница должна быть только на русском языке. На странице нужна полная английская версия. Срок — 10 рабочих дней, бюджет 40 000 рублей. Нужна форма заявки с отправкой на почту."
+      }
+    },
+    "AB-894-CTRL-CONTRADICTION-EN": {
+      "family": "contradiction",
+      "language": "en",
+      "input": {
+        "brief_text": "We need a landing page for a course. The page must be in Russian only. The page needs a full English version. Deadline: 10 business days, budget: 40 000 rubles. We need an application form that sends submissions by email."
+      }
+    },
+    "AB-894-CTRL-CONTRADICTION-ES": {
+      "family": "contradiction",
+      "language": "es",
+      "input": {
+        "brief_text": "Necesitamos una página de aterrizaje para un curso. La página debe estar solo en ruso. La página necesita una versión completa en inglés. Plazo: 10 días hábiles, presupuesto: 40 000 rublos. Necesitamos un formulario de solicitud que envíe las solicitudes por correo electrónico."
+      }
+    },
+    "AB-894-CTRL-COMPLETE-RU": {
+      "family": "complete",
+      "language": "ru",
+      "input": {
+        "brief_text": "Нужен лендинг для онлайн-школы: 5 блоков (оффер, программа, преподаватель, тарифы, форма заявки). Тексты и фото предоставляем мы. Форма отправляет заявку на почту info@school.example. Адаптив под мобильные. Срок — 14 рабочих дней, бюджет 60 000 рублей, 2 раунда правок включены. Приёмка: все блоки свёрстаны по согласованному макету, форма доставляет тестовую заявку."
+      }
+    },
+    "AB-894-CTRL-COMPLETE-EN": {
+      "family": "complete",
+      "language": "en",
+      "input": {
+        "brief_text": "We need a landing page for an online school with 5 blocks (offer, curriculum, teacher, pricing, application form). We supply the text and photos. The form sends applications to info@school.example. Mobile layout required. Deadline: 14 business days, budget: 60 000 rubles, 2 rounds of revisions included. Acceptance: all blocks follow the approved layout and the form delivers a test application."
+      }
+    },
+    "AB-894-CTRL-COMPLETE-ES": {
+      "family": "complete",
+      "language": "es",
+      "input": {
+        "brief_text": "Necesitamos una página de aterrizaje para una escuela en línea con 5 bloques (oferta, programa, docente, tarifas, formulario de solicitud). Nosotros proporcionamos los textos y las fotos. El formulario envía las solicitudes al correo info@school.example. Adaptación para móviles. Plazo: 14 días hábiles, presupuesto: 60 000 rublos, se incluyen 2 rondas de revisiones. Aceptación: todos los bloques siguen el diseño acordado y el formulario entrega una solicitud de prueba."
+      }
+    }
+  },
+  "rubric": {
+    "vague": [
+      "The business website is the only specified deliverable. Style and customer growth are wishes.",
+      "Ask openly for required pages/functions and for the decision that approves the design. No platform, deadline, deliverable or number is presupposed."
+    ],
+    "feasibility": [
+      "500 products, customer accounts, payment and 1C must fit tomorrow’s delivery and a budget of 15 000 rubles. Advertising starts Friday; the store launch is undated. Each mention of a date or amount must retain its subject and status.",
+      "Identify the combined feasibility risk and the open revision scope. Ask what work to prioritize or bound, without inventing a commitment or declaring delivery impossible."
+    ],
+    "contradiction": [
+      "Report both conflicting language requirements with their evidence. Ask the client which language/version to deliver; neither alternative is agreed.",
+      "Preserve the independent email form requirement."
+    ],
+    "complete": [
+      "Preserve all five named blocks, agreed layout, client-supplied text and photos, test form delivery and recipient, mobile support, 14 business days, 60 000 rubles and two included revision rounds.",
+      "The brief is complete and consistent. No findings or questions."
+    ]
+  },
+  "runs": [
+    {
+      "case_id": "AB-894-B-EN",
+      "run": 1,
+      "session_id": "scenario_session_01795508187076814713_0000000004_50fb69d708434ef8bb47515a49b9f133",
+      "job_id": "job_01795508187134613346_0000000012_10cd7e559c34446aa1929c7a85060fbf",
+      "result_id": "artifact_01795508202981223057_0000000133_c123b7d5a50e4c88bcf6a0ba9f3104fd",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en",
+            "deliverables": [
+              "A website for the client's business."
+            ]
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "The required pages and functions are unspecified, leaving the website’s scope and completion criteria undefined.",
+            "severity": "high",
+            "evidence": "I need a website for my business."
+          },
+          {
+            "category": "ambiguity",
+            "description": "The request for a beautiful, modern website does not define a design approval process or an agreed basis for accepting its appearance.",
+            "severity": "medium",
+            "evidence": "I want it to look beautiful and modern"
+          },
+          {
+            "category": "ambiguity",
+            "description": "The goal of bringing in customers does not clarify whether acceptance depends on customer acquisition results or on delivering agreed website features that support that goal.",
+            "severity": "medium",
+            "evidence": "bring in customers"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Which pages and features must your website include for you to consider it complete?",
+            "rationale": "This defines the scope of the website and what must be delivered for acceptance.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "How would you like to review and approve the website’s design before it is built?",
+            "rationale": "An agreed design approval process establishes when the website’s appearance meets your expectations.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Will you consider the website complete when the agreed features for attracting customers are delivered, or must it achieve a measurable customer acquisition result?",
+            "rationale": "This clarifies whether acceptance depends on delivering the website or on its business results.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508187379584179_0000000050_fb9df9f3c6f54b83a27d3febf75f80a0",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508187338364401_0000000042_5bbfc578a6af4a1c9ba42f10de17b9e6",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508192532792779_0000000080_6ac2bb2c81e34d16abc4c219601a218f",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508192525253612_0000000078_262fc8de7e794719ae8388ed35ff5da8",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508197909852424_0000000110_2db092ec80b94ab7845b2db763ce2b66",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508197903291868_0000000108_1e31e0ecf3e24aac830f023f33d963dd",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "A website for the client's business.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-EN",
+      "run": 2,
+      "session_id": "scenario_session_01795508249502256189_0000000514_aec6a1d3d64a42f3a887115070a2a0ad",
+      "job_id": "job_01795508249517797561_0000000516_1fb914a2bfae46cab49df13e85e56cb4",
+      "result_id": "artifact_01795508266513199833_0000000655_a7f32e01c3854d29be9dcbc23309b452",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en",
+            "deliverables": [
+              "A website for the client's business."
+            ]
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "The required pages and functions are unspecified, so the website's scope and completion criteria cannot be agreed.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "“Beautiful and modern” does not establish an agreed design direction or how the client will approve the design.",
+            "severity": "medium",
+            "evidence": "I want it to look beautiful and modern"
+          },
+          {
+            "category": "ambiguity",
+            "description": "It is unclear whether bringing in customers is a general business goal or an acceptance condition, and no measure of success is defined.",
+            "severity": "medium",
+            "evidence": "bring in customers"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Which pages and features must the website include for you to consider it complete?",
+            "rationale": "Your answer will define the work included and what must be delivered for completion.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "How would you like to review and approve the design before the website is built?",
+            "rationale": "Agreeing on an approval process will establish when the design meets your expectations.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Is bringing in customers a general goal, or must the website achieve a specific measurable result before you accept the work, and if so, what result?",
+            "rationale": "This will clarify whether customer acquisition is an aim or a condition for accepting the finished website.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508250714039137_0000000532_439c84d353514c439c70897502b9a5f4",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508250659247014_0000000524_78413186ee8c4c72bf7ea9645f13e889",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508253288291477_0000000574_622baa0896144cfea00785c8b7bb123e",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508253283606931_0000000572_08ce2b6b087d4db0808612fcaa76d953",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508261986171408_0000000630_b407ff15b6db4888b042cb41b5012a0f",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508261959310995_0000000626_bc75008b07e941e59521b4624ba1ead5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "A website for the client's business.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-EN",
+      "run": 3,
+      "session_id": "scenario_session_01795508309381972553_0000000987_b2d438fa49a7420ba387fa1b4bf404a0",
+      "job_id": "job_01795508309391429911_0000000989_844ccc21d5254b018c77fe946b4fa04f",
+      "result_id": "artifact_01795508321049301407_0000001125_f442316247044c66a2987a4fa02bb149",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "A website for the client's business."
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ],
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "The required website pages and functions are unspecified, leaving the deliverable and its acceptance scope undefined.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "The request for a beautiful, modern website does not establish design expectations or how the client will approve the design.",
+            "severity": "medium",
+            "evidence": "I want it to look beautiful and modern"
+          },
+          {
+            "category": "ambiguity",
+            "description": "The goal to bring in customers does not clarify whether acceptance depends on customer acquisition results or on agreed website features that support that goal.",
+            "severity": "medium",
+            "evidence": "bring in customers"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Which pages and functions must your website include for you to consider it complete?",
+            "rationale": "This defines what needs to be built and delivered.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "How would you like to review and approve the design before the website is built?",
+            "rationale": "Agreeing on a design approval process helps establish whether the proposed look meets your expectations.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Will you consider the website successful based on agreed features that help attract customers, or will completion depend on achieving specific customer acquisition results?",
+            "rationale": "This clarifies whether acceptance depends on the website delivered or on measurable business results.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508309457667485_0000000998_691983d841634b2e996a7869bf72ff9b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508309446227915_0000000996_c4d69426d5eb470aaa5d99f22597aa0f",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508312116992963_0000001039_756d061aa06c48d49bd329daceee1d9b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508312096530007_0000001037_63b1ef732ab846179223c06a6913523f",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508316825929636_0000001108_4d43c0ccb29741bfb549e2d4b4ab9c7c",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508316812621040_0000001106_8666005c566743509bb12844b01ea40d",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "A website for the client's business.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-ES",
+      "run": 1,
+      "session_id": "scenario_session_01795508187081005824_0000000005_04731d1f4c274684befef38bdac72861",
+      "job_id": "job_01795508187142931407_0000000014_9b7f0e8507f34af0a79537e656d3855b",
+      "result_id": "artifact_01795508202916263002_0000000128_cab0c0f67e6d40ba8553032b84db2c1d",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Un sitio web para el negocio del cliente."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ],
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "No se especifican las páginas ni las funciones que debe incluir el sitio web, por lo que falta delimitar el alcance del trabajo.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "La petición de un sitio «bonito y moderno» no define criterios de diseño ni cómo se aprobará su apariencia.",
+            "severity": "medium",
+            "evidence": "Quiero que sea bonito y moderno"
+          },
+          {
+            "category": "ambiguity",
+            "description": "El objetivo de atraer clientes no aclara si es una aspiración comercial o una condición de aceptación y, en este último caso, cómo se comprobará su cumplimiento.",
+            "severity": "medium",
+            "evidence": "que atraiga clientes"
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Qué páginas y funciones necesita que incluya el sitio web?",
+            "rationale": "Su respuesta permitirá delimitar qué debe incluir el sitio para considerar completo el trabajo.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Cómo le gustaría revisar y aprobar el diseño para confirmar que tiene la apariencia bonita y moderna que busca?",
+            "rationale": "Acordar cómo aprobará el diseño permitirá determinar cuándo su apariencia cumple con lo esperado.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Atraer clientes es un objetivo general del sitio o un requisito que debemos comprobar para dar el trabajo por aceptado y, en ese caso, cómo lo comprobaríamos?",
+            "rationale": "Esta distinción permitirá acordar si la aceptación depende de entregar el sitio o también de demostrar resultados comerciales.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508187345521776_0000000043_34e2f64f3c7a4f40a40f79cff4c6e631",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508187321747399_0000000038_b21cfb590cef4c529225ca01a49bc8e4",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508191973482774_0000000060_f6f81101f6f3456ba9654246246df538",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508191968542415_0000000058_1c080f8446f6422f934842b5a68aa4b5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508197814418026_0000000100_3e40abea637841408da4f4031a892dad",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508197806883016_0000000098_ae63f9c307b2424c85e6d5a2bb08e115",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "Un sitio web para el negocio del cliente.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-ES",
+      "run": 2,
+      "session_id": "scenario_session_01795508251957264050_0000000540_eed2562b06d54abbb9d5d9c7d3a9186d",
+      "job_id": "job_01795508251991604920_0000000542_729925249e0045b09abebb7472b73302",
+      "result_id": "artifact_01795508267672207065_0000000679_796bfb06a69d4d26b6eee96321b0943b",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Un sitio web para el negocio del cliente."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ],
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "No se especifican las páginas ni las funciones que debe incluir el sitio web, por lo que falta delimitar el alcance del encargo.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "La petición de un sitio «bonito y moderno» no define cómo se aprobará el diseño ni qué criterios permitirán aceptarlo.",
+            "severity": "medium",
+            "evidence": "Quiero que sea bonito y moderno"
+          },
+          {
+            "category": "ambiguity",
+            "description": "No se aclara si «que atraiga clientes» es un objetivo general o una condición de aceptación que requerirá resultados medibles.",
+            "severity": "medium",
+            "evidence": "que atraiga clientes"
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Qué páginas y funciones necesita que incluya el sitio web?",
+            "rationale": "Su respuesta permitirá delimitar qué debe incluir el sitio para considerar completo el trabajo.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Cómo le gustaría revisar y dar por aprobado el diseño del sitio web?",
+            "rationale": "Acordar cómo se aprobará el diseño permitirá determinar cuándo cumple sus expectativas.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Atraer clientes es un objetivo general del sitio o necesita que se alcance un resultado medible para aceptar el trabajo?",
+            "rationale": "Esta distinción permitirá establecer si la aceptación depende del sitio entregado o también de sus resultados comerciales.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508252230595385_0000000551_b020248b77474354873776cd920256d0",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508252190449319_0000000549_7934bda057c349fda83459ba98215fff",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508254642449959_0000000584_7d65d873b2424642b9eb4a8fcb0bd850",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508254611217221_0000000582_7149d55bb5d743d9b0c24def5d2eb913",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508263019499685_0000000648_dad3a04e65004460b957d53f6b47c5d1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508262985602064_0000000646_18a3edf08e194832b99a6505d8b7b51c",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "Un sitio web para el negocio del cliente.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-ES",
+      "run": 3,
+      "session_id": "scenario_session_01795508312487282370_0000001041_ffd637bf32214545ae4de5ef1e3d6b32",
+      "job_id": "job_01795508312499446851_0000001043_32eef0218afc477ab5e614be6c1591d4",
+      "result_id": "artifact_01795508325783272687_0000001183_4ab572d8f55e43c487c246e82dd8b6b1",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Un sitio web para el negocio del cliente."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ],
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "No se especifican las páginas ni las funciones que debe incluir el sitio web, por lo que falta delimitar qué se entregará.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "La petición de un sitio «bonito y moderno» no define cómo se aprobará el diseño ni qué criterios permitirán considerarlo aceptado.",
+            "severity": "medium",
+            "evidence": "Quiero que sea bonito y moderno"
+          },
+          {
+            "category": "ambiguity",
+            "description": "No se aclara si atraer clientes es un objetivo general o una condición de aceptación y, en este último caso, cómo se comprobará su cumplimiento.",
+            "severity": "medium",
+            "evidence": "que atraiga clientes"
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Qué páginas y funciones necesita que incluya el sitio web para considerarlo completo?",
+            "rationale": "Su respuesta permitirá delimitar qué debe entregarse para dar por terminado el sitio.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Cómo decidirá si el diseño propuesto cumple con lo que considera bonito y moderno y queda aprobado?",
+            "rationale": "Acordar cómo aprobará el diseño permitirá comprobar que el resultado cumple sus expectativas.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Atraer clientes es un objetivo general del sitio o una condición para aceptar el trabajo y, en ese caso, cómo se comprobará su cumplimiento?",
+            "rationale": "Esta distinción permitirá establecer si la aceptación depende del sitio entregado o también de resultados comerciales verificables.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508312579745014_0000001052_be85208689d545cb91dec72b8fe27a0a",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508312540210034_0000001050_9f462da803f145dc9827d9d8096b040b",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508314878671293_0000001075_585442fe263c4961b81d2467e42f4a7a",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508314846881010_0000001073_9ed07be9b5334cfba65144caa5ab735d",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508319949380685_0000001118_01872a00f9844745ba8c5e594de5f081",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508319924423103_0000001116_c1cf8530c00549d8b7195bc245846ab5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "Un sitio web para el negocio del cliente.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795508186954293453_0000000000_dc7e4e4cfbcd4ca388d90d42a68d29ab",
+      "job_id": "job_01795508187012585079_0000000002_90312dc62b854e2ab8d96db43bdbd252",
+      "result_id": "artifact_01795508206140644108_0000000175_2c41e7f906c44a5e80924a687d6e359d",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ],
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "Не определены необходимые страницы и функции сайта, поэтому нельзя согласовать объём работ и проверить полноту результата.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Пожелание «красиво и современно» не задаёт критериев и порядка согласования дизайна, поэтому неясно, на каком основании он будет принят.",
+            "severity": "medium",
+            "evidence": "Хочется красиво и современно"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Неясно, означает ли пожелание «чтобы клиенты шли» требование к возможностям сайта или обязательство обеспечить привлечение клиентов, что оставляет ожидаемый результат и границы ответственности исполнителя неопределёнными.",
+            "severity": "medium",
+            "evidence": "чтобы клиенты шли"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какие страницы и возможности обязательно должны быть на сайте?",
+            "rationale": "Это позволит согласовать объём работ и проверить, что готовый сайт включает всё необходимое.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Как вы будете согласовывать дизайн и определять, что он соответствует вашему пожеланию «красиво и современно»?",
+            "rationale": "Это поможет заранее установить понятный порядок принятия дизайна.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Под пожеланием «чтобы клиенты шли» вы подразумеваете создание сайта, через который клиентам удобно обращаться к вам, или также работу по привлечению клиентов?",
+            "rationale": "Это позволит определить, входит ли привлечение клиентов в обязанности исполнителя или работа ограничивается созданием сайта.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508187359257010_0000000046_d2279d0419884347836948bdb5b5821a",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508187241437168_0000000030_3e4a1dd5a72b436fa24bb8e144fd3b0d",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508192133663735_0000000070_1631357eb424431ebc6ada4ddb8a4963",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508192129104226_0000000068_dec4cc6483554812bb84a7c2fe4713b0",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508201669949474_0000000120_1f5fc5a39e74498ba7b4d50815402404",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508201662535584_0000000118_6d9cd8f29f4d4c8993db3afa8b2cfe2e",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "Сайт для бизнеса.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795508245848651363_0000000467_ba0d5ce1be8e46a1b15a0e0ba43c9a90",
+      "job_id": "job_01795508245853356257_0000000469_a1c8eae6d7db47ee8de1e050b824318d",
+      "result_id": "artifact_01795508261175301410_0000000611_6a63c277ba8948cbb2dc02c8815829c1",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса заказчика."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "Не определены обязательные страницы и функции сайта, поэтому нельзя согласовать объём работ и проверить полноту результата.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Пожелание «красиво и современно» не задаёт критериев оценки внешнего вида сайта и порядка согласования дизайна.",
+            "severity": "medium",
+            "evidence": "Хочется красиво и современно"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Фраза «чтобы клиенты шли» не уточняет, входит ли привлечение клиентов в работу исполнителя и влияет ли этот результат на приёмку сайта.",
+            "severity": "medium",
+            "evidence": "чтобы клиенты шли"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какие страницы и функции обязательно должны быть на сайте, чтобы вы считали работу выполненной?",
+            "rationale": "Это позволит согласовать объём работ и проверить полноту готового сайта.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Как вы будете согласовывать дизайн сайта и принимать решение, что он соответствует вашему пожеланию «красиво и современно»?",
+            "rationale": "Это поможет определить порядок утверждения дизайна и избежать разногласий при приёмке.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Пожелание «чтобы клиенты шли» — это общая цель сайта или обязательный результат работы исполнителя, от которого будет зависеть приёмка?",
+            "rationale": "Ответ позволит определить, входит ли привлечение клиентов в обязательства исполнителя и условия приёмки сайта.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508245880956930_0000000478_d48b8b723f8347e2b4195680f5d82e09",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508245874617343_0000000476_53082e83574b4fea95af4e496397adc5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508248126681476_0000000488_df327575fb4243ba976a647ec1a04672",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508248120176445_0000000486_498b787740214de29c50d326fad6f785",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508256264030924_0000000594_5520fe2c376549d69a6517f118d103a6",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508256244272601_0000000592_96f3a42871a5481aa1ff3381c9274880",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "Сайт для бизнеса заказчика.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-B-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795508309138411849_0000000974_f26a170770964fdf8311b2b5837c2400",
+      "job_id": "job_01795508309160734564_0000000976_86d32c665ec14fa0bfbcfd31cd2b41bb",
+      "result_id": "artifact_01795508321776275894_0000001149_3a81c4d3caa646ea824e849b042a8e26",
+      "output": {
+        "extracted": {
+          "values": {
+            "deliverables": [
+              "Сайт для бизнеса."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "acceptance_criteria",
+            "assumptions"
+          ],
+          "confidence": {
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [
+          {
+            "category": "missing_information",
+            "description": "Не определены необходимые страницы и функции сайта, поэтому объём работ и условия приёмки нужно согласовать до начала разработки.",
+            "severity": "high"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Пожелание сделать сайт красивым и современным не определяет, по каким конкретным признакам заказчик будет оценивать и утверждать дизайн.",
+            "severity": "medium",
+            "evidence": "«Хочется красиво и современно»"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Фраза «чтобы клиенты шли» не уточняет, является ли привлечение клиентов пожеланием или условием приёмки сайта и как в последнем случае будет оцениваться результат.",
+            "severity": "medium",
+            "evidence": "«чтобы клиенты шли»"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какие страницы и функции обязательно должны быть на сайте, чтобы вы приняли работу?",
+            "rationale": "Ответ позволит согласовать объём разработки и определить, что должно быть готово к приёмке сайта.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Как вы будете утверждать дизайн сайта: какие признаки будут означать для вас, что он достаточно красивый и современный?",
+            "rationale": "Ответ поможет установить понятные условия утверждения дизайна и избежать разногласий при его оценке.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Привлечение клиентов — это пожелание или обязательное условие приёмки сайта, и если условие, то по какому показателю и за какой период вы будете оценивать результат?",
+            "rationale": "Ответ позволит определить, зависит ли приёмка сайта от привлечения клиентов и как в таком случае проверять выполнение этого условия.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 2
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508309288893202_0000000985_f103411709a14e5b9bdf0e5fc9490c87",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508309261591764_0000000983_964cfa403c4c4bd79552b75ec95c83bf",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508311505991353_0000001023_e652ca26af864c0fa08cfaefb79bf3b6",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508311489556791_0000001020_5044c3f36cb94e6cb6b022bcf8b08025",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508316304821118_0000001098_e7f56a20ba1341b1bd95f805eb8e69d2",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508316285457297_0000001096_50d7c20f3c7c4b00833c28bc1f93458c",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The business website remains a deliverable. No acceptance criteria or project premises were supplied. Pages/features and design approval are open client decisions.",
+        "excerpt": "Сайт для бизнеса.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-EN",
+      "run": 1,
+      "session_id": "scenario_session_01795508203634887917_0000000144_1321542676494dba953adc6a615d3786",
+      "job_id": "job_01795508203673303949_0000000146_329168ecf97842e9aee59641de1b0400",
+      "result_id": "artifact_01795508239685011519_0000000395_ce5de9eb62f24b3cb33b559fb43ec95d",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The online shop contains 500 products.",
+              "The online shop supports customer accounts.",
+              "The online shop supports online payment.",
+              "The online shop integrates with 1C.",
+              "Delivery is due tomorrow.",
+              "The project budget is 15 000 rubles.",
+              "The freelancer develops the design."
+            ],
+            "assumptions": [
+              "Advertising starts on Friday.",
+              "Few revisions are expected, but requirements may change during the work."
+            ],
+            "deliverables": [
+              "An online shop.",
+              "A design for the online shop."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "The online shop with 500 products, customer accounts, online payment, 1C integration and freelancer-created design may not fit delivery tomorrow and a budget of 15 000 rubles, with advertising starting on Friday, so feasibility and priorities need agreement.",
+            "severity": "high",
+            "evidence": "online shop with 500 products, customer accounts, online payment and 1C integration / Delivery tomorrow because advertising starts on Friday. Budget: 15 000 rubles. / Come up with the design yourselves"
+          },
+          {
+            "category": "scope_risk",
+            "description": "The expectation of few revisions does not bound the work because requirements may change along the way, and no revision limit or change-approval process is defined.",
+            "severity": "medium",
+            "evidence": "There will be few revisions, but everything may change along the way."
+          },
+          {
+            "category": "missing_information",
+            "description": "The brief does not define how the client will approve the design or which specific visual references will guide that approval.",
+            "severity": "medium",
+            "evidence": "Come up with the design yourselves; I like what big sites do."
+          },
+          {
+            "category": "missing_information",
+            "description": "The 1C integration lacks an agreed target configuration, data to exchange and synchronization behavior, leaving its acceptance conditions undefined.",
+            "severity": "high",
+            "evidence": "1C integration"
+          },
+          {
+            "category": "missing_information",
+            "description": "The online payment requirement does not identify the payment provider or the payment flows that must pass acceptance testing.",
+            "severity": "medium",
+            "evidence": "online payment"
+          },
+          {
+            "category": "missing_information",
+            "description": "Customer accounts are required, but the customer actions and account functions included in delivery are not defined.",
+            "severity": "medium",
+            "evidence": "customer accounts"
+          },
+          {
+            "category": "missing_information",
+            "description": "Responsibility for supplying and loading the 500 products, including their descriptions, images and prices, is not assigned.",
+            "severity": "medium",
+            "evidence": "online shop with 500 products"
+          }
+        ],
+        "questions": [
+          {
+            "question": "With advertising starting on Friday, which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: the 500-product catalogue, customer accounts, online payment, 1C integration and the design?",
+            "rationale": "Agreeing on the essential work for tomorrow’s delivery will establish whether the scope can fit the deadline and budget.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "What information must the shop exchange with your 1C system, and in which direction and how often, for you to consider the integration complete?",
+            "rationale": "Defining the required information exchange will make the integration’s scope and completion conditions clear.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "What limit on included revisions should we agree on before further changes require separate approval of their cost and timing?",
+            "rationale": "An agreed revision limit will distinguish included adjustments from changes that affect the price or delivery date.",
+            "priority": "medium",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "How would you like to review and approve the proposed design before we build the shop?",
+            "rationale": "An agreed design approval step will provide a clear basis for proceeding with the build.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Which online payment service should customers be able to use when the shop is delivered?",
+            "rationale": "The selected payment service determines the setup and testing needed to accept online payments.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508203777585220_0000000166_6aa382e92bc34de591e6e03e0b53a9b7",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508203764128833_0000000163_4ba412d9d1c0416d8dd6efd7573c3e41",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508212978872711_0000000232_f3d099477eac459f8501a89869ff0b9c",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508212914334293_0000000230_197af4d4cfe74587bdd036bf66771df5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508226669476227_0000000320_b41efe406d9746b7b7f396808b7db6e5",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508226657030974_0000000318_98cc0bb5bac64eff9274a4b11546af99",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "With advertising starting on Friday, which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles: the 500-product catalogue, customer accounts, online payment, 1C integration and the design?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-EN",
+      "run": 2,
+      "session_id": "scenario_session_01795508261918305483_0000000618_a6a01457dd974df79ae9f7cca58a33f0",
+      "job_id": "job_01795508261946463231_0000000623_d8f75741d0e24a7aba45e8a23f42f3a7",
+      "result_id": "artifact_01795508292674607425_0000000821_581e489352ea4461a4c76497071ba244",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "The online shop includes 500 products.",
+              "The online shop supports customer accounts.",
+              "The online shop supports online payment.",
+              "The online shop integrates with 1C.",
+              "Delivery is due tomorrow.",
+              "The project budget is 15 000 rubles.",
+              "The freelancer develops the design."
+            ],
+            "assumptions": [
+              "Advertising starts on Friday.",
+              "Few revisions are anticipated.",
+              "Requirements may change during the project."
+            ],
+            "deliverables": [
+              "An online shop.",
+              "A design for the online shop."
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "The online shop with 500 products, customer accounts, online payment and 1C integration may not fit delivery tomorrow and a budget of 15 000 rubles, with advertising starting on Friday, so the scope, delivery commitment and budget need to be reconciled before agreement.",
+            "severity": "high",
+            "evidence": "“online shop with 500 products, customer accounts, online payment and 1C integration” / “Delivery tomorrow because advertising starts on Friday” / “Budget: 15 000 rubles”"
+          },
+          {
+            "category": "scope_risk",
+            "description": "The allowance for everything to change leaves requirements and revisions unbounded despite the expectation of few revisions, with no agreed change-control or additional-payment process.",
+            "severity": "high",
+            "evidence": "There will be few revisions, but everything may change along the way."
+          },
+          {
+            "category": "missing_information",
+            "description": "The brief leaves design creation to the freelancer but does not establish how the client will approve the design or which visual decisions must be approved before implementation.",
+            "severity": "medium",
+            "evidence": "Come up with the design yourselves; I like what big sites do."
+          },
+          {
+            "category": "missing_information",
+            "description": "The required 1C integration lacks a defined target configuration, data to exchange, synchronization direction and acceptance checks, leaving its scope unresolved.",
+            "severity": "high",
+            "evidence": "1C integration"
+          },
+          {
+            "category": "missing_information",
+            "description": "Responsibility for supplying and loading the 500 products, including their descriptions, images and prices, is not specified.",
+            "severity": "medium",
+            "evidence": "an online shop with 500 products"
+          },
+          {
+            "category": "missing_information",
+            "description": "The online payment requirement does not identify the payment provider or the payment outcomes that must be demonstrated for acceptance.",
+            "severity": "medium",
+            "evidence": "online payment"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles, given that advertising starts on Friday?",
+            "rationale": "This establishes the scope required for tomorrow so its feasibility can be assessed against the budget.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "How should we agree on changes to previously approved work, including any effect on cost and delivery time?",
+            "rationale": "An agreed change process keeps revisions manageable if requirements change during the project.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "What information must the shop and your 1C system exchange for you to consider the integration complete?",
+            "rationale": "Defining the required information exchange establishes the integration scope and what must be demonstrated for acceptance.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "How would you like to approve the proposed design before we build the shop?",
+            "rationale": "An agreed design approval step provides a clear basis for implementation and reduces avoidable rework.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Who will be responsible for supplying and uploading the descriptions, images and prices for the 500 products?",
+            "rationale": "Assigning responsibility for product content clarifies the work included and what is needed to populate the shop.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508262050750864_0000000638_2ab936900b6347bcb257a4bc5276ded6",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508262043337755_0000000636_0c4b178c03ee417195c879bc7a9a3094",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508268867851913_0000000693_f4014c8aa6c54d36befc6e22b7ed17d3",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508268842286309_0000000691_e0ae9e44dbc4486da5f753557dbf553d",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508283437291397_0000000746_4c3a70be51cb402d8a2609c32eeac4d7",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508283416683000_0000000744_1cff0bfee27e407db4a61966a11e63f7",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "Which parts of the shop must be ready for delivery tomorrow within the budget of 15 000 rubles, given that advertising starts on Friday?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-EN",
+      "run": 3,
+      "session_id": "scenario_session_01795508321624475424_0000001131_d9713bcd78714ced9a348e6b458d03f5",
+      "job_id": "job_01795508321629207188_0000001133_5ed5350681d4404092ecf82ef1494279",
+      "result_id": "artifact_01795508350744192406_0000001345_f9dc7376600d486998659b231b6bd414",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The online shop contains 500 products.",
+              "The online shop supports customer accounts.",
+              "The online shop supports online payment.",
+              "The online shop integrates with 1C.",
+              "Delivery is due tomorrow.",
+              "The project budget is 15 000 rubles.",
+              "The freelancer develops the design themselves."
+            ],
+            "assumptions": [
+              "Advertising starts on Friday.",
+              "Few revisions are anticipated, but everything may change during the project."
+            ],
+            "deliverables": [
+              "An online shop.",
+              "A design developed by the freelancer."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "The combined scope of an online shop with 500 products, customer accounts, online payment and 1C integration needs feasibility agreement against delivery tomorrow and a budget of 15 000 rubles, with advertising starting on Friday as a separate event.",
+            "severity": "high",
+            "evidence": "“online shop with 500 products, customer accounts, online payment and 1C integration” / “Delivery tomorrow because advertising starts on Friday” / “Budget: 15 000 rubles.”"
+          },
+          {
+            "category": "scope_risk",
+            "description": "The expectation of few revisions does not bound the work when everything may change along the way, leaving the limits and treatment of changes undefined.",
+            "severity": "high",
+            "evidence": "There will be few revisions, but everything may change along the way."
+          },
+          {
+            "category": "missing_information",
+            "description": "The required 1C integration lacks an identified target configuration, data-exchange scope and acceptance checks, so completion cannot be assessed consistently.",
+            "severity": "high",
+            "evidence": "1C integration"
+          },
+          {
+            "category": "missing_information",
+            "description": "The online payment requirement does not identify the payment provider or the payment outcomes that must pass acceptance testing.",
+            "severity": "medium",
+            "evidence": "online payment"
+          },
+          {
+            "category": "missing_information",
+            "description": "The design direction leaves the reference sites, approval process and basis for accepting the proposed design undefined.",
+            "severity": "medium",
+            "evidence": "Come up with the design yourselves; I like what big sites do."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Which parts of the shop—500 products, customer accounts, online payment and 1C integration—must be ready for delivery tomorrow within the budget of 15 000 rubles?",
+            "rationale": "This establishes the required scope for tomorrow’s delivery without treating Friday’s advertising start as the delivery deadline.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "What limits should apply to revisions and changes included in the agreed price?",
+            "rationale": "Clear limits distinguish included revisions from changes that require a separate agreement.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "What information must the shop exchange with 1C for you to consider the integration complete?",
+            "rationale": "The required information exchange determines the integration work and what must be demonstrated at acceptance.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Which payment provider should the shop use?",
+            "rationale": "The chosen provider determines how online payment will be implemented and tested.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "How will you approve the proposed design before we build the shop?",
+            "rationale": "An agreed approval process establishes when the design is accepted and ready to implement.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508321682725000_0000001142_aee07886046842368d2d66612850ea3b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508321668008098_0000001140_1909b77d9ea24708a1edd0685a78e5b5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508330498753195_0000001230_43ae54871f7041b5a5a3bb7d6e043d94",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508330490408472_0000001228_e356eedc41d54d6d983a169d45c9e771",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508340867957630_0000001260_8d5d36ac664c48f191d30a6a4882a8fb",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508340860864075_0000001258_92d27cd121a545719fd5a9f4e7470f86",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "Which parts of the shop—500 products, customer accounts, online payment and 1C integration—must be ready for delivery tomorrow within the budget of 15 000 rubles?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-ES",
+      "run": 1,
+      "session_id": "scenario_session_01795508203705568369_0000000149_a6876e974da9412eb5becbacdcce87f3",
+      "job_id": "job_01795508203712063611_0000000151_c9f008faba2a49b99ceb49e249f86815",
+      "result_id": "artifact_01795508234961620391_0000000347_b90c308763194f49972ad9bc5c11e191",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "La tienda incluye 500 productos.",
+              "La tienda dispone de cuentas de cliente.",
+              "La tienda permite el pago en línea.",
+              "La tienda está integrada con 1C.",
+              "La entrega se realiza mañana.",
+              "El presupuesto es de 15 000 rublos."
+            ],
+            "assumptions": [
+              "La publicidad empieza el viernes.",
+              "Se prevén pocos cambios, aunque todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Una tienda en línea.",
+              "Una propuesta de diseño para la tienda."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "Es necesario confirmar la viabilidad conjunta de una tienda con 500 productos, cuentas de cliente, pago en línea e integración con 1C, con entrega mañana y presupuesto de 15 000 rublos, teniendo en cuenta que la publicidad empieza el viernes.",
+            "severity": "high",
+            "evidence": "«tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C»; «Entrega mañana porque la publicidad empieza el viernes»; «Presupuesto: 15 000 rublos»."
+          },
+          {
+            "category": "scope_risk",
+            "description": "La posibilidad de cambiar todo sobre la marcha deja sin límites las modificaciones incluidas y sin definir su efecto sobre el precio, el plazo y la aceptación del trabajo.",
+            "severity": "high",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se define qué datos y operaciones debe cubrir la integración con 1C ni cómo se comprobará su funcionamiento para aceptarla.",
+            "severity": "high",
+            "evidence": "integración con 1C"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se especifica qué proveedor o métodos debe admitir el pago en línea ni qué prueba permitirá dar esta función por aceptada.",
+            "severity": "medium",
+            "evidence": "pago en línea"
+          },
+          {
+            "category": "ambiguity",
+            "description": "La referencia a «sitios grandes» no concreta la dirección visual ni establece cómo se aprobará el diseño propuesto antes de desarrollar la tienda.",
+            "severity": "medium",
+            "evidence": "Proponed el diseño; me gustan los sitios grandes."
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Qué debe estar terminado para la entrega de mañana, con el presupuesto de 15 000 rublos, de la tienda solicitada con 500 productos, cuentas de cliente, pago en línea e integración con 1C, teniendo en cuenta que la publicidad empieza el viernes?",
+            "rationale": "La respuesta permitirá evaluar si el alcance exigido para mañana es viable con el presupuesto indicado.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Qué límites acordamos para los cambios incluidos en el encargo, a partir de los cuales sería necesaria vuestra aprobación de un ajuste de precio o plazo?",
+            "rationale": "Acordar estos límites evitará que las modificaciones alteren el alcance sin revisar sus consecuencias.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Qué datos y operaciones debe cubrir la integración con 1C para que la consideréis completa?",
+            "rationale": "Definir el resultado esperado permitirá concretar y comprobar el alcance de la integración.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "¿Qué proveedor o métodos de pago debe admitir la tienda?",
+            "rationale": "Esta elección determina qué solución de pago habrá que implementar.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "¿Cómo daréis vuestra aprobación al diseño propuesto antes de que empecemos a desarrollar la tienda?",
+            "rationale": "Acordar cómo se aprobará el diseño permitirá confirmar la propuesta visual antes de construir la tienda.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508203781040418_0000000168_451fb0b043604e7982727f84743ddd64",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508203762220863_0000000162_753adca16c634277a3d4982c0777c2e3",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508210854954291_0000000222_c8699a76d0fa42b1b5144ab2437a187b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508210846097310_0000000220_5f49ff6b74a84d02bf197c7aff4b8d20",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508223017776838_0000000286_e9f2e0e584e24e94b52e8731ce258a05",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508223003749662_0000000284_049ee435635545d49c888d3a726fe057",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "¿Qué debe estar terminado para la entrega de mañana, con el presupuesto de 15 000 rublos, de la tienda solicitada con 500 productos, cuentas de cliente, pago en línea e integración con 1C, teniendo en cuenta que la publicidad empieza el viernes?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-ES",
+      "run": 2,
+      "session_id": "scenario_session_01795508267260229003_0000000661_df3da7d9b4e849769012421fb212f3e2",
+      "job_id": "job_01795508267280201872_0000000663_f0c057919e98424fbc9882091eb7d06b",
+      "result_id": "artifact_01795508295001959781_0000000865_9439e58591594089a2167d82621ae84a",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "La tienda incluye 500 productos.",
+              "La tienda permite crear cuentas de cliente.",
+              "La tienda permite realizar pagos en línea.",
+              "La tienda está integrada con 1C.",
+              "La entrega se realiza mañana.",
+              "El presupuesto es de 15 000 rublos."
+            ],
+            "assumptions": [
+              "La publicidad empieza el viernes.",
+              "Se prevén pocos cambios, aunque todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Una tienda en línea.",
+              "Una propuesta de diseño para la tienda."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "Es necesario validar la viabilidad conjunta de entregar mañana una tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C por 15 000 rublos, teniendo en cuenta que la publicidad empieza el viernes.",
+            "severity": "high",
+            "evidence": "«tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C»; «Entrega mañana porque la publicidad empieza el viernes»; «Presupuesto: 15 000 rublos»."
+          },
+          {
+            "category": "scope_risk",
+            "description": "La posibilidad de cambiar todo sobre la marcha deja el alcance abierto y requiere acordar límites de revisión y cómo se aprobarán los cambios y sus efectos en el precio y la entrega.",
+            "severity": "medium",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se especifica qué datos ni operaciones debe cubrir la integración con 1C, por lo que falta delimitar las funciones que deberán comprobarse para aceptarla.",
+            "severity": "medium",
+            "evidence": "integración con 1C"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se indican los métodos de pago que debe admitir la tienda ni el proveedor de pagos que se integrará, decisiones necesarias para delimitar y aceptar el pago en línea.",
+            "severity": "medium",
+            "evidence": "pago en línea"
+          },
+          {
+            "category": "ambiguity",
+            "description": "La preferencia por «los sitios grandes» no define una dirección visual verificable ni cómo se aprobará el diseño propuesto.",
+            "severity": "medium",
+            "evidence": "Proponed el diseño; me gustan los sitios grandes."
+          }
+        ],
+        "questions": [
+          {
+            "question": "De la tienda solicitada —500 productos, cuentas de cliente, pago en línea e integración con 1C—, ¿qué debe estar listo para la entrega de mañana dentro del presupuesto de 15 000 rublos, teniendo en cuenta que la publicidad empieza el viernes?",
+            "rationale": "Permite evaluar la viabilidad del trabajo imprescindible para la entrega de mañana sin confundirla con el inicio de la publicidad el viernes.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Qué acuerdo aplicaremos para limitar las revisiones incluidas y aprobar los cambios que afecten al precio o a la entrega?",
+            "rationale": "Permite controlar los cambios sobre la marcha y evitar desacuerdos sobre el trabajo incluido.",
+            "priority": "medium",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Qué datos debe intercambiar la tienda con 1C y qué operaciones deben poder realizarse para que consideréis aceptada la integración?",
+            "rationale": "Define las funciones concretas que habrá que implementar y comprobar en la integración con 1C.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "¿Qué métodos de pago y qué proveedor debe admitir la tienda para que consideréis completo el pago en línea?",
+            "rationale": "Permite delimitar la integración de pagos y comprobar que admite las opciones necesarias.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "¿Cómo aprobaréis el diseño que os propongamos para dejar confirmada la apariencia de la tienda antes de desarrollarla?",
+            "rationale": "Establece una aprobación verificable del diseño que no dependa únicamente de la preferencia por los sitios grandes.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508267374008840_0000000672_aa4916ce81d1499e9c3b2fb41ce180e0",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508267347577509_0000000670_25dcdaf791d84d4cb1ea9a0f816527d8",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508273651329068_0000000726_c777a31826a8405ba6b31d7bdae48d24",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508273640604736_0000000724_0742ade1451d4bfe8eb003105612dd37",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508286522846532_0000000766_6b1ce019a60743d7a0221ace3a2bbc00",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508286516954342_0000000764_e165153bb40f40da889db617ad1b2d4e",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "De la tienda solicitada —500 productos, cuentas de cliente, pago en línea e integración con 1C—, ¿qué debe estar listo para la entrega de mañana dentro del presupuesto de 15 000 rublos, teniendo en cuenta que la publicidad empieza el viernes?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-ES",
+      "run": 3,
+      "session_id": "scenario_session_01795508322457738058_0000001155_b672f2f7db2a4d52aa56ba7702b500ff",
+      "job_id": "job_01795508322470067412_0000001157_d910626be26d4efaaecab046871c3b4f",
+      "result_id": "artifact_01795508354973576145_0000001379_602b728af21d4929bab3d4027f1d2352",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "La tienda en línea incluye 500 productos.",
+              "La tienda permite crear cuentas de cliente.",
+              "La tienda permite realizar pagos en línea.",
+              "La tienda está integrada con 1C.",
+              "La entrega se realiza mañana.",
+              "El presupuesto es de 15 000 rublos."
+            ],
+            "assumptions": [
+              "La publicidad empieza el viernes.",
+              "Se prevén pocos cambios, aunque todo puede cambiar sobre la marcha."
+            ],
+            "deliverables": [
+              "Una tienda en línea.",
+              "Una propuesta de diseño para la tienda."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "Es necesario acordar la viabilidad conjunta de una tienda en línea con 500 productos, cuentas de cliente, pago en línea, integración con 1C y propuesta de diseño, con entrega mañana y presupuesto de 15 000 rublos, teniendo en cuenta que la publicidad empieza el viernes.",
+            "severity": "high",
+            "evidence": "\"tienda en línea con 500 productos, cuentas de cliente, pago en línea e integración con 1C\"; \"Entrega mañana porque la publicidad empieza el viernes\"; \"Presupuesto: 15 000 rublos\"; \"Proponed el diseño\"."
+          },
+          {
+            "category": "scope_risk",
+            "description": "La posibilidad de cambiar cualquier aspecto sobre la marcha deja el alcance abierto y requiere acordar límites y un procedimiento para ajustar el precio y el plazo.",
+            "severity": "high",
+            "evidence": "Habrá pocos cambios, pero todo puede cambiar sobre la marcha."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se concreta qué datos y operaciones debe cubrir la integración con 1C ni cómo se comprobará su funcionamiento para aceptarla.",
+            "severity": "medium",
+            "evidence": "integración con 1C"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se especifica qué proveedor de pago en línea se utilizará ni qué resultado de una transacción permitirá dar esta función por aceptada.",
+            "severity": "medium",
+            "evidence": "pago en línea"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se indica quién proporcionará las fichas de los 500 productos ni si su preparación y carga forman parte del trabajo contratado.",
+            "severity": "medium",
+            "evidence": "una tienda en línea con 500 productos"
+          },
+          {
+            "category": "ambiguity",
+            "description": "La preferencia por «sitios grandes» no define una dirección visual concreta ni cómo se aprobará la propuesta de diseño.",
+            "severity": "medium",
+            "evidence": "Proponed el diseño; me gustan los sitios grandes."
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Qué parte de la tienda solicitada debe quedar terminada para la entrega de mañana con el presupuesto de 15 000 rublos?",
+            "rationale": "La respuesta permitirá acordar un alcance viable para la entrega de mañana, sin confundirla con el inicio de la publicidad el viernes.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Qué procedimiento acordaremos para aprobar los cambios sobre la marcha y sus posibles efectos en el precio y el plazo antes de realizarlos?",
+            "rationale": "Acordar este procedimiento evitará que los cambios amplíen el trabajo sin ajustar las condiciones de entrega.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Qué datos debe intercambiar la tienda con 1C y qué resultado comprobaréis para dar esa integración por aceptada?",
+            "rationale": "La respuesta definirá el alcance de la integración y una comprobación concreta para aceptarla.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "¿Cómo se repartirá entre vosotros y nosotros la preparación y la carga de las fichas de los 500 productos?",
+            "rationale": "Este reparto permitirá delimitar el trabajo incluido y saber qué materiales debéis proporcionar.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 4
+          },
+          {
+            "question": "¿Cómo aprobaréis la propuesta de diseño para que podamos empezar a construir la tienda con un diseño acordado?",
+            "rationale": "Definir cómo se aprobará el diseño evitará trabajar sobre una interpretación no confirmada de vuestra preferencia por sitios grandes.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 5
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508322526609036_0000001166_3f63ebc68172451282e2d1823604739c",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508322513281374_0000001164_76951aa66a94427c94e19c25ea396ab5",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508328841041874_0000001210_c13da02129b046d9b7aa87d0f0e870b9",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508328836089211_0000001208_a205745228084c939adb41c679d519db",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508342086101897_0000001294_04f6c9fd9ce74090a0fd418d8a840b20",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508342077199179_0000001292_22af9888d15547eba1a725770fc29c19",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "¿Qué parte de la tienda solicitada debe quedar terminada para la entrega de mañana con el presupuesto de 15 000 rublos?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795508187115109645_0000000008_11a33a37826147d2abad8ed3c2b7bf9e",
+      "job_id": "job_01795508187140394947_0000000013_0a3604705a3b43b085bda1ecf9023dc7",
+      "result_id": "artifact_01795508218671193763_0000000249_baa03256d63d47f6bd9f50bef8b8f01a",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Интернет-магазин рассчитан на 500 товаров.",
+              "В интернет-магазине есть личный кабинет.",
+              "В интернет-магазине доступна онлайн-оплата.",
+              "Интернет-магазин интегрирован с 1С.",
+              "Сдача интернет-магазина — завтра.",
+              "Бюджет проекта — 15 000 рублей."
+            ],
+            "assumptions": [
+              "Запуск рекламы запланирован на пятницу.",
+              "Клиент ожидает немного правок, но допускает изменение требований по ходу работы."
+            ],
+            "deliverables": [
+              "Интернет-магазин."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "Объём интернет-магазина на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С требует согласования реализуемого состава работ при сдаче завтра и бюджете 15 000 рублей, учитывая запуск рекламы в пятницу.",
+            "severity": "high",
+            "evidence": "«интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С»; «Сдача завтра, потому что в пятницу запуск рекламы»; «Бюджет 15 000 рублей»."
+          },
+          {
+            "category": "scope_risk",
+            "description": "Возможность изменения любых требований по ходу работы оставляет объём работ и правок неограниченным, поскольку порядок согласования изменений и их влияния на стоимость и срок не установлен.",
+            "severity": "high",
+            "evidence": "«Правок будет немного, но по ходу всё может поменяться»."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определено, какие действия должны быть доступны в личном кабинете, какие сценарии онлайн-оплаты должны работать и какие данные должны передаваться между магазином и 1С для приёмки этих функций.",
+            "severity": "high",
+            "evidence": "«с личным кабинетом, онлайн-оплатой и интеграцией с 1С»."
+          },
+          {
+            "category": "ambiguity",
+            "description": "Пожелание сделать дизайн как у больших сайтов не определяет конкретные визуальные ориентиры и порядок утверждения дизайна, поэтому основание для его приёмки остаётся неясным.",
+            "severity": "medium",
+            "evidence": "«Дизайн придумайте сами, мне нравится как у больших сайтов»."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какой объём из перечисленного — магазин на 500 товаров, личный кабинет, онлайн-оплата и интеграция с 1С — обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая запуск рекламы в пятницу?",
+            "rationale": "Это позволит согласовать выполнимый объём работ к завтрашней сдаче, не смешивая её с запуском рекламы в пятницу.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Как будем согласовывать правки и изменения требований до их выполнения, включая возможное изменение стоимости и срока?",
+            "rationale": "Согласованный порядок позволит отличать правки в рамках исходного задания от дополнительных работ.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Какие возможности личного кабинета, способы и действия при онлайн-оплате, а также передача каких данных между магазином и 1С должны войти в обязательный список для приёмки?",
+            "rationale": "Этот список определит, что именно должно работать, чтобы вы могли принять перечисленные функции магазина.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Как вы будете утверждать предложенный мной дизайн перед его реализацией на сайте?",
+            "rationale": "Понятный порядок утверждения позволит зафиксировать согласованный внешний вид и избежать разногласий при приёмке.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508187354419686_0000000045_13de0b879c7047a5ac794ec3411c8ac8",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508187315113980_0000000037_7df9d50afe07436687f2ead4a0a40da7",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508196771439727_0000000090_6a51bd5c494c42ba9269c9891eba44dd",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508196765164982_0000000088_17ec0ca4852c48fa9018a0c7d18d2992",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508207134001852_0000000202_202e981058794894a3ab912a50b153b4",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508207115451044_0000000200_997a98a705664e7985f600619573f912",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "Какой объём из перечисленного — магазин на 500 товаров, личный кабинет, онлайн-оплата и интеграция с 1С — обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая запуск рекламы в пятницу?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795508252455532344_0000000553_82e0dadb182d4300af4a57a9e1c446a2",
+      "job_id": "job_01795508252474695340_0000000555_fe46c41a96354471b2e0f4c76c37e1fc",
+      "result_id": "artifact_01795508288961489131_0000000773_3efae358f2c8411abd44f06abfb96257",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Интернет-магазин рассчитан на 500 товаров.",
+              "В интернет-магазине есть личный кабинет.",
+              "В интернет-магазине доступна онлайн-оплата.",
+              "Интернет-магазин интегрирован с 1С.",
+              "Сдача интернет-магазина — завтра.",
+              "Бюджет проекта — 15 000 рублей.",
+              "Исполнитель самостоятельно разрабатывает дизайн."
+            ],
+            "assumptions": [
+              "Запуск рекламы запланирован на пятницу.",
+              "Предполагается небольшое количество правок.",
+              "Требования могут меняться по ходу работы."
+            ],
+            "deliverables": [
+              "Интернет-магазин с самостоятельно разработанным исполнителем дизайном."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "Объём интернет-магазина на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С требует согласования реализуемости при сдаче завтра и бюджете 15 000 рублей, особенно с учётом запуска рекламы в пятницу.",
+            "severity": "high",
+            "evidence": "«интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С»; «Сдача завтра, потому что в пятницу запуск рекламы»; «Бюджет 15 000 рублей»."
+          },
+          {
+            "category": "scope_risk",
+            "description": "Возможность менять требования по ходу работы оставляет объём работ и правок неограниченным, поскольку порядок согласования изменений и их влияния на стоимость и срок не установлен.",
+            "severity": "medium",
+            "evidence": "«Правок будет немного, но по ходу всё может поменяться»."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определены действия покупателя в личном кабинете, сценарии онлайн-оплаты и состав обмена с 1С, поэтому отсутствует согласованная основа для проверки этих функций при приёмке.",
+            "severity": "medium",
+            "evidence": "«с личным кабинетом, онлайн-оплатой и интеграцией с 1С»."
+          },
+          {
+            "category": "ambiguity",
+            "description": "Пожелание сделать дизайн «как у больших сайтов» не задаёт конкретного визуального ориентира и не определяет, как заказчик будет согласовывать и принимать предложенный исполнителем дизайн.",
+            "severity": "medium",
+            "evidence": "«Дизайн придумайте сами, мне нравится как у больших сайтов»."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не указано, кто предоставляет сведения и изображения для 500 товаров и входит ли заполнение каталога в работу исполнителя.",
+            "severity": "medium",
+            "evidence": "«интернет-магазин на 500 товаров»."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какой объём магазина на 500 товаров, включая личный кабинет, онлайн-оплату и интеграцию с 1С, обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей?",
+            "rationale": "Это позволит оценить реализуемость обязательного объёма к завтрашней сдаче, учитывая отдельный запуск рекламы в пятницу.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Согласны ли вы, что изменения уже согласованных требований будут браться в работу только после вашего подтверждения их влияния на стоимость и срок?",
+            "rationale": "Это установит понятный порядок изменения объёма работ и согласования дополнительных правок.",
+            "priority": "medium",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Какие действия покупателя в личном кабинете, способы онлайн-оплаты и данные для обмена с 1С нужно включить в обязательный список для проверки при приёмке?",
+            "rationale": "Согласованный список позволит определить, когда личный кабинет, оплата и обмен с 1С считаются выполненными.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Как вы будете согласовывать предложенный дизайн: утвердите макеты до начала сборки магазина или выберете другой порядок?",
+            "rationale": "Это определит момент утверждения внешнего вида и снизит риск переделок после сборки магазина.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 3
+          },
+          {
+            "question": "Как распределим подготовку описаний и изображений и заполнение каталога на 500 товаров между вами и исполнителем?",
+            "rationale": "Это определит обязанности сторон по наполнению каталога и объём работы исполнителя.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508252621622457_0000000564_0ab2b84144e848f792e03fc52432b692",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508252591391134_0000000562_8a986d193a7a448e92baf6a30e759dd6",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508260822571955_0000000604_f52ce1d22182431f99d053d8b777e026",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508260787119322_0000000602_6d3ab2ca7a374fa1b141ea9cede60dd2",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508277490216943_0000000736_f811e9bb4dc8429ca3a341897a118008",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508277475502296_0000000734_210cf35775f04039bdb76917c093d2c2",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "Какой объём магазина на 500 товаров, включая личный кабинет, онлайн-оплату и интеграцию с 1С, обязательно должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-C-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795508315483081879_0000001077_6adfe58c37e24a1498b9eb78a6e40ef9",
+      "job_id": "job_01795508315534815675_0000001079_733ab207074549f6b1df6484fd8d0ea7",
+      "result_id": "artifact_01795508347045435713_0000001311_68260bf6c33248598cdb2033237acdba",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Интернет-магазин рассчитан на 500 товаров.",
+              "В интернет-магазине есть личный кабинет.",
+              "В интернет-магазине доступна онлайн-оплата.",
+              "Интернет-магазин интегрирован с 1С.",
+              "Сдача интернет-магазина — завтра.",
+              "Бюджет проекта — 15 000 рублей.",
+              "Исполнитель самостоятельно разрабатывает дизайн."
+            ],
+            "assumptions": [
+              "Запуск рекламы запланирован на пятницу.",
+              "Ожидается небольшое количество правок, но в ходе работы требования могут измениться."
+            ],
+            "deliverables": [
+              "Интернет-магазин с самостоятельно разработанным исполнителем дизайном."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": []
+        },
+        "issues": [
+          {
+            "category": "scope_risk",
+            "description": "Объём интернет-магазина на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С требует согласования реалистичности сдачи «завтра» при бюджете 15 000 рублей с учётом запуска рекламы «в пятницу».",
+            "severity": "high",
+            "evidence": "Нужен интернет-магазин на 500 товаров с личным кабинетом, онлайн-оплатой и интеграцией с 1С. Сдача завтра, потому что в пятницу запуск рекламы. Бюджет 15 000 рублей."
+          },
+          {
+            "category": "scope_risk",
+            "description": "Возможность менять требования по ходу работы оставляет объём изменений и число правок неограниченными, поскольку порядок пересмотра стоимости и срока не установлен.",
+            "severity": "high",
+            "evidence": "Правок будет немного, но по ходу всё может поменяться."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определены принимаемые функции личного кабинета, способы онлайн-оплаты и состав обмена с 1С, поэтому границы реализации и проверки этих функций остаются открытыми.",
+            "severity": "high",
+            "evidence": "с личным кабинетом, онлайн-оплатой и интеграцией с 1С"
+          },
+          {
+            "category": "missing_information",
+            "description": "Не указано, кто предоставляет и загружает данные и изображения для 500 товаров и должны ли все карточки быть заполнены к сдаче магазина.",
+            "severity": "medium",
+            "evidence": "Нужен интернет-магазин на 500 товаров"
+          },
+          {
+            "category": "ambiguity",
+            "description": "Ориентир на «большие сайты» не определяет ожидаемый внешний вид магазина, а порядок согласования и утверждения дизайна не установлен.",
+            "severity": "medium",
+            "evidence": "Дизайн придумайте сами, мне нравится как у больших сайтов."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какой объём магазина должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая, что запуск рекламы запланирован на пятницу?",
+            "rationale": "Это позволит согласовать обязательный объём к сдаче и оценить возможность выполнить его в указанные срок и бюджет.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Согласны ли вы, что изменения уже согласованных требований выполняются только после отдельного утверждения их влияния на стоимость и срок сдачи?",
+            "rationale": "Такой порядок позволит учитывать изменения без неограниченного расширения объёма работ в исходных условиях.",
+            "priority": "high",
+            "category": "scope_risk",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Какие возможности личного кабинета, способы онлайн-оплаты и данные для обмена с 1С должны входить в обязательный состав магазина?",
+            "rationale": "Этот перечень определит границы реализации и проверки заявленных функций при приёмке.",
+            "priority": "high",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Какую часть подготовки и загрузки описаний и изображений для 500 товаров вы поручаете мне?",
+            "rationale": "Распределение этой работы позволит определить объём наполнения магазина, за который я отвечаю при сдаче.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "Как мы будем согласовывать дизайн и фиксировать, что вы его утвердили?",
+            "rationale": "Понятный порядок утверждения позволит проверить, что предложенный внешний вид соответствует вашим ожиданиям.",
+            "priority": "medium",
+            "category": "ambiguity",
+            "source_issue_index": 4
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508315653899239_0000001088_5d4db0a2d83348cf8577c8a65477d25b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508315628016466_0000001086_264db037b03d475d8e0d1ba7972c3370",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508324099752574_0000001176_673765d97d4e4564aa3227e600e329ec",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508324081202098_0000001174_e9cf3d8b32d24ab2846a9ed00f37653f",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508335718742296_0000001240_52071dae327840a890fba55303c23f77",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508335713155743_0000001238_b23a343d754047e89e8abebc88659636",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "The high-severity combined risk retains the requested scope, delivery tomorrow and the stated budget. The draft distinguishes Friday advertising from delivery, keeps revisions open, and asks the client which scope must be ready.",
+        "excerpt": "Какой объём магазина должен быть готов к сдаче завтра в рамках бюджета 15 000 рублей, учитывая, что запуск рекламы запланирован на пятницу?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-EN",
+      "run": 1,
+      "session_id": "scenario_session_01795508239368518942_0000000377_f9249b4afd1042459623dfa51ab88a28",
+      "job_id": "job_01795508239377694867_0000000379_161631545dd147158bec0aa1bf7afb57",
+      "result_id": "artifact_01795508248834352212_0000000497_10f589d6cdd9416bb81b569d734a7226",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "The landing page contains 5 blocks: offer, curriculum, teacher, pricing, and application form.",
+              "The form sends applications to info@school.example.",
+              "The landing page has a mobile layout.",
+              "The deadline is 14 business days.",
+              "The budget is 60 000 rubles.",
+              "2 rounds of revisions are included.",
+              "All blocks follow the approved layout.",
+              "The form successfully delivers a test application."
+            ],
+            "assumptions": [
+              "The client supplies the text and photos."
+            ],
+            "deliverables": [
+              "A landing page for an online school."
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508239403599582_0000000388_c5e759cdc2384de990d8207a65da9d77",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508239395747271_0000000386_56e5f73454d54ce4afe033ff2af65438",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508243811055488_0000000442_a96006fe0bf945fd86d0305de8082a5f",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508243798199097_0000000440_0f900c3c57dc45888b0b3d27d9100136",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "The form sends applications to info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-EN",
+      "run": 2,
+      "session_id": "scenario_session_01795508295333612989_0000000871_3f9d1397ffab4b6aa0ae4b3ce4aaa936",
+      "job_id": "job_01795508295344334831_0000000873_4d12ea24475e4f9b863331ebe740962e",
+      "result_id": "artifact_01795508304200831239_0000000921_42019a67d86c4ae0aa917ef5230a3e64",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "The landing page contains 5 blocks: offer, curriculum, teacher, pricing, and application form.",
+              "The application form sends applications to info@school.example.",
+              "The landing page includes a mobile layout.",
+              "The delivery deadline is 14 business days.",
+              "The budget is 60 000 rubles.",
+              "2 rounds of revisions are included.",
+              "All blocks follow the approved layout.",
+              "The form successfully delivers a test application."
+            ],
+            "assumptions": [
+              "The client supplies the text and photos."
+            ],
+            "deliverables": [
+              "A landing page for an online school."
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508295395469941_0000000882_6476b14a325f40a7b48b378903a9d53a",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508295375868086_0000000880_4fc4b50c5bb3476e8f7436e874c48500",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508299139572784_0000000902_e9c12d8f6f5b47ea8da5c1ee7ded1328",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508299134093194_0000000900_ea6d26afd124411eb42fba6961b9f02f",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "The application form sends applications to info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-EN",
+      "run": 3,
+      "session_id": "scenario_session_01795508356540520811_0000001389_d27dc379dcc64b4e866268b56d5402a3",
+      "job_id": "job_01795508356562396541_0000001397_812a93f4bf2343b9a2252bc9953806bb",
+      "result_id": "artifact_01795508363736059385_0000001482_8f43b9c3e7db495584673057e5a1f74e",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The landing page contains 5 blocks: offer, curriculum, teacher, pricing, and application form.",
+              "All blocks follow the approved layout.",
+              "The application form sends applications to info@school.example.",
+              "The form successfully delivers a test application.",
+              "The landing page includes a mobile layout.",
+              "The delivery deadline is 14 business days.",
+              "The budget is 60 000 rubles.",
+              "2 rounds of revisions are included."
+            ],
+            "assumptions": [
+              "The client supplies the text and photos."
+            ],
+            "deliverables": [
+              "A landing page for an online school."
+            ]
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508356632641658_0000001406_d70aba3989744ae39cafc38a48c008ee",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508356618976778_0000001404_a8e109e27db04870b49161e90b9342e7",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508360332423213_0000001453_de6607ee620c4d3a9e2c4825de477011",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508360317300062_0000001451_ac4f0af035fe42b197e2a241c3abd3d6",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "The application form sends applications to info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-ES",
+      "run": 1,
+      "session_id": "scenario_session_01795508240055284534_0000000411_216e21634fe548b2bc1e15d8a839c9a4",
+      "job_id": "job_01795508240063469344_0000000413_edd27dbb736344039cbc9544495f03a6",
+      "result_id": "artifact_01795508250768717945_0000000534_7f86839079564fc3965855badedd2bd7",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "La página contiene 5 bloques: oferta, programa, docente, tarifas y formulario de solicitud.",
+              "El formulario envía las solicitudes al correo info@school.example.",
+              "La página está adaptada para móviles.",
+              "El plazo de entrega es de 14 días hábiles.",
+              "El presupuesto es de 60 000 rublos.",
+              "Se incluyen 2 rondas de revisiones.",
+              "Todos los bloques siguen el diseño acordado.",
+              "El formulario entrega una solicitud de prueba."
+            ],
+            "assumptions": [
+              "El cliente proporciona los textos y las fotos."
+            ],
+            "deliverables": [
+              "Una página de aterrizaje para una escuela en línea."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508240087366559_0000000422_709ea8f419e546f19d3b89641c8b3695",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508240081177196_0000000420_b7e247b7b8464c10b09a0ec72f8b9f3d",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508243857809909_0000000452_aafd971ad5844308997ece2a7a69b1f8",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508243851893974_0000000450_4781b1a53655441a9b94975812bccca4",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "El formulario envía las solicitudes al correo info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-ES",
+      "run": 2,
+      "session_id": "scenario_session_01795508305344901865_0000000927_c4d82ad0423a4b9d8871ab617a2766c0",
+      "job_id": "job_01795508305350198038_0000000929_31e333c1b4f24bfa942fc5a3f9bee1ce",
+      "result_id": "artifact_01795508313002994446_0000001061_376371b2d75143c4a8e49f93f59f2c07",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "La página contiene 5 bloques: oferta, programa, docente, tarifas y formulario de solicitud.",
+              "El formulario envía las solicitudes al correo info@school.example.",
+              "La página está adaptada para móviles.",
+              "El plazo de entrega es de 14 días hábiles.",
+              "El presupuesto es de 60 000 rublos.",
+              "Se incluyen 2 rondas de revisiones.",
+              "Todos los bloques siguen el diseño acordado.",
+              "El formulario entrega una solicitud de prueba."
+            ],
+            "assumptions": [
+              "El cliente proporciona los textos y las fotos."
+            ],
+            "deliverables": [
+              "Una página de aterrizaje para una escuela en línea."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": [],
+          "confidence": {
+            "acceptance_criteria": 1,
+            "assumptions": 1,
+            "deliverables": 1,
+            "analysis_language": 1
+          }
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508305386949690_0000000938_2c176964deb5458bbc6fce6dbaeb03d1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508305369041549_0000000936_ec4b8ab1b3e740daaed36f7d57e08ad6",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508309623076077_0000001008_0b3d3e356ede43a5ba0b17d42b38cfb9",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508309609719009_0000001006_ea0828f18d9c4a3d976ab376a59f2956",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "El formulario envía las solicitudes al correo info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-ES",
+      "run": 3,
+      "session_id": "scenario_session_01795508358667369977_0000001419_eb1db757cfe24cb6b7b44de9880333c9",
+      "job_id": "job_01795508358680346505_0000001421_5514f8a649ac4adca1e647f63c49c565",
+      "result_id": "artifact_01795508366831415686_0000001495_11453d9f84bf4b6caac7dbfc2624d1fd",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "La página contiene 5 bloques: oferta, programa, docente, tarifas y formulario de solicitud.",
+              "El formulario envía las solicitudes al correo info@school.example.",
+              "La página está adaptada para móviles.",
+              "El plazo de entrega es de 14 días hábiles.",
+              "El presupuesto es de 60 000 rublos.",
+              "Se incluyen 2 rondas de revisiones.",
+              "Todos los bloques siguen el diseño acordado.",
+              "El formulario entrega una solicitud de prueba."
+            ],
+            "assumptions": [
+              "El cliente proporciona los textos y las fotos."
+            ],
+            "deliverables": [
+              "Una página de aterrizaje para una escuela en línea."
+            ],
+            "analysis_language": "es"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508358736239662_0000001430_a60040657b3e4b03b92a37fb6d3e9c4b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508358722633909_0000001428_7fe93fd11b254edd8b14d20ab259d25a",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508362480516333_0000001473_1db6e275b3944669af5a88a78dd6cf9d",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508362455227704_0000001471_c15c59c9065349aa976fbfbad5fded1a",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "El formulario envía las solicitudes al correo info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795508235419345548_0000000353_c06fe28ea1044687a1ead3dbe125b0b8",
+      "job_id": "job_01795508235434715866_0000000355_90b5801569534bab9992a3dc12100984",
+      "result_id": "artifact_01795508245473494785_0000000461_26943ce1a9134cd4bf913e78ae3bfc8f",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Лендинг содержит 5 блоков: оффер, программа, преподаватель, тарифы, форма заявки.",
+              "Все блоки свёрстаны по согласованному макету.",
+              "Форма отправляет заявку на почту info@school.example.",
+              "Форма доставляет тестовую заявку.",
+              "Лендинг адаптирован для мобильных устройств.",
+              "Срок выполнения — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены 2 раунда правок."
+            ],
+            "assumptions": [
+              "Тексты и фото предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Лендинг для онлайн-школы."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508235490871820_0000000364_eeb8c9dc56c340e6a5034d715e60109b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508235481551101_0000000362_34c427d8af8343e0b3b9c77a35fc569d",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508239867392060_0000000409_551cdf8c8f9945a48a4b5b85b8d05cfb",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508239860463949_0000000407_04aeea77c69c4001b6635d4f951aba09",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "Форма отправляет заявку на почту info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795508293030214276_0000000827_d671a93b2336456395d4c0a229e0b308",
+      "job_id": "job_01795508293035141802_0000000829_0b83dc9976374b00baff8147a8162df7",
+      "result_id": "artifact_01795508308280798079_0000000968_740577b57a3841b69cceb7fee113b544",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Лендинг содержит 5 блоков: оффер, программа, преподаватель, тарифы, форма заявки.",
+              "Все блоки свёрстаны по согласованному макету.",
+              "Форма доставляет тестовую заявку на почту info@school.example.",
+              "Лендинг адаптирован для мобильных устройств.",
+              "Срок выполнения — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены 2 раунда правок."
+            ],
+            "assumptions": [
+              "Тексты и фото предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Лендинг для онлайн-школы."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508293064590923_0000000838_5ec444dd8fa44f15a8c258454ae9f371",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508293056935726_0000000836_3b37c35ed5cb48c7bfd34a6a7379cb3b",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508297445937357_0000000892_0d10e0099e5e4f9c9792a0f9f67bd40f",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508297438061974_0000000890_c77c27c9796f40c7ae8e498039cbbe8b",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "Форма доставляет тестовую заявку на почту info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-COMPLETE-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795508351562379492_0000001355_7d48b70b173940708c29f9961639925e",
+      "job_id": "job_01795508351601395309_0000001363_a8133c31b6bf452f892189850d790d96",
+      "result_id": "artifact_01795508359717353503_0000001439_ab2c1b53973e41bcb53df965fa520dbd",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Лендинг содержит 5 блоков: оффер, программа, преподаватель, тарифы, форма заявки.",
+              "Все блоки свёрстаны по согласованному макету.",
+              "Форма доставляет тестовую заявку на почту info@school.example.",
+              "Лендинг адаптирован под мобильные устройства.",
+              "Срок выполнения — 14 рабочих дней.",
+              "Бюджет — 60 000 рублей.",
+              "Включены 2 раунда правок."
+            ],
+            "assumptions": [
+              "Тексты и фото предоставляет заказчик."
+            ],
+            "deliverables": [
+              "Лендинг для онлайн-школы."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": []
+        },
+        "issues": [],
+        "questions": []
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508351719191556_0000001372_ab4a0031935844ab8fddbfa633b8c20a",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508351691496053_0000001370_0a5a9e422d84477f8758473daeeaebca",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508356553534509_0000001394_b1266820790446e1919bc412e51fa3b3",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508356545604392_0000001392_cd8819ec10444d9daa980c9837dc67c3",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "All agreed blocks, assets, layout, mobile support, recipient, test submission, schedule, budget and revision allowance are present. No findings or questions.",
+        "excerpt": "Форма доставляет тестовую заявку на почту info@school.example.",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-EN",
+      "run": 1,
+      "session_id": "scenario_session_01795508219290180685_0000000255_ed3f1da306a942a7b9fb0662a99fb2ba",
+      "job_id": "job_01795508219299708917_0000000257_f44aaa2b911d4794aa6c32a4b67095c4",
+      "result_id": "artifact_01795508239053319771_0000000371_c818b05807f44819b4c8180ef22d5a5c",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "en",
+            "acceptance_criteria": [
+              "The landing page must be completed within 10 business days.",
+              "The budget is 40 000 rubles.",
+              "The application form sends submissions by email."
+            ],
+            "deliverables": [
+              "A landing page for a course.",
+              "An application form that sends submissions by email."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "The page is required to be Russian-only and also to have a full English version, so the required language versions must be resolved before work starts.",
+            "severity": "high",
+            "evidence": "The page must be in Russian only. / The page needs a full English version."
+          },
+          {
+            "category": "missing_information",
+            "description": "The required course information and landing-page sections are not specified, leaving the page’s content scope undefined.",
+            "severity": "medium",
+            "evidence": "We need a landing page for a course."
+          },
+          {
+            "category": "missing_information",
+            "description": "The application form’s required fields and recipient email address are unspecified, leaving its expected submissions and delivery destination undefined.",
+            "severity": "medium",
+            "evidence": "We need an application form that sends submissions by email."
+          },
+          {
+            "category": "missing_information",
+            "description": "No design requirements or design-approval process are specified, leaving no agreed basis for accepting the landing page’s appearance.",
+            "severity": "medium"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Should the landing page be Russian-only, or should it have both Russian and full English versions?",
+            "rationale": "This resolves the conflicting language requirements and establishes which versions must be delivered.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Which sections and course information must the landing page include?",
+            "rationale": "This defines the content scope needed for the page to be considered complete.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Which fields should the application form include, and which must visitors complete before submitting?",
+            "rationale": "This establishes what information the form must collect for an application to be accepted.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Which email address should receive the application submissions?",
+            "rationale": "This identifies the destination needed to configure and test email delivery.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "How would you like to review and approve the landing page’s design before it is built?",
+            "rationale": "This establishes a clear approval step for accepting the page’s appearance before implementation.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508219444303680_0000000266_e152670f16304da2a05312b4a18bbd72",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508219427219609_0000000264_91c4b5026cae4771b0c3b80ff8cb051e",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508222324122899_0000000276_111189a76b954c50b8b7d2007ccc91cf",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508222314001244_0000000274_ca6f843f5570463fb18bb0b270868642",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508232448959072_0000000340_0fc853a3dcc8479e889ddfd6e1c09ad2",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508232431017908_0000000338_024661475ed9451fb8648b921b59c462",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "Should the landing page be Russian-only, or should it have both Russian and full English versions?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-EN",
+      "run": 2,
+      "session_id": "scenario_session_01795508289299748853_0000000779_083655c1ff2e40fcbb6d255c755c6f92",
+      "job_id": "job_01795508289304452915_0000000781_70338e0dec2e4c41a31b5051efc19b47",
+      "result_id": "artifact_01795508308123386050_0000000955_c39edf01023c435db00d21027a67ee2f",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "The page includes an application form that sends submissions by email.",
+              "The deadline is 10 business days.",
+              "The budget is 40 000 rubles."
+            ],
+            "deliverables": [
+              "A landing page for a course.",
+              "An application form that sends submissions by email."
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "The page is required to be Russian-only and also to have a full English version, so the language scope must be resolved before work starts.",
+            "severity": "high",
+            "evidence": "The page must be in Russian only. / The page needs a full English version."
+          },
+          {
+            "category": "missing_information",
+            "description": "The required landing-page sections and course content are unspecified, leaving the page’s content scope undefined.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "No design requirements or design-approval process are specified, leaving the basis for accepting the page’s appearance undefined.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "The application form’s required fields and destination email address are unspecified, leaving its submission requirements incomplete.",
+            "severity": "medium"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+            "rationale": "This decision resolves the conflicting language requirements and defines which versions must be delivered.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Which sections and course information must the landing page include?",
+            "rationale": "Your answer will define the content that must be present for the page to be accepted.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "How would you like to review and approve the page’s design before it is built?",
+            "rationale": "An agreed approval process will establish when the design is accepted and ready to build.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Which fields must the application form contain?",
+            "rationale": "The required fields determine what information the form must collect from applicants.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "Which email address should receive application submissions?",
+            "rationale": "The destination address is needed to configure and verify email delivery of applications.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508289865533100_0000000790_95b76833ab784a19aec880e547800f9e",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508289325511919_0000000788_d659783bde2b40439e533ab6869a16ec",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508294337262623_0000000848_1fc76c89012443b5940274dccd9425fa",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508294331335341_0000000846_c23a203487734843ac6c6e3417c189a0",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508302681201907_0000000912_2867cb42607f481891514e274b9a5e59",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508302642485378_0000000910_0a5f04787b944c6aa1aa16f987fe9a53",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-EN",
+      "run": 3,
+      "session_id": "scenario_session_01795508341486383751_0000001273_8c020acb68954584b0ce75b871c0aec8",
+      "job_id": "job_01795508341490742680_0000001275_a98c77a7fe5346eea644dba6094fe698",
+      "result_id": "artifact_01795508357711574640_0000001413_2014a5afadb2454194ab6fa7d3d8cd61",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "The landing page must be delivered within 10 business days.",
+              "The project budget is 40 000 rubles.",
+              "The application form must send submissions by email."
+            ],
+            "deliverables": [
+              "A landing page for a course.",
+              "An application form."
+            ],
+            "analysis_language": "en"
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "The page is required to be in Russian only and also to have a full English version, so the agreed language scope must be resolved.",
+            "severity": "high",
+            "evidence": "The page must be in Russian only. / The page needs a full English version."
+          },
+          {
+            "category": "missing_information",
+            "description": "The required course information and landing-page sections are unspecified, leaving the page’s content scope undefined.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "The brief does not specify how the client will approve the landing-page design or what criteria will determine design acceptance.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "The application form’s required fields and recipient email address are unspecified, leaving its submission requirements incomplete.",
+            "severity": "medium",
+            "evidence": "We need an application form that sends submissions by email."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+            "rationale": "This resolves the conflicting language requirements and determines the scope of content and development.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Which sections and course details must the landing page include?",
+            "rationale": "An agreed content list defines what must be included for the page to be complete.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "How will you approve the landing-page design, and what requirements must it meet for your approval?",
+            "rationale": "A clear approval process and agreed requirements establish when the design is accepted.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Which fields should the application form contain, and which must visitors complete before submitting?",
+            "rationale": "This defines the information the form must collect for an application to be accepted.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "Which email address should receive application submissions?",
+            "rationale": "The recipient address is needed to configure and test email delivery.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508341518033818_0000001284_d27f00072c874c058fa5720088ef8812",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508341509508584_0000001282_343b3d7d51a44d719337c8ab3ae464d7",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508344262509130_0000001304_d74d4922edf44878b888430062864564",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508344249967696_0000001302_a2a4ab5cef8f4b9e9af710a5af36e86f",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508350358951546_0000001338_ec887b7463b54f37b97bd44271b45f8b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508350338522684_0000001336_aa17cc70fe334b5a88b5e5c7a2cb105a",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "Should the landing page be Russian-only, or should it include both Russian and full English versions?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-ES",
+      "run": 1,
+      "session_id": "scenario_session_01795508226202237866_0000000299_162ea3b4d4f64fccb0e0b74a383ee6e6",
+      "job_id": "job_01795508226206659965_0000000301_4ba397f7690040f5bd7889f63cd46825",
+      "result_id": "artifact_01795508249157134352_0000000508_553f13ae9d32441a9539b641d364a1a2",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "La página incluye un formulario de solicitud que envía las solicitudes por correo electrónico.",
+              "El plazo de entrega es de 10 días hábiles.",
+              "El presupuesto es de 40 000 rublos."
+            ],
+            "deliverables": [
+              "Una página de aterrizaje para un curso.",
+              "Un formulario de solicitud que envía las solicitudes por correo electrónico."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "Se exige que la página esté solo en ruso y, a la vez, que tenga una versión completa en inglés, por lo que debe acordarse qué versiones lingüísticas se entregarán.",
+            "severity": "high",
+            "evidence": "La página debe estar solo en ruso. / La página necesita una versión completa en inglés."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se especifican las secciones ni los contenidos del curso que debe incluir la página de aterrizaje, necesarios para delimitar la entrega.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se define cómo aprobará el cliente el diseño de la página ni qué criterios determinarán su aceptación.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se indican los datos que debe recoger el formulario ni la dirección de correo destinataria, necesarios para acordar y comprobar su funcionamiento.",
+            "severity": "medium",
+            "evidence": "Necesitamos un formulario de solicitud que envíe las solicitudes por correo electrónico."
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿La página debe entregarse solo en ruso o en ruso con una versión completa en inglés?",
+            "rationale": "Esta decisión resuelve los requisitos contradictorios y permite definir las versiones que se entregarán.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Qué secciones y contenidos del curso debe incluir la página para que la considere completa?",
+            "rationale": "La respuesta permitirá delimitar el contenido de la entrega y comprobar que no falte información necesaria.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Cómo desea aprobar el diseño de la página y qué condiciones deberá cumplir para que lo considere aceptado?",
+            "rationale": "Acordar el procedimiento y las condiciones de aprobación permitirá verificar la aceptación del diseño.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "¿Qué datos debe recoger el formulario de solicitud?",
+            "rationale": "Definir los datos solicitados permitirá construir el formulario y comprobar que recoge la información necesaria.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "¿A qué dirección de correo electrónico deben enviarse las solicitudes del formulario?",
+            "rationale": "Conocer la dirección destinataria permitirá configurar el envío y comprobar que las solicitudes llegan al correo indicado.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508226234374504_0000000310_6fc0bf9629144b6fa5186a83f02ab2e9",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508226226216606_0000000308_9e731da371814d098b3fd4fd28584531",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508230751129838_0000000330_0dc4b1093bea4426bbafb6063e15ee6d",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508230743863587_0000000328_1b473443af7f472984bd828c40d1f286",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508242751655791_0000000432_9cc25af4c5c84a9ebdda2b07bbc2f38c",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508242746221066_0000000430_af30919048a248f7ad3e62612943de6c",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "¿La página debe entregarse solo en ruso o en ruso con una versión completa en inglés?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-ES",
+      "run": 2,
+      "session_id": "scenario_session_01795508290298058616_0000000803_defa5691ae2e48dba54e589ccc671e13",
+      "job_id": "job_01795508290303005238_0000000805_60b92e022b344147af3f400b185a169a",
+      "result_id": "artifact_01795508311559749679_0000001025_d3b83c005b03496c9e054369cd9331fb",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "El plazo de entrega de la página es de 10 días hábiles.",
+              "El presupuesto del encargo es de 40 000 rublos.",
+              "El formulario de solicitud envía las solicitudes por correo electrónico."
+            ],
+            "deliverables": [
+              "Una página de aterrizaje para un curso.",
+              "Un formulario de solicitud integrado en la página."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "Se exige que la página esté solo en ruso y, a la vez, que tenga una versión completa en inglés, por lo que debe resolverse qué idiomas se entregarán.",
+            "severity": "high",
+            "evidence": "La página debe estar solo en ruso. / La página necesita una versión completa en inglés."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se especifican las secciones ni los contenidos que debe incluir la página de aterrizaje del curso, lo que impide delimitar su alcance y comprobar que esté completa.",
+            "severity": "medium",
+            "evidence": "Necesitamos una página de aterrizaje para un curso."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se define cómo se aprobará el diseño de la página ni qué criterios se utilizarán para aceptarlo.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se indican los campos del formulario de solicitud ni la dirección de correo destinataria, necesarios para concretar su funcionamiento y verificar el envío.",
+            "severity": "medium",
+            "evidence": "Necesitamos un formulario de solicitud que envíe las solicitudes por correo electrónico."
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Debemos entregar la página únicamente en ruso o en ruso con una versión completa en inglés?",
+            "rationale": "Esta decisión resuelve la contradicción y permite fijar el alcance de los idiomas que se entregarán.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Qué secciones y contenidos debe incluir la página para que la consideren completa?",
+            "rationale": "La respuesta permitirá delimitar el contenido requerido y comprobar que la página esté completa.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Cómo desean aprobar el diseño de la página y qué criterios utilizarán para aceptarlo?",
+            "rationale": "Definir el procedimiento de aprobación y sus criterios permitirá verificar que el diseño cumple sus expectativas.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "¿Qué campos debe incluir el formulario de solicitud?",
+            "rationale": "Conocer los campos permitirá construir el formulario y verificar que recoge la información necesaria.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "¿A qué dirección de correo electrónico deben enviarse las solicitudes del formulario?",
+            "rationale": "La dirección destinataria es necesaria para configurar y comprobar el envío de las solicitudes.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508290336336116_0000000814_7a145eb2ac5946608f172960743f0dad",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508290329261437_0000000812_2a4984cbc70a41c28a1b1b8b3dc1b3df",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508294486157814_0000000858_78ad8839d41c4d179d41e620a54d8bef",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508294479423219_0000000856_432f6f901e37443fbdd86a5ddeb8241b",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508305622871217_0000000948_97b9d14f550141878743f19b6efbe6f5",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508305608946135_0000000946_0c6ab29fd2554044aabaea82a12b2752",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "¿Debemos entregar la página únicamente en ruso o en ruso con una versión completa en inglés?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-ES",
+      "run": 3,
+      "session_id": "scenario_session_01795508347595523024_0000001317_69f16d89ef7d4d3badc65ee9e0281921",
+      "job_id": "job_01795508347599922670_0000001319_1c28b072884042e98401a55319afbdcd",
+      "result_id": "artifact_01795508368419954760_0000001506_989178c78e294b879468c51fa2965148",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "es",
+            "acceptance_criteria": [
+              "El plazo de entrega es de 10 días hábiles.",
+              "El presupuesto es de 40 000 rublos.",
+              "El formulario de solicitud envía las solicitudes por correo electrónico."
+            ],
+            "deliverables": [
+              "Una página de aterrizaje para un curso.",
+              "Un formulario de solicitud integrado en la página."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "Se exige que la página esté solo en ruso y, a la vez, que tenga una versión completa en inglés, por lo que debe acordarse qué versiones lingüísticas se entregarán.",
+            "severity": "high",
+            "evidence": "La página debe estar solo en ruso. / La página necesita una versión completa en inglés."
+          },
+          {
+            "category": "missing_information",
+            "description": "No se especifica qué secciones y contenidos del curso debe incluir la página de aterrizaje para considerarse completa.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se define cómo se aprobará el diseño de la página ni qué condiciones determinarán su aceptación visual.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "No se indican los datos que debe recoger el formulario ni la dirección de correo electrónico que debe recibir las solicitudes, necesarios para acordar y comprobar su funcionamiento.",
+            "severity": "medium",
+            "evidence": "Necesitamos un formulario de solicitud que envíe las solicitudes por correo electrónico."
+          }
+        ],
+        "questions": [
+          {
+            "question": "¿Debemos entregar la página solo en ruso o en ruso e inglés?",
+            "rationale": "Esta decisión resuelve la contradicción y permite fijar qué versiones lingüísticas se incluirán en la entrega.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "¿Qué secciones y contenidos del curso debe incluir la página para que la consideren completa?",
+            "rationale": "Definir el contenido necesario permite acordar el alcance y comprobar que la página está completa.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "¿Cómo aprobarán el diseño de la página para que podamos considerarlo aceptado?",
+            "rationale": "Acordar el procedimiento de aprobación permite saber cuándo el diseño cumple sus expectativas y puede darse por definitivo.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "¿Qué datos debe pedir el formulario de solicitud?",
+            "rationale": "Definir los datos que se recogerán permite construir el formulario y comprobar que incluye todos los campos necesarios.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "¿A qué dirección de correo electrónico debe enviar el formulario las solicitudes recibidas?",
+            "rationale": "Conocer la dirección de destino permite configurar el envío y comprobar que las solicitudes llegan al destinatario correcto.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508347626045046_0000001328_55b47c2463904725976c3c4fb02cf87a",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508347617862080_0000001326_5e041633301846d2b21c2ac7bc080339",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508351587776206_0000001361_349233de90da4a94b1b11b40f25cfa6c",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508351570754402_0000001358_0bff52148a6744cb81e24e13c5d3ff5b",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508360457066799_0000001463_8caff3081cbc4acbaf2519e83df103ac",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508360441635184_0000001461_b408c03cc9064698b2b20c3f2d166996",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "¿Debemos entregar la página solo en ruso o en ruso e inglés?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-RU",
+      "run": 1,
+      "session_id": "scenario_session_01795508206875905268_0000000181_6700099b62d54934ad8e5ad61de3d6e7",
+      "job_id": "job_01795508206890341929_0000000183_002123d6b5ee498dbeb4be2326273a0c",
+      "result_id": "artifact_01795508224532378476_0000000293_23b25629a0134efbb84bd1cf5649f4dc",
+      "output": {
+        "extracted": {
+          "values": {
+            "acceptance_criteria": [
+              "Срок выполнения — 10 рабочих дней.",
+              "Бюджет — 40 000 рублей.",
+              "Форма заявки отправляет заявки на электронную почту."
+            ],
+            "deliverables": [
+              "Лендинг для курса.",
+              "Форма заявки с отправкой на электронную почту."
+            ],
+            "analysis_language": "ru"
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "Требование сделать страницу только на русском языке противоречит требованию разместить на ней полную английскую версию, поэтому необходимо согласовать языковой состав лендинга.",
+            "severity": "high",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определены обязательные разделы и содержание лендинга курса, по которым можно проверить полноту готовой страницы.",
+            "severity": "medium",
+            "evidence": "Нужен лендинг для курса."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определено, как заказчик будет согласовывать дизайн лендинга и на каком основании он будет считаться утверждённым.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "Для формы заявки не указаны необходимые поля и адрес электронной почты получателя, поэтому состав заявки и результат её отправки пока нельзя однозначно проверить.",
+            "severity": "medium",
+            "evidence": "Нужна форма заявки с отправкой на почту."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какой вариант требуется: лендинг только на русском языке или лендинг с русской и полной английской версиями?",
+            "rationale": "Выбор устранит противоречие и определит языковой состав готового лендинга.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Какие разделы и сведения о курсе обязательно должны быть на лендинге?",
+            "rationale": "Этот перечень позволит проверить полноту готовой страницы.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Как вы будете согласовывать дизайн лендинга и что будет считаться его окончательным утверждением?",
+            "rationale": "Понятный порядок согласования позволит определить, когда дизайн принят и можно переходить к его реализации.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Какие поля должны быть в форме заявки и какие из них обязательны для заполнения?",
+            "rationale": "Это определит состав заявки и условия, при которых форму можно отправить.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "На какой адрес электронной почты должны приходить заявки с лендинга?",
+            "rationale": "Адрес получателя необходим для настройки отправки и проверки доставки заявок.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508207049354368_0000000193_89bb1621e6fd4b6b9ddcdf257e25dccd",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508207000442413_0000000191_4f34e325a8e7443d9389a0650774f943",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508210703386150_0000000212_1630c4f607d54deb87eabd97835a038b",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508210690050223_0000000210_58fd57342b2a43e4adb150685e1680b4",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508217726109727_0000000242_f1cdc192fd12405dba77abb693a3dc86",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508217709143509_0000000240_377aedb0f9b845d4b66eebfc04c8aa2f",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "Какой вариант требуется: лендинг только на русском языке или лендинг с русской и полной английской версиями?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-RU",
+      "run": 2,
+      "session_id": "scenario_session_01795508268877171630_0000000695_b48f706c1e2f4cf3bbd64d57200efcea",
+      "job_id": "job_01795508268912291083_0000000697_37beb267971644908eddc35b8d7d6f5f",
+      "result_id": "artifact_01795508289930032464_0000000797_6d015845722f46ddba24779da1449a31",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Срок выполнения — 10 рабочих дней.",
+              "Бюджет — 40 000 рублей.",
+              "Форма заявки отправляет данные на электронную почту."
+            ],
+            "deliverables": [
+              "Лендинг для курса.",
+              "Форма заявки с отправкой данных на электронную почту."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "Требование сделать страницу только на русском языке противоречит требованию разместить на ней полную английскую версию, поэтому необходимо согласовать языковой состав лендинга.",
+            "severity": "high",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определены состав и содержание блоков лендинга курса, поэтому неясно, какую информацию должна включать готовая страница для приёмки.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определены порядок согласования дизайна лендинга и условия, по которым заказчик будет считать его утверждённым.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "Для формы заявки не указаны необходимые поля и адрес получателя писем, без которых нельзя однозначно согласовать её наполнение и проверить доставку заявок.",
+            "severity": "medium",
+            "evidence": "Нужна форма заявки с отправкой на почту."
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какой вариант лендинга нужно сделать: только на русском языке или с полной английской версией?",
+            "rationale": "Выбор определит языковой состав готового лендинга и объём работ.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Какие блоки и сведения о курсе должны обязательно присутствовать на лендинге?",
+            "rationale": "Это позволит согласовать состав страницы и проверить полноту готового лендинга.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Как вы будете согласовывать дизайн лендинга и каким образом подтвердите, что он утверждён?",
+            "rationale": "Это позволит определить момент утверждения дизайна перед дальнейшей работой.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "Какие поля нужно включить в форму заявки?",
+            "rationale": "Согласованный список полей определит, какие данные должна собирать форма.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          },
+          {
+            "question": "На какой адрес электронной почты должны приходить заявки с лендинга?",
+            "rationale": "Адрес получателя нужен для настройки отправки и проверки доставки заявок.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508268981941245_0000000706_977774be0608472fac94509979920fc5",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508268974172222_0000000704_6f0b95e6f57747fc88c47c85ec189cbe",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508272349765545_0000000716_4bce9d0402da49aa9b659d789d6bb7ec",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508272335421920_0000000714_afedc6bbac9a48e0858a8d36a7dfa50e",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508283893697642_0000000756_80f68df217eb4699ac8704803c50cde0",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508283871372072_0000000754_85f22991452047d0a4944d15d52a9c8c",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "Какой вариант лендинга нужно сделать: только на русском языке или с полной английской версией?",
+        "automated_check": "PASS"
+      }
+    },
+    {
+      "case_id": "AB-894-CTRL-CONTRADICTION-RU",
+      "run": 3,
+      "session_id": "scenario_session_01795508326277537234_0000001189_3c12fa5708b2431c9d1cf622e758ecdd",
+      "job_id": "job_01795508326284339167_0000001191_f6e921a9b5984d2dabffb35e9e5df8d4",
+      "result_id": "artifact_01795508341149042698_0000001267_be600ad6d01743cda4b582d39e16b598",
+      "output": {
+        "extracted": {
+          "values": {
+            "analysis_language": "ru",
+            "acceptance_criteria": [
+              "Срок выполнения — 10 рабочих дней.",
+              "Бюджет — 40 000 рублей.",
+              "Форма заявки отправляет заявки на электронную почту."
+            ],
+            "deliverables": [
+              "Лендинг для курса.",
+              "Форма заявки с отправкой на электронную почту."
+            ]
+          },
+          "missing_fields": [
+            "assumptions"
+          ]
+        },
+        "issues": [
+          {
+            "category": "contradiction",
+            "description": "Требование сделать страницу только на русском языке противоречит требованию разместить на ней полную английскую версию, поэтому до начала работы необходимо согласовать языковой состав лендинга.",
+            "severity": "high",
+            "evidence": "Страница должна быть только на русском языке. / На странице нужна полная английская версия."
+          },
+          {
+            "category": "missing_information",
+            "description": "Не определено, какие разделы и сведения о курсе, помимо формы заявки, должны входить в лендинг, поэтому состав страницы для приёмки остаётся открытым.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "Не указано, как заказчик будет согласовывать дизайн лендинга и на основании чего оформление будет считаться утверждённым.",
+            "severity": "medium"
+          },
+          {
+            "category": "missing_information",
+            "description": "Не указан адрес электронной почты, на который форма должна отправлять заявки, поэтому получателя необходимо согласовать для настройки и проверки отправки.",
+            "severity": "medium"
+          }
+        ],
+        "questions": [
+          {
+            "question": "Какой вариант лендинга вы выбираете: только на русском языке или с полной английской версией?",
+            "rationale": "Выбор устранит противоречие и определит языковой состав лендинга для приёмки.",
+            "priority": "high",
+            "category": "contradiction",
+            "source_issue_index": 0
+          },
+          {
+            "question": "Какие разделы и сведения о курсе должны быть на лендинге помимо формы заявки?",
+            "rationale": "Это позволит согласовать состав страницы и проверить его полноту при сдаче.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 1
+          },
+          {
+            "question": "Как вы будете согласовывать дизайн лендинга и подтверждать, что он утверждён?",
+            "rationale": "Это позволит определить, когда оформление считается принятым и можно переходить к его реализации.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 2
+          },
+          {
+            "question": "На какой адрес электронной почты должны приходить заявки из формы?",
+            "rationale": "Адрес нужен для настройки отправки и проверки получения заявок.",
+            "priority": "medium",
+            "category": "missing_information",
+            "source_issue_index": 3
+          }
+        ]
+      },
+      "calls": [
+        {
+          "id": "provider_call_01795508326307060446_0000001200_aedbb5107acc415ba1a05b5fb866c516",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508326301041025_0000001198_fa2d8898e2de4b80a3530496c8005d68",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508329261539978_0000001220_5763ac54d6f34a2690029ed574f7abd9",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508329256405893_0000001218_9eef0974c0c44b2c831a3b9b933950f0",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        },
+        {
+          "id": "provider_call_01795508335983609753_0000001250_a9eea0142f1b4f94b987bc5c05d03a66",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "status": "succeeded",
+          "error_code": null,
+          "action_run_id": "action_run_01795508335975006231_0000001248_eb66c74cca5d437d9b561c17db5636a1",
+          "semantic_attempt_index": 1,
+          "provider_policy_ref": "sol_text_generation_v1"
+        }
+      ],
+      "review": {
+        "acceptance": "pass",
+        "reason": "Both language alternatives are quoted and left undecided; the linked question asks the client to choose. The email form remains a separate acceptance criterion.",
+        "excerpt": "Какой вариант лендинга вы выбираете: только на русском языке или с полной английской версией?",
+        "automated_check": "PASS"
+      }
+    }
+  ]
+}

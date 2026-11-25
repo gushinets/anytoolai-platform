@@ -18,6 +18,7 @@ import {
   LEVELS,
   composeCopyText,
   extractBriefDecoderResult,
+  hasQuestions,
 } from "../src/products/briefDecoder/parseBriefDecoder";
 import { BRIEF_DECODER_MESSAGES } from "../src/products/briefDecoder/messages";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
@@ -126,6 +127,13 @@ const completedEvents = (events: ProductRunEvent[]) => events.filter((e) => e.ty
 describe("Brief Decoder definition", () => {
   it.each(LOCALES)("example brief passes the validator in %s", (locale) => {
     expect(briefDecoderDefinition.validate(BRIEF_DECODER_MESSAGES[locale].decode.example.inputs)).toEqual({});
+  });
+
+  it("requires an authored question to count a saved result as viewed", () => {
+    const result = extractBriefDecoderResult(composedOutput(""))!;
+    const question = result.questions[0]!;
+    expect(hasQuestions({ ...result, questions: [{ ...question, question: "\u200b" }] })).toBe(false);
+    expect(hasQuestions({ ...result, questions: [{ ...question, question: "\u200b" }, question] })).toBe(true);
   });
 
   it("shows an example while keeping the typed brief", async () => {
