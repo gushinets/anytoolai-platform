@@ -1,3 +1,4 @@
+import { hasAuthoredText } from "../shared/authoredText";
 import type { Translate } from "../../i18n";
 import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
 
@@ -158,5 +159,5 @@ export function composeCopyText({ brief, issues, questions }: CopySource, t: Tra
 
 /** Activation = first rendering of a non-empty clarifying-question list. */
 export function hasQuestions(result: BriefDecoderResult): boolean {
-  return result.questions.length > 0;
+  return result.questions.some(({ question }) => hasAuthoredText(question));
 }

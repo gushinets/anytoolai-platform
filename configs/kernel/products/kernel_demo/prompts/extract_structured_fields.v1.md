@@ -2,7 +2,7 @@
 
 Extract structured values from `source_text` according to the dynamic `fields` specification
 supplied in the input payload. Each field spec has a `name`, a `type`
-(`string` | `number` | `integer` | `boolean` | `date` | `array_of_strings`), a `description` of
+(`string` | `number` | `integer` | `boolean` | `date` | `array_of_strings` | `nonblank_string` | `nonempty_text_list` | `language_tag`), a `description` of
 what to look for, and a `required` flag.
 
 Rules:

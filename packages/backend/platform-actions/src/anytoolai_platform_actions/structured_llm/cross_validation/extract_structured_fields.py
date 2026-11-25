@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+import re
+from collections.abc import Mapping
+from typing import Any
+
+from anytoolai_platform_core.common.authored_text import has_authored_text
 
 from ._shared import (
     _coerce_integer_valued,
@@ -12,14 +16,28 @@ from ._shared import (
     _truncated_repr,
 )
 
+
+def _nonblank_string(value: Any) -> bool:
+    return isinstance(value, str) and has_authored_text(value)
+
+
 _FIELD_TYPE_CHECKS: Mapping[str, Any] = {
     "string": lambda value: isinstance(value, str),
+    "nonblank_string": _nonblank_string,
+    "nonempty_text_list": lambda value: (
+        isinstance(value, list) and bool(value) and all(_nonblank_string(item) for item in value)
+    ),
+    "language_tag": lambda value: (
+        isinstance(value, str)
+        and re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*", value) is not None
+    ),
     "number": _is_finite_number,
     "integer": lambda value: _coerce_integer_valued(value) is not None,
     "boolean": lambda value: isinstance(value, bool),
     "date": _is_iso_date_string,
-    "array_of_strings": lambda value: isinstance(value, list)
-    and all(isinstance(item, str) for item in value),
+    "array_of_strings": lambda value: (
+        isinstance(value, list) and all(isinstance(item, str) for item in value)
+    ),
 }
 
 

@@ -1,5 +1,8 @@
+import { hasAuthoredText } from "../shared/authoredText";
 import { isRecord, isStringArray, isOneOf } from "../shared/resultGuards";
+import { trimBackendWhitespace } from "../runtime/fieldValidation";
 import { composeDocument } from "./presentation";
+export { hasAuthoredText };
 export { composeCopyText } from "./presentation";
 
 // Acceptance Builder's canonical results (`acceptance_builder.draft_output_v1` / `check_output_v1`)
@@ -13,6 +16,21 @@ export const DELTA_STATUSES = ["match", "partial", "mismatch"] as const;
 // Order is the schema's `prefixItems` order, which the copy text must follow.
 export const DELTA_CRITERIA = ["scope_coverage", "requirement_fit", "completeness", "clarity"] as const;
 
+export const LEVELS = ["low", "medium", "high"] as const;
+export const ISSUE_CATEGORIES = [
+  "missing_information",
+  "ambiguity",
+  "scope_risk",
+  "timeline_risk",
+  "budget_risk",
+  "contradiction",
+] as const;
+
+type Level = (typeof LEVELS)[number];
+export type IssueCategory = (typeof ISSUE_CATEGORIES)[number];
+
+export type Issue = { category: IssueCategory; severity: Level; description: string; evidence?: string };
+export type ClarifyingQuestion = { question: string; rationale: string; priority: Level; category: IssueCategory; sourceIssueIndex: number };
 export type ListField = (typeof LIST_FIELDS)[number];
 export type Verdict = (typeof VERDICTS)[number];
 export type DeltaStatus = (typeof DELTA_STATUSES)[number];
@@ -29,7 +47,58 @@ export type AcceptanceBuilderResult = {
   document: { sections: { title: string; content: string }[]; summary: string };
   // Present only for `check_v1`.
   comparison?: Comparison;
+  issues?: Issue[];
+  questions?: ClarifyingQuestion[];
 };
+
+function mapAll<T>(items: unknown, map: (item: unknown) => T | null): T[] | null {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+  const out: T[] = [];
+  for (const item of items) {
+    const mapped = map(item);
+    if (mapped === null) {
+      return null;
+    }
+    out.push(mapped);
+  }
+  return out;
+}
+
+// A stored Draft v1 used Python's whitespace set, which allowed a BOM on its own.
+function isStoredText(value: unknown): value is string {
+  return typeof value === "string" && trimBackendWhitespace(value).length > 0;
+}
+
+function toIssue(item: unknown): Issue | null {
+  if (
+    !isRecord(item) ||
+    !isOneOf(ISSUE_CATEGORIES, item.category) ||
+    !isOneOf(LEVELS, item.severity) ||
+    !Object.keys(item).every((key) => ["category", "description", "severity", "evidence"].includes(key)) ||
+    !isStoredText(item.description) ||
+    (item.evidence !== undefined && !isStoredText(item.evidence))
+  ) {
+    return null;
+  }
+  return { category: item.category, severity: item.severity, description: item.description, evidence: item.evidence };
+}
+
+function toQuestion(item: unknown): ClarifyingQuestion | null {
+  if (
+    !isRecord(item) ||
+    !Object.keys(item).every((key) => ["question", "rationale", "priority", "category", "source_issue_index"].includes(key)) ||
+    typeof item.source_issue_index !== "number" || !Number.isInteger(item.source_issue_index) || item.source_issue_index < 0 ||
+    !isStoredText(item.question) ||
+    !isStoredText(item.rationale) ||
+    !isOneOf(LEVELS, item.priority) ||
+    !isOneOf(ISSUE_CATEGORIES, item.category)
+  ) {
+    return null;
+  }
+  return { question: item.question, rationale: item.rationale, priority: item.priority, category: item.category, sourceIssueIndex: item.source_issue_index };
+}
 
 function toLists(values: unknown): AcceptanceBuilderResult["lists"] | null {
   // `values` is a closed object with non-empty lists: an unknown key or an empty list is a
@@ -99,12 +168,19 @@ function extract(output: Record<string, unknown>, requireComparison: boolean): A
   // The draft output has no `comparison` (closed schema). An attached `?session=` id is editable, so
   // a check session must not be shown as a draft result with its verdict silently dropped.
   if (!requireComparison) {
-    if (output.comparison !== undefined) {
+    if (output.comparison !== undefined || Object.values(lists).some((items) => !items.every(isStoredText))) {
       return null;
     }
     const data = { lists, missingFields: missing, analysisLanguage: language };
-    return { ...data, document: composeDocument(data) };
+    // Attached v1 results predate issue detection. Keep their lists readable without claiming a risk assessment.
+    if (!("issues" in output) && !("questions" in output)) return { ...data, document: composeDocument(data) };
+    const issues = mapAll(output.issues, toIssue);
+    const questions = mapAll(output.questions, toQuestion);
+    if (!issues || !questions || questions.length > 5 || questions.some((q) => q.sourceIssueIndex >= issues.length)) return null;
+    const draft = { ...data, issues, questions };
+    return { ...draft, document: composeDocument(draft) };
   }
+  if ("issues" in output || "questions" in output) return null;
   const comparison = toComparison(output.comparison);
   if (!comparison) return null;
   const data = { lists, missingFields: missing, comparison, analysisLanguage: language };
@@ -118,5 +194,5 @@ export const extractCheckResult = (output: Record<string, unknown>) => extract(o
 
 /** Activation for `draft_v1`: first display of a non-empty criteria list (no verdict exists). */
 export function hasCriteria(result: AcceptanceBuilderResult): boolean {
-  return (result.lists.acceptance_criteria?.length ?? 0) > 0;
+  return result.lists.acceptance_criteria?.some(hasAuthoredText) ?? false;
 }

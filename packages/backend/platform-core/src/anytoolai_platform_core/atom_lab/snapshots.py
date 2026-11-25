@@ -22,6 +22,7 @@ from anytoolai_platform_core.providers.models import (
     StructuredOutputMode,
 )
 from anytoolai_platform_core.scenarios.models import ScenarioSessionRecord
+from anytoolai_platform_core.structured_output.schemas import publication_schema
 from anytoolai_platform_core.workflows.models import JobRecord
 
 
@@ -103,7 +104,7 @@ def build_atom_lab_run_record(
         input_schema=_mutable_json(input_schema.schema),
         output_schema_ref=output_schema.schema_ref,
         output_schema_version=output_schema.version,
-        output_schema=_mutable_json(output_schema.schema),
+        output_schema=publication_schema(output_schema.schema),
         input_payload=_mutable_json(request.input_payload),
         provider_policy_ref=policy.provider_policy_ref,
         provider_policy=policy_snapshot,
@@ -340,6 +341,7 @@ def _definition_bundle(**definitions: Any) -> dict[str, Any]:
         "output_schema": {
             "schema_ref": output_schema.schema_ref,
             "version": output_schema.version,
+            # The declared schema pins publication rules in existing and new hashes.
             "schema": _mutable_json(output_schema.schema),
             "schema_version": output_schema.schema_version,
             "metadata": _definition_metadata(output_schema.metadata),

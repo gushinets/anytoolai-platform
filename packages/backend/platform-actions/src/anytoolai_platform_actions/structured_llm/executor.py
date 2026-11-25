@@ -29,6 +29,7 @@ from anytoolai_platform_core.structured_output.errors import (
     StructuredOutputError,
     to_safe_validation_error,
 )
+from anytoolai_platform_core.structured_output.schemas import publication_schema
 from anytoolai_platform_core.structured_output.service import (
     StructuredOutputFinalizer,
     StructuredOutputPersistenceContext,
@@ -82,6 +83,10 @@ class StructuredLlmActionExecutor:
         ):
             raise ValueError("run-local action settings are incompatible with the action config")
         response_schema = self._config_registry.get_schema(action_definition.output_schema_ref)
+        if response_schema is not None:
+            response_schema = replace(
+                response_schema, schema=publication_schema(response_schema.schema)
+            )
         provider_request = ProviderRequest(
             provider_policy_ref=action_config.provider_policy_ref,
             tenant_id=request.tenant_id,

@@ -126,6 +126,10 @@ report exit code. Re-evaluate saved captures read-only, compare old/new statuses
 original files and reviews, and record aggregate results here without raw evidence directories.
 Run focused checks, commit and push; no live provider calls.
 
+Use `python scripts/agent/brief_language_eval.py report --out <archive-dir> --historical-any-761`
+to replay the original contract for an unversioned ANY-761 Acceptance Builder archive.
+Reports for new collections use the current contract and the flag is refused for those manifests.
+
 Review round2 verification:73 collector/regression tests and Ruff passed. Doctor, documentation,
 generated-documentation and whitespace checks passed. No provider calls or product changes.
 

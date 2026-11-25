@@ -1,0 +1,20 @@
+{
+  "response_json": {
+    "questions": [
+      {
+        "source_issue_index": 0,
+        "category": "missing_information",
+        "priority": "high",
+        "question": "What should appear on each course certificate?",
+        "rationale": "This defines the required content."
+      }
+    ]
+  },
+  "input_tokens": 60,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "acceptance_builder.generate_questions_v1"
+  }
+}

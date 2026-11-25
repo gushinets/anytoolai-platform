@@ -18,7 +18,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["string", "number", "integer", "boolean", "date", "array_of_strings"]
+            "enum": ["string", "number", "integer", "boolean", "date", "array_of_strings", "nonblank_string", "nonempty_text_list", "language_tag"]
           },
           "description": {
             "type": "string",

@@ -48,6 +48,7 @@ from anytoolai_platform_core.storage.transactions import (
 from anytoolai_platform_core.structured_output.schemas import (
     normalize_mapping,
     normalize_schema_mapping,
+    publication_schema,
 )
 from anytoolai_platform_core.workflows.errors import (
     WorkflowExecutionError,
@@ -929,9 +930,7 @@ class SequentialWorkflowRunner:
         schema_ref: str,
     ) -> None:
         schema = self._require_schema(schema_ref)
-        normalized_schema = normalize_schema_mapping(schema.schema)
-        if normalized_schema is None:
-            return
+        normalized_schema = publication_schema(schema.schema)
         try:
             validate_json_schema(instance=payload, schema=normalized_schema)
         except JsonSchemaValidationError as exc:

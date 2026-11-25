@@ -85,6 +85,9 @@ Brief Decoder -> Acceptance Builder
 External Task Finder & Fit -> ProposalAI
 ```
 
+Acceptance Builder Draft extracts criteria, assumptions and deliverables, detects risks and
+contradictions, and generates up to five client questions when it finds issues.
+
 Any delivered handoff reuses the existing backend-owned bearer token, safe preview, acceptance,
 expiry, replay protection, and source/target session linkage. Navigation stays in the same tab and
 the target start policy is `immediate`. Deferred continuation remains outside the first validation set.

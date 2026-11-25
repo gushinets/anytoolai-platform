@@ -1,4 +1,4 @@
-"""Collect ANY-761 canonical outputs and ledger evidence on an isolated local live stack.
+"""Collect multilingual brief evaluations and ledger evidence on an isolated local live stack.
 
 Model selection belongs to the stack's backend configuration. This collector never changes it.
 Each invocation creates a new directory; failures and previous series are never overwritten.
@@ -12,19 +12,30 @@ import hashlib
 import json
 import re
 import time
+from functools import cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from anytoolai_platform_core.structured_output.schemas import publication_schema
+from draft_risk_review import DECISION_FIELDS, decision_questions
+from jsonschema import Draft202012Validator
 from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _request
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "tests/fixtures/brief_language_eval/cases.json"
 WORKER_PYTHON = "/app/apps/platform-worker/.venv/bin/python"
-SCENARIOS = (
-    "brief_decoder.decode_v1",
-    "acceptance_builder.draft_v1",
-    "acceptance_builder.check_v1",
+PRODUCTS = (
+    ROOT / "packages/backend/product-platforms/freelancer-suite/src"
+    / "anytoolai_freelancer_suite/products"
 )
+DRAFT = "acceptance_builder.draft_v1"
+CHECK = "acceptance_builder.check_v1"
+OUTPUT_SCHEMAS = {
+    "brief_decoder.decode_v1": "brief_decoder/schemas/decode_output.schema.json",
+    DRAFT: "acceptance_builder/schemas/draft_output.schema.json",
+    CHECK: "acceptance_builder/schemas/check_output.schema.json",
+}
+SCENARIOS = tuple(OUTPUT_SCHEMAS)
 
 # Read the running worker's files, not a potentially different host checkout. Never export keys.
 SNAPSHOT = """
@@ -35,6 +46,11 @@ root = Path('/app')
 products = (root / 'packages/backend/product-platforms/freelancer-suite/src'
             / 'anytoolai_freelancer_suite/products')
 files = [root / 'configs/kernel/litellm_router.yaml']
+kernel = root / 'configs/kernel/schemas'
+files.extend(kernel / name for name in (
+    'extract_input.schema.json', 'extract_output.schema.json', 'issue_detection_output.schema.json',
+    'generate_questions_input.schema.json', 'generate_questions_output.schema.json',
+))
 for name in ('brief_decoder', 'acceptance_builder'):
     files += sorted(p for p in (products / name).rglob('*') if p.is_file())
 hashes = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
@@ -129,11 +145,48 @@ def authored_fields(output: dict) -> dict[str, str]:
     return fields
 
 
-def review_template(record: dict) -> dict:
+@cache
+def _output_validator(scenario: str, *, historical: bool = False) -> Draft202012Validator:
+    path = PRODUCTS / OUTPUT_SCHEMAS[scenario]
+    schema = json.loads(path.read_text(encoding="utf-8"))
+    return Draft202012Validator(schema if historical else publication_schema(schema))
+
+
+def output_contract_error(record: dict, *, historical: bool = False) -> str | None:
+    """Check the planned scenario before treating its output as reviewable evidence."""
+    output = record.get("output")
+    if output is None and not record.get("result_id"):
+        return None
+    scenario = record["case"]["scenario_id"]
+    if isinstance(output, dict):
+        if historical and scenario.startswith("acceptance_builder.") and "document" in output:
+            # The archived document shape predates the current stored-result schema.
+            return None
+        if scenario == DRAFT and not historical and not {"issues", "questions"} <= output.keys():
+            return f"{scenario} output requires both issues and questions"
+    error = next(_output_validator(scenario, historical=historical).iter_errors(output), None)
+    if error is not None:
+        return f"{scenario} output violates {error.validator} at {error.json_path}"
+    if "issues" in output:
+        issue_count = len(output["issues"])
+        for index, question in enumerate(output["questions"]):
+            if not 0 <= question["source_issue_index"] < issue_count:
+                return (
+                    f"{scenario} output at $.questions[{index}].source_issue_index "
+                    f"must reference an issue (expected 0 <= index < {issue_count})"
+                )
+    return None
+
+
+def review_template(record: dict, *, historical: bool = False) -> dict:
+    decision_field = DECISION_FIELDS.get(record["case"].get("family"))
+    output = record.get("output") or {}
+    fields = {} if output_contract_error(record, historical=historical) else authored_fields(output)
     return {
         "evidence_sha256": digest(record),
+        **({decision_field: None} if decision_field else {}),
         "reviewer": "",
-        "fields": {path: None for path in authored_fields(record.get("output") or {})},
+        "fields": dict.fromkeys(fields),
         "criteria": {question: None for question in record["case"]["criteria"]},
         "notes": "",
     }
@@ -146,23 +199,28 @@ def primary_language(tag: object) -> str | None:
     return tag.split("-")[0].lower()
 
 
-def analysis_language_matches(record: dict) -> bool:
+def analysis_language_matches(record: dict, *, historical: bool = False) -> bool:
     output = record.get("output")
     if not output or not record["case"]["scenario_id"].startswith("acceptance_builder."):
         return True
     values = output.get("extracted", {}).get("values", {})
     # Historical document outputs must also pass the generate_document ledger check below.
-    if "document" in output and "analysis_language" not in values:
+    if historical and "document" in output and "analysis_language" not in values:
         return True
     actual = primary_language(values.get("analysis_language"))
     expected = primary_language(record["case"].get("expected_language"))
     return actual is not None and expected is not None and actual == expected
 
 
-def review_status(record: dict, review: dict) -> str:
-    expected = review_template(record)
-    if review.get("evidence_sha256") != expected["evidence_sha256"]:
+def review_status(record: dict, review: dict, *, historical: bool = False) -> str:
+    """Grade current evidence. Historical contracts require an explicit archive replay."""
+    if review.get("evidence_sha256") != digest(record):
         raise ValueError("review does not belong to this evidence")
+    if record.get("error") or record.get("evidence_error") or output_contract_error(
+        record, historical=historical
+    ):
+        return "FAIL"
+    expected = review_template(record, historical=historical)
     decisions = []
     for group in ("fields", "criteria"):
         if set(review.get(group, {})) != set(expected[group]):
@@ -170,10 +228,7 @@ def review_status(record: dict, review: dict) -> str:
         decisions += list(review[group].values())
     if any(value is not None and type(value) is not bool for value in decisions):
         raise ValueError("review decisions must be true, false or null")
-    if (
-        record.get("error") or record.get("evidence_error") or False in decisions
-        or not analysis_language_matches(record)
-    ):
+    if False in decisions or not analysis_language_matches(record, historical=historical):
         return "FAIL"
     ledger = record.get("ledger") or {}
     if not record.get("output") or not ledger.get("calls"):
@@ -196,12 +251,15 @@ def review_status(record: dict, review: dict) -> str:
             "generate_questions",
             "generate_document",
         },
-        "acceptance_builder.draft_v1": {"extract"},
-        "acceptance_builder.check_v1": {"extract", "compare"},
+        DRAFT: {"extract", "detect_issues", "generate_questions"},
+        CHECK: {"extract", "compare"},
     }[scenario]
-    if scenario.startswith("acceptance_builder.") and "document" in record["output"]:
-        expected_steps = expected_steps | {"generate_document"}  # Retained pre-correction evidence.
-    if scenario == "brief_decoder.decode_v1" and not record["output"]["issues"]:
+    output = record["output"]
+    if historical and scenario.startswith("acceptance_builder.") and "document" in output:
+        expected_steps.add("generate_document")
+    if historical and scenario == DRAFT and "issues" not in output:
+        expected_steps -= {"detect_issues", "generate_questions"}
+    elif "generate_questions" in expected_steps and not output["issues"]:
         expected_steps.remove("generate_questions")
     completed = [action for action in actions if action["status"] != "skipped"]
     successful_calls = {
@@ -230,6 +288,24 @@ def review_status(record: dict, review: dict) -> str:
         or None in decisions
     ):
         return "PENDING"
+    family = record["case"].get("family")
+    if family in DECISION_FIELDS:
+        if "detect_issues" not in expected_steps:
+            return "FAIL"
+        language = primary_language(record["case"].get("expected_language"))
+        if language not in {"ru", "en", "es"}:
+            return "FAIL"
+        eligible = decision_questions(output, family, language)
+        if not eligible:
+            return "FAIL"
+        field = DECISION_FIELDS[family]
+        quotes = [q["question"] for q in eligible]
+        if field in review or family == "feasibility":
+            if review.get(field) not in quotes:
+                return "PENDING"
+        # Earlier contradiction reviews recorded the exact linked quotation at the end of notes.
+        elif not any(quote and review.get("notes", "").endswith(quote) for quote in quotes):
+            return "PENDING"
     return "PASS"
 
 
@@ -297,7 +373,40 @@ def collect(args: argparse.Namespace, case: dict, attempt: int, snapshot: dict) 
                 Exception
             ) as exc:  # Preserve the completed run even when evidence retrieval fails.
                 record["evidence_error"] = f"{type(exc).__name__}: {exc}"
+    record["evidence_error"] = output_contract_error(record) or record["evidence_error"]
     return record
+
+
+def draft_risk_cases() -> list[dict]:
+    suite = json.loads(
+        (ROOT / "tests/fixtures/acceptance_builder_eval/draft_risks_questions.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    cases = []
+    for case in suite["cases"]:
+        briefs = {case["language"]: case["input"]["brief_text"], **case.get("translations", {})}
+        for lang, brief in briefs.items():
+            cases.append(
+                {
+                    "id": f"{case['id'].rsplit('-', 1)[0]}-{lang.upper()}",
+                    "scenario_id": "acceptance_builder.draft_v1",
+                    "family": case["checks"],
+                    "expected_language": lang,
+                    "input": {"brief_text": brief},
+                    "criteria": suite["review_rubric"][case["checks"]],
+                }
+            )
+    return cases
+
+
+def _is_any761_archive_case(case: dict) -> bool:
+    prefix = {DRAFT: "ANY761-AB-D", CHECK: "ANY761-AB-C"}.get(case["scenario_id"])
+    return (
+        prefix is not None
+        and re.fullmatch(rf"{prefix}-(?:RU|EN|ES)-(?:basic|weak|mixed|override)", case["id"])
+        is not None
+    )
 
 
 def main() -> int:
@@ -306,18 +415,32 @@ def main() -> int:
     run = commands.add_parser("run")
     run.add_argument("--api-url", required=True)
     run.add_argument("--project", required=True, type=_parse_compose_project)
+    run.add_argument("--suite", choices=("language", "draft-risks"), default="language")
     run.add_argument("--scenario", choices=SCENARIOS, required=True)
-    run.add_argument("--family", choices=("basic", "weak", "mixed", "override"))
+    run.add_argument("--family", help="Filter by a family in the selected suite and scenario")
     run.add_argument("--repeats", type=int, default=3)
     run.add_argument("--timeout", type=int, default=240)
     run.add_argument("--out", type=Path, required=True)
     report = commands.add_parser("report")
     report.add_argument("--out", type=Path, required=True)
+    report.add_argument(
+        "--historical-any-761",
+        action="store_true",
+        help="Read an unversioned ANY-761 Acceptance Builder archive under its original contract",
+    )
     args = parser.parse_args()
     if args.command == "report":
         manifest = json.loads(evidence_path(args.out, "manifest.json").read_text(encoding="utf-8"))
+        historical = args.historical_any_761
+        if historical:
+            cases = manifest.get("cases", [])
+            if "evidence_contract" in manifest or not cases or not all(
+                _is_any761_archive_case(case) for case in cases
+            ):
+                report.error("--historical-any-761 requires an unversioned ANY-761 AB archive")
         statuses = []
         for key in manifest["runs"]:
+            reason = None
             path = evidence_path(args.out, f"{key}.json")
             if not path.exists():
                 status = "PENDING"
@@ -331,12 +454,22 @@ def main() -> int:
                     or record["snapshot"] != manifest["snapshot"]
                 ):
                     raise ValueError("run differs from the planned case/configuration")
-                review = json.loads(
-                    evidence_path(args.out, f"{key}.review.json").read_text(encoding="utf-8")
-                )
-                status = review_status(record, review)
+                reason = output_contract_error(record, historical=historical)
+                if reason or record.get("error") or record.get("evidence_error"):
+                    status = "FAIL"
+                else:
+                    review_path = evidence_path(args.out, f"{key}.review.json")
+                    status = (
+                        review_status(
+                            record,
+                            json.loads(review_path.read_text(encoding="utf-8")),
+                            historical=historical,
+                        )
+                        if review_path.exists()
+                        else "PENDING"
+                    )
             statuses.append(status)
-            print(f"{key}: {status}")
+            print(f"{key}: {status}" + (f" ({reason})" if reason else ""))
         return 0 if statuses and set(statuses) == {"PASS"} else 1
     url = urlsplit(args.api_url)
     if (
@@ -352,12 +485,21 @@ def main() -> int:
     if args.repeats < 1 or args.timeout < 1:
         parser.error("repeats and timeout must be positive")
     args.api_url = args.api_url.rstrip("/")
-    cases = [
-        case
-        for case in json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
-        if case["scenario_id"] == args.scenario
-        and (args.family is None or case["family"] == args.family)
-    ]
+    cases = (
+        draft_risk_cases()
+        if args.suite == "draft-risks"
+        else json.loads(SUITE.read_text(encoding="utf-8"))["cases"]
+    )
+    cases = [case for case in cases if case["scenario_id"] == args.scenario]
+    if not cases:
+        parser.error("no cases match the selected suite and scenario")
+    if args.family is not None:
+        families = sorted({case["family"] for case in cases})
+        if args.family not in families:
+            parser.error(
+                f"unknown family for {args.suite}/{args.scenario}; choose from {', '.join(families)}"
+            )
+        cases = [case for case in cases if case["family"] == args.family]
     runs = [f"{case['id']}--{attempt}" for attempt in range(1, args.repeats + 1) for case in cases]
     for key in runs:
         evidence_path(args.out, f"{key}.json")
@@ -365,19 +507,27 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=False)
     write_json(
         evidence_path(args.out, "manifest.json"),
-        {"cases": cases, "runs": runs, "snapshot": snapshot, "source": _git_state()},
+        {
+            "cases": cases,
+            "runs": runs,
+            "snapshot": snapshot,
+            "source": _git_state(),
+            "evidence_contract": "current",
+        },
     )
     for attempt in range(1, args.repeats + 1):
         for case in cases:
             key = f"{case['id']}--{attempt}"
             record = collect(args, case, attempt, snapshot)
             write_json(evidence_path(args.out, f"{key}.json"), record)
-            write_json(evidence_path(args.out, f"{key}.review.json"), review_template(record))
-            print(
-                f"{key}: {'ERROR' if record['error'] else 'collected; review pending'}", flush=True
+            write_json(
+                evidence_path(args.out, f"{key}.review.json"), review_template(record)
             )
-            if record["error"] or record["evidence_error"]:
+            error = record["error"] or record["evidence_error"]
+            if error:
+                print(f"{key}: ERROR ({error})", flush=True)
                 return 1
+            print(f"{key}: collected; review pending", flush=True)
     return 0
 
 

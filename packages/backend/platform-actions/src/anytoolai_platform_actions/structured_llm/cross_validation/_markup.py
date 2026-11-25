@@ -5,6 +5,7 @@ import unicodedata
 from html.parser import HTMLParser
 from typing import Any
 
+from anytoolai_platform_core.common.authored_text import has_authored_text
 from markdown_it import MarkdownIt
 
 # A hand-rolled tag-name allowlist keeps missing real constructs (svg/math, custom
@@ -300,7 +301,7 @@ def _has_visible_text(value: str, text_format: Any) -> bool:
     Code review findings this shape replaces a format-blind token walk for: plain_text was
     entity-decoded like markup ("&nbsp;" rejected as blank), and a regex tag-strip counted
     `<style>`/`<script>`/`<template>` content as visible text."""
-    return _reader_text(value, text_format).strip() != ""
+    return has_authored_text(_reader_text(value, text_format))
 
 
 def _tokenize_markdown(value: str) -> list[Any]:
