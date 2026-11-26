@@ -1,0 +1,1385 @@
+{
+  "issue": "ANY-851",
+  "round": 9,
+  "date": "2026-11-25",
+  "reviewer": "Codex agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form backed by an isolated live-provider stack.",
+    "base_source_sha": "d16f1b66480e789abd84e858a1a66d49191dfde7",
+    "profile_fingerprint": "45b50d9f0469d52710027a48c4a7c67223271ae4c943e690144b47d3bb798473",
+    "prompt_sha256": {
+      "reply_draft_compose_reply.v1.md": "21f7c042ba4ef3552ac078b0bd34158e7113ecae74ea27832dcb343cbbc81f47"
+    },
+    "configured_reasoning_effort": "medium",
+    "client_update_writer_provider_policy": "sol_text_generation_v1"
+  },
+  "summary": {
+    "gpt-6.1-sol": {
+      "passed": 21,
+      "total": 24
+    }
+  },
+  "tone_comparisons": [
+    {
+      "language": "ru",
+      "runs": [
+        "S4-neutral-ru",
+        "S4-firm-ru",
+        "S4-warm-ru"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "Neutral opens with what the client expected and introduces the option with «могу предложить». Firm opens with the main screen as the attributed issue and makes the offer with «предлагаю». Warm acknowledges disappointment personally. All three make the same two-option first-round offer before brief context."
+    },
+    {
+      "language": "en",
+      "runs": [
+        "S4-neutral-en",
+        "S4-firm-en",
+        "S4-warm-en"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "Neutral opens with what the client expected and presents an available option. Firm opens with the main screen and makes a direct proposal. Warm acknowledges the experience personally. All three retain the first-round scope and put brief context last."
+    },
+    {
+      "language": "es",
+      "runs": [
+        "S4-neutral-es",
+        "S4-firm-es",
+        "S4-warm-es"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "Neutral opens with «Esperabas» and presents an option with «Puedo ofrecerte». Firm opens with the screen as the point at issue and makes a direct offer with «Te ofrezco». Warm starts with «Entiendo». All three keep both versions inside the first revision round and mention the brief only after the offer."
+    }
+  ],
+  "runs": [
+    {
+      "id": "S4-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632573408004200_0000000021_40443ac2eba54e4596534433bb66f8cf",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю ваше разочарование: главный экран показался вам скучным, а вы ожидали другого. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Понимаю ваше разочарование: главный экран показался вам скучным, а вы ожидали другого. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Понимаю ваше разочарование: главный экран показался вам скучным, а вы ожидали другого. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with what the client expected and introduces the option with «могу предложить». Firm opens with the main screen as the attributed issue and makes the offer with «предлагаю». Warm acknowledges disappointment personally. All three make the same two-option first-round offer before brief context."
+    },
+    {
+      "id": "S4-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632573096393327_0000000012_22f756b2849a4b4eb0e0d6a656490198",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The main screen looks dull to you and falls short of your expectations. I propose two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "The main screen looks dull to you and falls short of your expectations. I propose two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "The main screen looks dull to you and falls short of your expectations. I propose two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with what the client expected and presents an available option. Firm opens with the main screen and makes a direct proposal. Warm acknowledges the experience personally. All three retain the first-round scope and put brief context last."
+    },
+    {
+      "id": "S4-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632573725276700_0000000027_4133e695bea049228890416d4dfef0b1",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Esperabas algo distinto y la pantalla principal te resulta apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Esperabas algo distinto y la pantalla principal te resulta apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "Esperabas algo distinto y la pantalla principal te resulta apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with «Esperabas» and presents an option with «Puedo ofrecerte». Firm opens with the screen as the point at issue and makes a direct offer with «Te ofrezco». Warm starts with «Entiendo». All three keep both versions inside the first revision round and mention the brief only after the offer."
+    },
+    {
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632573574750717_0000000024_6168fab949e840d2a42f0545b607ff29",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que esperaban algo muy distinto y que la pantalla principal les resulte apagada. Puedo ofrecerles dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperaban algo muy distinto y que la pantalla principal les resulte apagada. Puedo ofrecerles dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "Entiendo que esperaban algo muy distinto y que la pantalla principal les resulte apagada. Puedo ofrecerles dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "FAIL",
+          "reason": "Esperaban, les and ofrecerles address a group, although esperaba is singular in the source and the group is only the earlier requester."
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the individual sender as the person with the expectation and the addressee. The earlier group request keeps its separate actors.",
+          "verdict": "FAIL",
+          "reason": "Esperaban, les and ofrecerles address a group, although esperaba is singular in the source and the group is only the earlier requester."
+        }
+      ],
+      "review_note": "Neutral opens with «Esperabas» and presents an option with «Puedo ofrecerte». Firm opens with the screen as the point at issue and makes a direct offer with «Te ofrezco». Warm starts with «Entiendo». All three keep both versions inside the first revision round and mention the brief only after the offer."
+    },
+    {
+      "id": "S4-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632573290209450_0000000015_7b846603d30541f4a195747549e0e5de",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы ожидали другого результата: главный экран показался вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. В брифе яркие цвета не упоминались."
+      },
+      "visible_text": "Вы ожидали другого результата: главный экран показался вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. В брифе яркие цвета не упоминались.",
+      "copied_text": "Вы ожидали другого результата: главный экран показался вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. В брифе яркие цвета не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with what the client expected and introduces the option with «могу предложить». Firm opens with the main screen as the attributed issue and makes the offer with «предлагаю». Warm acknowledges disappointment personally. All three make the same two-option first-round offer before brief context."
+    },
+    {
+      "id": "S4-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632573372599415_0000000018_c1f98677c3de42c0a30dea177b6a0d79",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Главный экран выглядит для вас скучно. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Главный экран выглядит для вас скучно. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Главный экран выглядит для вас скучно. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with what the client expected and introduces the option with «могу предложить». Firm opens with the main screen as the attributed issue and makes the offer with «предлагаю». Warm acknowledges disappointment personally. All three make the same two-option first-round offer before brief context."
+    },
+    {
+      "id": "S4-neutral-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632586645113326_0000000034_2f492b5474454b34877860b3f383eb2e",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "You expected a completely different main screen and found it dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "You expected a completely different main screen and found it dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "You expected a completely different main screen and found it dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with what the client expected and presents an available option. Firm opens with the main screen and makes a direct proposal. Warm acknowledges the experience personally. All three retain the first-round scope and put brief context last."
+    },
+    {
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632592060989283_0000000040_5f33e8ff6df04437bd9c0c3e2d1c6dc0",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I understand your disappointment with the main screen looking dull rather than what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand your disappointment with the main screen looking dull rather than what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "I understand your disappointment with the main screen looking dull rather than what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "FAIL",
+          "reason": "The wording attributes disappointment to the client while taking the screen looking dull as a premise."
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the assessment that the screen looks dull explicitly attributed to the client, including when expressing empathy.",
+          "verdict": "FAIL",
+          "reason": "The wording attributes disappointment to the client while taking the screen looking dull as a premise."
+        }
+      ],
+      "review_note": "Neutral opens with what the client expected and presents an available option. Firm opens with the main screen and makes a direct proposal. Warm acknowledges the experience personally. All three retain the first-round scope and put brief context last."
+    },
+    {
+      "id": "S4-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632597454604841_0000000046_513450cc4ac84a35a921b8e5f48abb96",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal te resulta apagada. Te ofrezco dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "La pantalla principal te resulta apagada. Te ofrezco dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "La pantalla principal te resulta apagada. Te ofrezco dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ meaningfully in the opening or decision. Warm remains distinct through personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with «Esperabas» and presents an option with «Puedo ofrecerte». Firm opens with the screen as the point at issue and makes a direct offer with «Te ofrezco». Warm starts with «Entiendo». All three keep both versions inside the first revision round and mention the brief only after the offer."
+    },
+    {
+      "id": "Tentative-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Нам важно понимать, успеем ли запустить его на этой неделе.",
+        "reply_goal": "Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632600520043620_0000000052_a069f57a427d4cee84c84cded392401d",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вам важно понимать, успеете ли вы запустить финальный макет на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Вам важно понимать, успеете ли вы запустить финальный макет на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Вам важно понимать, успеете ли вы запустить финальный макет на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
+    },
+    {
+      "id": "Tentative-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Нам важно понимать, успеем ли запустить его на этой неделе.",
+        "reply_goal": "Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632607881167622_0000000058_ae987adbe397497ca4f7a32a2ac4e8c6",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вам нужна ясность по сроку передачи финального макета для запуска на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Вам нужна ясность по сроку передачи финального макета для запуска на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Вам нужна ясность по сроку передачи финального макета для запуска на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
+    },
+    {
+      "id": "Tentative-neutral-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Can you deliver the final layout on Thursday? We need to know if we can launch this week.",
+        "reply_goal": "Thursday is unconfirmed. On Tuesday I will check my workload and let the client know whether I can deliver the final layout on Thursday.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632611834477633_0000000064_78029cc560464709b6c39a089c23f55f",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "You need to know whether you can launch this week. I will check my workload on Tuesday and let you know whether I can deliver the final layout on Thursday. Thursday is unconfirmed."
+      },
+      "visible_text": "You need to know whether you can launch this week. I will check my workload on Tuesday and let you know whether I can deliver the final layout on Thursday. Thursday is unconfirmed.",
+      "copied_text": "You need to know whether you can launch this week. I will check my workload on Tuesday and let you know whether I can deliver the final layout on Thursday. Thursday is unconfirmed.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
+    },
+    {
+      "id": "Tentative-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Can you deliver the final layout on Thursday? We need to know if we can launch this week.",
+        "reply_goal": "Thursday is unconfirmed. On Tuesday I will check my workload and let the client know whether I can deliver the final layout on Thursday.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632615195639820_0000000069_ccbe93c139a548a58d24c057b421742d",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Your launch this week depends on whether the final layout can be delivered on Thursday. I will check my workload on Tuesday and let you know whether I can deliver the final layout on Thursday. Thursday is unconfirmed."
+      },
+      "visible_text": "Your launch this week depends on whether the final layout can be delivered on Thursday. I will check my workload on Tuesday and let you know whether I can deliver the final layout on Thursday. Thursday is unconfirmed.",
+      "copied_text": "Your launch this week depends on whether the final layout can be delivered on Thursday. I will check my workload on Tuesday and let you know whether I can deliver the final layout on Thursday. Thursday is unconfirmed.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the separate delivery question and launch planning concern without adding a dependency.",
+          "verdict": "FAIL",
+          "reason": "Says the launch depends on Thursday delivery. The source states no such prerequisite."
+        }
+      ],
+      "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
+    },
+    {
+      "id": "Tentative-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Necesitamos saber si podemos lanzarla esta semana.",
+        "reply_goal": "La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632622921995006_0000000076_dd30d2af8b8246e9be9a56c6ea2babad",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Necesitan saber si pueden lanzar la maqueta final esta semana. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregarla el jueves."
+      },
+      "visible_text": "Necesitan saber si pueden lanzar la maqueta final esta semana. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregarla el jueves.",
+      "copied_text": "Necesitan saber si pueden lanzar la maqueta final esta semana. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregarla el jueves.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
+    },
+    {
+      "id": "Tentative-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Necesitamos saber si podemos lanzarla esta semana.",
+        "reply_goal": "La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632629061240016_0000000082_8a5a158c91654a1683a8681a987749e7",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La entrega de la maqueta final el jueves es el punto que necesitan aclarar para planificar el lanzamiento de esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves."
+      },
+      "visible_text": "La entrega de la maqueta final el jueves es el punto que necesitan aclarar para planificar el lanzamiento de esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "copied_text": "La entrega de la maqueta final el jueves es el punto que necesitan aclarar para planificar el lanzamiento de esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Thursday delivery is unconfirmed. The freelancer checks their own workload on Tuesday, then reports whether they can deliver Thursday."
+    },
+    {
+      "id": "R05-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "По счёту INV-104 вы просите 1 250 USD, но у нас в смете 1 250 EUR. Подтвердите валюту и что включены две версии ролика по 30 секунд. Можно перенести сдачу с 15 октября на 10 октября?",
+        "reply_goal": "Признать опечатку в счёте: верно 1 250 EUR, отправлю исправленный счёт, не утверждать что уже отправлен. Включены ровно 2 версии по 30 секунд и один раунд правок. Согласованный срок 15 октября 2026, перенос на 10 октября не подтверждён; сначала нужно проверить загрузку, обещать лишь сообщить о возможности переноса. Не конвертировать EUR в USD.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632634372132849_0000000089_0d8d5b7a2f6349dd8f4088291843aa98",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "В счёте INV-104 допущена опечатка в валюте. Правильная сумма по счёту INV-104 — 1 250 EUR. Отправлю исправленный счёт.\n\nПодтверждаю: включены ровно 2 версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года, он остаётся в силе. Перенос на 10 октября не подтверждён: сначала мне нужно проверить загрузку, после чего сообщу о возможности переноса."
+      },
+      "visible_text": "В счёте INV-104 допущена опечатка в валюте. Правильная сумма по счёту INV-104 — 1 250 EUR. Отправлю исправленный счёт.\n\nПодтверждаю: включены ровно 2 версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года, он остаётся в силе. Перенос на 10 октября не подтверждён: сначала мне нужно проверить загрузку, после чего сообщу о возможности переноса.",
+      "copied_text": "В счёте INV-104 допущена опечатка в валюте. Правильная сумма по счёту INV-104 — 1 250 EUR. Отправлю исправленный счёт.\n\nПодтверждаю: включены ровно 2 версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года, он остаётся в силе. Перенос на 10 октября не подтверждён: сначала мне нужно проверить загрузку, после чего сообщу о возможности переноса.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer explicitly responsible in first person for sending the corrected invoice.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The invoice admission and identifier come first. The corrected EUR amount, commitment to send a corrected invoice, scope and both date statuses are preserved."
+    },
+    {
+      "id": "R05-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Invoice INV-104 asks for 1,250 USD, but our estimate says 1,250 EUR. Please confirm the currency and that two 30-second versions are included. Can we move delivery from October 15 to October 10?",
+        "reply_goal": "Acknowledge the typo in the invoice: the correct amount is 1,250 EUR and I will send a corrected invoice. Do not say it has already been sent. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026. October 10 is unconfirmed. I need to check my workload first and only promise to say whether the new date is possible. Do not convert EUR to USD.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632639556900767_0000000096_43a26da6e6dd4015be42795828642e04",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Invoice INV-104 contains a currency typo. The correct amount is 1,250 EUR, and I will send a corrected invoice.\n\nExactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026. October 10 is not confirmed. I will first check my workload, then let you know whether delivery on October 10 is possible."
+      },
+      "visible_text": "Invoice INV-104 contains a currency typo. The correct amount is 1,250 EUR, and I will send a corrected invoice.\n\nExactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026. October 10 is not confirmed. I will first check my workload, then let you know whether delivery on October 10 is possible.",
+      "copied_text": "Invoice INV-104 contains a currency typo. The correct amount is 1,250 EUR, and I will send a corrected invoice.\n\nExactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026. October 10 is not confirmed. I will first check my workload, then let you know whether delivery on October 10 is possible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer explicitly responsible in first person for sending the corrected invoice.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The invoice admission and identifier come first. The corrected EUR amount, commitment to send a corrected invoice, scope and both date statuses are preserved."
+    },
+    {
+      "id": "R05-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "En la factura INV-104 nos pides 1.250 USD, pero el presupuesto indica 1.250 EUR. Confirma la moneda y que se incluyen dos versiones de 30 segundos. ¿Podemos adelantar la entrega del 15 al 10 de octubre?",
+        "reply_goal": "Reconocer el error tipográfico de la factura: el importe correcto es 1.250 EUR y enviaré la factura corregida. No decir que ya se envió. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada es el 15 de octubre de 2026. El 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y solo prometer que informaré si el cambio es posible. No convertir euros a dólares.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632642437212695_0000000101_623c1c032881464fae25a2bdd2f4b957",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura INV-104 corregida.\n\nConfirmo que se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026; el adelanto al 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y te informaré de si el cambio es posible."
+      },
+      "visible_text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura INV-104 corregida.\n\nConfirmo que se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026; el adelanto al 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y te informaré de si el cambio es posible.",
+      "copied_text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura INV-104 corregida.\n\nConfirmo que se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026; el adelanto al 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y te informaré de si el cambio es posible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer explicitly responsible in first person for sending the corrected invoice.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The invoice admission and identifier come first. The corrected EUR amount, commitment to send a corrected invoice, scope and both date statuses are preserved."
+    },
+    {
+      "id": "S4-shared-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Сначала предложи две версии экрана в первом раунде. Затем раздельно передай позицию клиента по просьбе о ярких цветах и расхождению с договорённостью со мной, не подтверждая ни одной из них. В брифе ярких цветов не было.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632644640533450_0000000107_03bfa1d53b80490eb715cd60d8873a6a",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю ваше разочарование тем, что главный экран кажется вам скучным. Могу предложить две версии главного экрана в первом раунде. Вы пишете, что с вашей стороны была просьба о ярких цветах. Отдельно вы отмечаете, что результат не соответствует тому, о чём мы с вами договаривались. В брифе яркие цвета не были указаны."
+      },
+      "visible_text": "Понимаю ваше разочарование тем, что главный экран кажется вам скучным. Могу предложить две версии главного экрана в первом раунде. Вы пишете, что с вашей стороны была просьба о ярких цветах. Отдельно вы отмечаете, что результат не соответствует тому, о чём мы с вами договаривались. В брифе яркие цвета не были указаны.",
+      "copied_text": "Понимаю ваше разочарование тем, что главный экран кажется вам скучным. Могу предложить две версии главного экрана в первом раунде. Вы пишете, что с вашей стороны была просьба о ярких цветах. Отдельно вы отмечаете, что результат не соответствует тому, о чём мы с вами договаривались. В брифе яркие цвета не были указаны.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen in the first round specified in the goal.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Relays both claims explicitly after the offer. The request for bright colors is attributed to the client or their team. The agreement remains a separate attributed claim, with its original participants.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both client and freelancer as parties to the alleged shared agreement; says only that the brief omits bright colors.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The scoped offer precedes disputed history. The client side remains the requester, and the claimed shared agreement includes the client and freelancer."
+    },
+    {
+      "id": "S4-shared-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "First offer two versions of the main screen in the first revision round. Then report the client’s request for bright colors and their claim that the result differs from their agreement with me as two separate claims, without confirming either. The brief did not mention bright colors.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632648004043091_0000000112_0b6b06b7aed245b780f108222dd9ead7",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I understand how disappointing it is when the main screen looks dull to you and feels completely different from what you expected. I can offer two versions of the main screen in the first revision round. You’ve said you asked for bright colors. You also say the result differs from what you and I agreed on. The brief did not mention bright colors."
+      },
+      "visible_text": "I understand how disappointing it is when the main screen looks dull to you and feels completely different from what you expected. I can offer two versions of the main screen in the first revision round. You’ve said you asked for bright colors. You also say the result differs from what you and I agreed on. The brief did not mention bright colors.",
+      "copied_text": "I understand how disappointing it is when the main screen looks dull to you and feels completely different from what you expected. I can offer two versions of the main screen in the first revision round. You’ve said you asked for bright colors. You also say the result differs from what you and I agreed on. The brief did not mention bright colors.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Relays both claims explicitly after the offer. The request for bright colors is attributed to the client or their team. The agreement remains a separate attributed claim, with its original participants.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both client and freelancer as parties to the alleged shared agreement; says only that the brief omits bright colors.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The scoped offer precedes disputed history. The client side remains the requester, and the claimed shared agreement includes the client and freelancer."
+    },
+    {
+      "id": "S4-shared-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "Primero ofrece dos versiones de la pantalla principal en la primera ronda de cambios. Después, menciona por separado la petición del cliente de usar colores vivos y su versión de que el resultado difiere del acuerdo que hizo conmigo, sin confirmar ninguna de las dos afirmaciones. El brief no mencionaba colores vivos.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632651897394862_0000000118_4dc07d4d800648a5a9f7d887e3892a34",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo tu decepción al ver que la pantalla principal te resulta apagada. Puedo ofrecerte dos versiones de la pantalla principal en la primera ronda de cambios. Mencionas que ustedes pidieron colores vivos. También señalas que el resultado difiere de lo que acordamos. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo tu decepción al ver que la pantalla principal te resulta apagada. Puedo ofrecerte dos versiones de la pantalla principal en la primera ronda de cambios. Mencionas que ustedes pidieron colores vivos. También señalas que el resultado difiere de lo que acordamos. El brief no mencionaba colores vivos.",
+      "copied_text": "Entiendo tu decepción al ver que la pantalla principal te resulta apagada. Puedo ofrecerte dos versiones de la pantalla principal en la primera ronda de cambios. Mencionas que ustedes pidieron colores vivos. También señalas que el resultado difiere de lo que acordamos. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Relays both claims explicitly after the offer. The request for bright colors is attributed to the client or their team. The agreement remains a separate attributed claim, with its original participants.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both client and freelancer as parties to the alleged shared agreement; says only that the brief omits bright colors.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The scoped offer precedes disputed history. The client side remains the requester, and the claimed shared agreement includes the client and freelancer."
+    },
+    {
+      "id": "S4-third-party-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Я ожидал более яркий главный экран. Мы просили яркие цвета. Мы с координатором площадки договорились о другом результате.",
+        "reply_goal": "Предложи две версии главного экрана в первом раунде правок. После предложения явно передай, что клиент считает результат отличным от его договорённости с координатором площадки, и отдельно передай просьбу клиента о ярких цветах. Изложи обе как позицию клиента.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632657885646749_0000000124_8e1e3ba1e9f94434a7d9cafde91631ce",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю ваше разочарование: вы ожидали более яркий главный экран. Могу предложить две версии главного экрана в первом раунде правок. По вашему мнению, результат отличается от того, о чём вы договорились с координатором площадки. Вы также отмечаете, что с вашей стороны была просьба использовать яркие цвета."
+      },
+      "visible_text": "Понимаю ваше разочарование: вы ожидали более яркий главный экран. Могу предложить две версии главного экрана в первом раунде правок. По вашему мнению, результат отличается от того, о чём вы договорились с координатором площадки. Вы также отмечаете, что с вашей стороны была просьба использовать яркие цвета.",
+      "copied_text": "Понимаю ваше разочарование: вы ожидали более яркий главный экран. Могу предложить две версии главного экрана в первом раунде правок. По вашему мнению, результат отличается от того, о чём вы договорились с координатором площадки. Вы также отмечаете, что с вашей стороны была просьба использовать яркие цвета.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Relays both claims explicitly after the offer. The request for bright colors is attributed to the client or their team. The agreement remains a separate attributed claim, with its original participants.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The alleged agreement is between the client and the venue coordinator. The freelancer is outside it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The scoped offer precedes disputed history. The request stays with the client side, and the alleged agreement stays with the client and the venue coordinator."
+    },
+    {
+      "id": "S4-third-party-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "I expected a brighter main screen. We asked for bright colors. The venue coordinator and I agreed on a different result.",
+        "reply_goal": "Offer two versions of the main screen in the first revision round. After that, explicitly report that the client says the result differs from their agreement with the venue coordinator and separately report their request for bright colors. Attribute both points to the client.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632663977036818_0000000130_cdf9b3cf803d4f24bbed793b9616b838",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I understand the main screen wasn’t as bright as you expected. I can offer two versions of the main screen in the first revision round. You say the result differs from what you and the venue coordinator agreed on. You also say your side asked for bright colors."
+      },
+      "visible_text": "I understand the main screen wasn’t as bright as you expected. I can offer two versions of the main screen in the first revision round. You say the result differs from what you and the venue coordinator agreed on. You also say your side asked for bright colors.",
+      "copied_text": "I understand the main screen wasn’t as bright as you expected. I can offer two versions of the main screen in the first revision round. You say the result differs from what you and the venue coordinator agreed on. You also say your side asked for bright colors.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Relays both claims explicitly after the offer. The request for bright colors is attributed to the client or their team. The agreement remains a separate attributed claim, with its original participants.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The alleged agreement is between the client and the venue coordinator. The freelancer is outside it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The scoped offer precedes disputed history. The request stays with the client side, and the alleged agreement stays with the client and the venue coordinator."
+    },
+    {
+      "id": "S4-third-party-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Esperaba una pantalla principal más luminosa. Pedimos colores vivos. La coordinadora del recinto y yo acordamos un resultado diferente.",
+        "reply_goal": "Ofrece dos versiones de la pantalla principal en la primera ronda de cambios. Después de la oferta, menciona explícitamente que, según el cliente, el resultado difiere de su acuerdo con la coordinadora del recinto, y menciona por separado su petición de colores vivos. Atribuye ambos puntos al cliente.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795632669199437865_0000000136_f295e344df1044e5a4f8fbe8eea136f2",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que la pantalla principal no se vea tan luminosa como esperabas. Puedo ofrecerte dos versiones de la pantalla principal en la primera ronda de cambios. Según comentas, el resultado difiere de lo que acordaste con la coordinadora del recinto. También señalas que pedisteis colores vivos."
+      },
+      "visible_text": "Entiendo que la pantalla principal no se vea tan luminosa como esperabas. Puedo ofrecerte dos versiones de la pantalla principal en la primera ronda de cambios. Según comentas, el resultado difiere de lo que acordaste con la coordinadora del recinto. También señalas que pedisteis colores vivos.",
+      "copied_text": "Entiendo que la pantalla principal no se vea tan luminosa como esperabas. Puedo ofrecerte dos versiones de la pantalla principal en la primera ronda de cambios. Según comentas, el resultado difiere de lo que acordaste con la coordinadora del recinto. También señalas que pedisteis colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Relays both claims explicitly after the offer. The request for bright colors is attributed to the client or their team. The agreement remains a separate attributed claim, with its original participants.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The alleged agreement is between the client and the venue coordinator. The freelancer is outside it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The scoped offer precedes disputed history. The request stays with the client side, and the alleged agreement stays with the client and the venue coordinator."
+    }
+  ],
+  "review_correction": "Round 10 corrected the three source-fidelity verdicts without altering the saved inputs or outputs."
+}

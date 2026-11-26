@@ -13,6 +13,11 @@
       "type": "string",
       "enum": ["neutral", "warm", "firm"]
     },
+    "output_layout": {
+      "type": "string",
+      "enum": ["single_text"],
+      "description": "When set, put the complete message and any client request in text and omit call_to_action."
+    },
     "constraints": {
       "type": "object",
       "properties": {

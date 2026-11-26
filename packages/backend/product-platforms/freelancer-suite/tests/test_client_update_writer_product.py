@@ -463,6 +463,7 @@ def test_compose_reply_step_maps_constraints_from_scenario_input(workflow_id: st
     reply_step = next(step for step in workflow["steps"] if step["step_id"] == "compose_reply")
 
     assert reply_step["input_mapping"]["constraints"] == "?scenario.input.constraints"
+    assert reply_step["input_mapping"]["output_layout"] == "?scenario.input.output_layout"
 
 
 # The E2E test's amount/due_date assertion doesn't protect the *other* grounded facts the billing
@@ -684,8 +685,9 @@ def test_prepaid_request_prompt_requires_a_payment_request_only_in_rule_d() -> N
                 "Do not offer or imply anything `situation` or `intent` excludes",
                 "unless `intent` explicitly counters that specific term",
                 "Exclusions in `intent` always hold",
-                "keep its exact value and give it the status",  # ANY-628 limits keep value and status
-                "give it the status of the first rule that applies",  # ANY-631 one prioritized rule
+                "keep its exact value",
+                "evaluate agreement status from `intent`",
+                "status of the first rule that applies",  # ANY-631 one prioritized rule
                 "(1) `intent` accepts, declines or counters it: do exactly that with the value `intent` gives",
                 "an accepted change (for example a second revision round) replaces the earlier term",
                 "a direction that only limits what to write about the term",
@@ -710,7 +712,7 @@ def test_reply_prompts_keep_agreed_terms_and_exclusions(
 @pytest.mark.parametrize(
     "fragment",
     (
-        "For client-facing facts included in `text` or `call_to_action`",
+        "For client-facing facts included in `text`",
         "readiness and agreement status",
         "numbers together with their units and the thing they count, "
         "identifiers and scope exclusions",
@@ -745,7 +747,7 @@ def test_update_prompt_requires_every_client_facing_fact_and_names_unknowns() ->
 
     # This pins the instruction; generated-text completeness requires live acceptance (ANY-624).
     for fragment in (
-        "Include in `text` or `call_to_action` every client-relevant result, blocker, request "
+        "Include in the update every client-relevant result, blocker, request "
         "to the client and next step mentioned in `situation`",
         "including raw progress notes not phrased as a message to the client",
         "A notes format does not make progress facts private",
@@ -989,8 +991,10 @@ def test_reply_draft_prompt_states_every_intent_item_and_client_constraint() -> 
     )
 
     for fragment in (
-        "Directly address each specific point raised in `situation` (every question, request "
-        "and constraint the client states",
+        "Answer each current question and request and respect each current constraint "
+        "in `situation`",
+        "what someone asked for or agreed in the past does not require a recap "
+        "to answer the concern",
         "State in `text` every fact, decision and action `intent` gives for the client",
         "each with its exact value, even when `situation` did not ask about it",
         "Such a fact, decision or promised action is content for the client, not a direction to "
@@ -1011,8 +1015,6 @@ def test_reply_draft_prompt_keeps_the_client_subject_and_scope() -> None:
     assert "Do not generalize, narrow or replace it" in prompt
 
 
-# ANY-626: the frontend appends `call_to_action` to `text`, so a request stated in both reaches the
-# client twice (QA R01, R02). Update composes the same two fields, so it carries the same rule.
 @pytest.mark.parametrize(
     "prompt_ref",
     [
@@ -1023,10 +1025,12 @@ def test_reply_draft_prompt_keeps_the_client_subject_and_scope() -> None:
 def test_compose_reply_prompt_states_each_client_request_once(prompt_ref: str) -> None:
     prompt = " ".join(_load_prompt_template(prompt_ref).split())
 
-    for fragment in (
-        "`text` and `call_to_action` reach the client as one message, with `call_to_action` after "
-        "a blank line: put each request to the client in only one of them.",
-        "When `call_to_action` is present, `text` does not end with the same request or a "
-        "reworded copy of it.",
-    ):
-        assert fragment in prompt, fragment
+    assert (
+        "When `output_layout` is `single_text`, put the complete copy-ready message in "
+        "`text` and omit `call_to_action`" in prompt
+    )
+    assert (
+        "Otherwise keep the main message in `text` and use the optional `call_to_action`" in prompt
+    )
+    assert "Each request appears once across the output" in prompt
+    assert "A separate `call_to_action` has its own 200-character limit" in prompt

@@ -1,0 +1,1498 @@
+{
+  "issue": "ANY-851",
+  "round": 11,
+  "date": "2026-11-25",
+  "reviewer": "Codex agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form backed by an isolated live-provider stack.",
+    "base_source_sha": "d9239f52b62be9b7ae9a993cce230e7ecbf0b706",
+    "profile_fingerprint": "9076f0a0dda6e4d0757dd8825bb61fc901dc1a7179310135da42bc702899edc3",
+    "prompt_sha256": {
+      "reply_draft_compose_reply.v1.md": "c10147a008dfcbe6fe193a4f6b96b06f2e6e0ca0bfbbd5bf6896c61b462b8983"
+    },
+    "configured_reasoning_effort": "medium",
+    "client_update_writer_provider_policy": "sol_text_generation_v1"
+  },
+  "summary": {
+    "gpt-6.1-sol": {
+      "passed": 24,
+      "total": 24
+    }
+  },
+  "scope": [
+    "ru",
+    "es"
+  ],
+  "prior_evidence_correction": [
+    "Dependency-firm-ru",
+    "Dependency-firm-es"
+  ],
+  "tone_comparisons": [
+    {
+      "scenario": "Dependency",
+      "language": "ru",
+      "runs": [
+        "Dependency-neutral-ru",
+        "Dependency-warm-ru",
+        "Dependency-firm-ru"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "scenario": "Dependency",
+      "language": "es",
+      "runs": [
+        "Dependency-neutral-es",
+        "Dependency-warm-es",
+        "Dependency-firm-es"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "scenario": "Tentative",
+      "language": "ru",
+      "runs": [
+        "Tentative-neutral-ru",
+        "Tentative-warm-ru",
+        "Tentative-firm-ru"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "scenario": "Tentative",
+      "language": "es",
+      "runs": [
+        "Tentative-neutral-es",
+        "Tentative-warm-es",
+        "Tentative-firm-es"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "scenario": "S4",
+      "language": "ru",
+      "runs": [
+        "S4-neutral-ru",
+        "S4-warm-ru",
+        "S4-firm-ru"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    },
+    {
+      "scenario": "S4",
+      "language": "es",
+      "runs": [
+        "S4-neutral-es",
+        "S4-warm-es",
+        "S4-firm-es"
+      ],
+      "same_input_except_tone": true,
+      "verdict": "PASS",
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    }
+  ],
+  "runs": [
+    {
+      "id": "Dependency-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Мы сможем запуститься на этой неделе только если получим макет к четвергу.",
+        "reply_goal": "Отрази указанное клиентом условие запуска. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637277259977706_0000000016_8e7de6c0549d4657a0b62b66df9fbfb6",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы хотите уточнить, возможна ли передача финального макета в четверг. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг. Учитываю, что вы сможете запуститься на этой неделе, только если получите макет к четвергу."
+      },
+      "visible_text": "Вы хотите уточнить, возможна ли передача финального макета в четверг. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг. Учитываю, что вы сможете запуститься на этой неделе, только если получите макет к четвергу.",
+      "copied_text": "Вы хотите уточнить, возможна ли передача финального макета в четверг. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг. Учитываю, что вы сможете запуститься на этой неделе, только если получите макет к четвергу.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "получите макет"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the same client group as in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "вы сможете запуститься"
+        },
+        {
+          "criterion": "Attributes to the client that receiving the layout by Thursday is necessary for the launch this week.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the necessary condition in the same direction and does not imply that meeting it guarantees a launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Leaves Thursday delivery unconfirmed and keeps the freelancer’s Tuesday workload check and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "id": "Dependency-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Мы сможем запуститься на этой неделе только если получим макет к четвергу.",
+        "reply_goal": "Отрази указанное клиентом условие запуска. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637277350019773_0000000021_9d6022f00ca14e028bfc358bfb5346ec",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что вы сможете запуститься на этой неделе, только если получите макет к четвергу. Срок передачи финального макета на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Понимаю, что вы сможете запуститься на этой неделе, только если получите макет к четвергу. Срок передачи финального макета на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Понимаю, что вы сможете запуститься на этой неделе, только если получите макет к четвергу. Срок передачи финального макета на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "получите макет"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the same client group as in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "вы сможете запуститься"
+        },
+        {
+          "criterion": "Attributes to the client that receiving the layout by Thursday is necessary for the launch this week.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the necessary condition in the same direction and does not imply that meeting it guarantees a launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Leaves Thursday delivery unconfirmed and keeps the freelancer’s Tuesday workload check and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "id": "Dependency-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Мы сможем запуститься на этой неделе только если получим макет к четвергу.",
+        "reply_goal": "Отрази указанное клиентом условие запуска. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637277517170050_0000000027_204a2c9c56094859b8c24a14e20f7c41",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Запуститься на этой неделе вы сможете, только если получите макет к четвергу. Срок передачи финального макета в четверг я пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Запуститься на этой неделе вы сможете, только если получите макет к четвергу. Срок передачи финального макета в четверг я пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Запуститься на этой неделе вы сможете, только если получите макет к четвергу. Срок передачи финального макета в четверг я пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "получите макет"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the same client group as in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "Запуститься на этой неделе вы сможете"
+        },
+        {
+          "criterion": "Attributes to the client that receiving the layout by Thursday is necessary for the launch this week.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the necessary condition in the same direction and does not imply that meeting it guarantees a launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Leaves Thursday delivery unconfirmed and keeps the freelancer’s Tuesday workload check and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "id": "Dependency-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Solo podremos lanzarla esta semana si recibimos la maqueta a más tardar el jueves.",
+        "reply_goal": "Reconoce la condición de lanzamiento que indica el cliente. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637277049752101_0000000012_dfa26f8e2c3d4fe1b65cef384508d2b0",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Ustedes solo podrán lanzar la maqueta esta semana si la reciben a más tardar el jueves. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregarla el jueves."
+      },
+      "visible_text": "Ustedes solo podrán lanzar la maqueta esta semana si la reciben a más tardar el jueves. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregarla el jueves.",
+      "copied_text": "Ustedes solo podrán lanzar la maqueta esta semana si la reciben a más tardar el jueves. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregarla el jueves.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "la reciben"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the same client group as in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "Ustedes solo podrán lanzar"
+        },
+        {
+          "criterion": "Attributes to the client that receiving the layout by Thursday is necessary for the launch this week.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the necessary condition in the same direction and does not imply that meeting it guarantees a launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Leaves Thursday delivery unconfirmed and keeps the freelancer’s Tuesday workload check and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "id": "Dependency-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Solo podremos lanzarla esta semana si recibimos la maqueta a más tardar el jueves.",
+        "reply_goal": "Reconoce la condición de lanzamiento que indica el cliente. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637277248621160_0000000015_8aac1a0a88dc452693f277798feeb977",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que solo podrán lanzarla esta semana si reciben la maqueta a más tardar el jueves. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo entregar la maqueta final el jueves."
+      },
+      "visible_text": "Entiendo que solo podrán lanzarla esta semana si reciben la maqueta a más tardar el jueves. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo entregar la maqueta final el jueves.",
+      "copied_text": "Entiendo que solo podrán lanzarla esta semana si reciben la maqueta a más tardar el jueves. La entrega de la maqueta final el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo entregar la maqueta final el jueves.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "reciben la maqueta"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the same client group as in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "podrán lanzarla"
+        },
+        {
+          "criterion": "Attributes to the client that receiving the layout by Thursday is necessary for the launch this week.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the necessary condition in the same direction and does not imply that meeting it guarantees a launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Leaves Thursday delivery unconfirmed and keeps the freelancer’s Tuesday workload check and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "id": "Dependency-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Solo podremos lanzarla esta semana si recibimos la maqueta a más tardar el jueves.",
+        "reply_goal": "Reconoce la condición de lanzamiento que indica el cliente. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637277360752322_0000000022_0b88234341384cefaddb8b89c59a9ba7",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La maqueta solo podrán lanzarla esta semana si la reciben a más tardar el jueves. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves."
+      },
+      "visible_text": "La maqueta solo podrán lanzarla esta semana si la reciben a más tardar el jueves. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "copied_text": "La maqueta solo podrán lanzarla esta semana si la reciben a más tardar el jueves. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "la reciben"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the same client group as in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "podrán lanzarla"
+        },
+        {
+          "criterion": "Attributes to the client that receiving the layout by Thursday is necessary for the launch this week.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the necessary condition in the same direction and does not imply that meeting it guarantees a launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Leaves Thursday delivery unconfirmed and keeps the freelancer’s Tuesday workload check and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The client group performs both actions. Thursday receipt remains necessary for launch, and Thursday delivery is unconfirmed."
+    },
+    {
+      "id": "Separate-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать материалы в четверг? Я смогу запустить курс на этой неделе, только если моя команда получит материалы к четвергу.",
+        "reply_goal": "Отрази условие, которое назвал клиент. Передачу материалов в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637299749987102_0000000042_b7fbddec25cf400fbe02c8d69481c099",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы хотите уточнить, смогу ли я передать материалы в четверг. Передачу материалов в четверг пока не подтверждаю. Вы сможете запустить курс на этой неделе, только если ваша команда получит материалы к четвергу. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг."
+      },
+      "visible_text": "Вы хотите уточнить, смогу ли я передать материалы в четверг. Передачу материалов в четверг пока не подтверждаю. Вы сможете запустить курс на этой неделе, только если ваша команда получит материалы к четвергу. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+      "copied_text": "Вы хотите уточнить, смогу ли я передать материалы в четверг. Передачу материалов в четверг пока не подтверждаю. Вы сможете запустить курс на этой неделе, только если ваша команда получит материалы к четвергу. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "ваша команда получит материалы"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the individual sender. The sender’s team performs the receiving action.",
+          "verdict": "PASS",
+          "observed_phrase": "Вы сможете запустить курс"
+        },
+        {
+          "criterion": "Preserves receiving by Thursday as a necessary condition without guaranteeing launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Acknowledges the client’s concern first, then leaves Thursday unconfirmed and keeps the freelancer’s Tuesday review and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The sender launches the course and the sender’s team receives the materials. The two actors and the necessary condition remain distinct."
+    },
+    {
+      "id": "Separate-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать материалы в четверг? Я смогу запустить курс на этой неделе, только если моя команда получит материалы к четвергу.",
+        "reply_goal": "Отрази условие, которое назвал клиент. Передачу материалов в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637300295034532_0000000045_89d6dc9aa69648a68f56f190d7487405",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что вы сможете запустить курс на этой неделе, только если ваша команда получит материалы к четвергу. Передачу материалов в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг."
+      },
+      "visible_text": "Понимаю, что вы сможете запустить курс на этой неделе, только если ваша команда получит материалы к четвергу. Передачу материалов в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+      "copied_text": "Понимаю, что вы сможете запустить курс на этой неделе, только если ваша команда получит материалы к четвергу. Передачу материалов в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "ваша команда получит материалы"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the individual sender. The sender’s team performs the receiving action.",
+          "verdict": "PASS",
+          "observed_phrase": "вы сможете запустить курс"
+        },
+        {
+          "criterion": "Preserves receiving by Thursday as a necessary condition without guaranteeing launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Acknowledges the client’s concern first, then leaves Thursday unconfirmed and keeps the freelancer’s Tuesday review and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The sender launches the course and the sender’s team receives the materials. The two actors and the necessary condition remain distinct."
+    },
+    {
+      "id": "Separate-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать материалы в четверг? Я смогу запустить курс на этой неделе, только если моя команда получит материалы к четвергу.",
+        "reply_goal": "Отрази условие, которое назвал клиент. Передачу материалов в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637300318948487_0000000048_54f32236d6524a1e8160e7473f367b10",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Запустить курс на этой неделе вы сможете, только если ваша команда получит материалы к четвергу. Передачу материалов в четверг я пока не подтверждаю. Во вторник я проверю свою загрузку и сообщу, смогу ли передать материалы в четверг."
+      },
+      "visible_text": "Запустить курс на этой неделе вы сможете, только если ваша команда получит материалы к четвергу. Передачу материалов в четверг я пока не подтверждаю. Во вторник я проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+      "copied_text": "Запустить курс на этой неделе вы сможете, только если ваша команда получит материалы к четвергу. Передачу материалов в четверг я пока не подтверждаю. Во вторник я проверю свою загрузку и сообщу, смогу ли передать материалы в четверг.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "ваша команда получит материалы"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the individual sender. The sender’s team performs the receiving action.",
+          "verdict": "PASS",
+          "observed_phrase": "Запустить курс на этой неделе вы сможете"
+        },
+        {
+          "criterion": "Preserves receiving by Thursday as a necessary condition without guaranteeing launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Acknowledges the client’s concern first, then leaves Thursday unconfirmed and keeps the freelancer’s Tuesday review and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The sender launches the course and the sender’s team receives the materials. The two actors and the necessary condition remain distinct."
+    },
+    {
+      "id": "Separate-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes enviarnos los materiales el jueves? Solo podré poner en marcha el curso esta semana si mi equipo recibe los materiales a más tardar el jueves.",
+        "reply_goal": "Reconoce la condición que indica el cliente. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo enviar los materiales el jueves.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637303861223556_0000000053_51840a3e6e294bf1904af7c0217cc69b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Solo podrás poner en marcha el curso esta semana si tu equipo recibe los materiales a más tardar el jueves. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviarlos el jueves."
+      },
+      "visible_text": "Solo podrás poner en marcha el curso esta semana si tu equipo recibe los materiales a más tardar el jueves. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviarlos el jueves.",
+      "copied_text": "Solo podrás poner en marcha el curso esta semana si tu equipo recibe los materiales a más tardar el jueves. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviarlos el jueves.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "tu equipo recibe los materiales"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the individual sender. The sender’s team performs the receiving action.",
+          "verdict": "PASS",
+          "observed_phrase": "podrás poner en marcha el curso"
+        },
+        {
+          "criterion": "Preserves receiving by Thursday as a necessary condition without guaranteeing launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Acknowledges the client’s concern first, then leaves Thursday unconfirmed and keeps the freelancer’s Tuesday review and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The sender launches the course and the sender’s team receives the materials. The two actors and the necessary condition remain distinct."
+    },
+    {
+      "id": "Separate-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes enviarnos los materiales el jueves? Solo podré poner en marcha el curso esta semana si mi equipo recibe los materiales a más tardar el jueves.",
+        "reply_goal": "Reconoce la condición que indica el cliente. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo enviar los materiales el jueves.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637307988112395_0000000065_37d9f5f3bdde4f8fafd525e9c7dd3258",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que solo podrás poner en marcha el curso esta semana si tu equipo recibe los materiales a más tardar el jueves. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviar los materiales el jueves."
+      },
+      "visible_text": "Entiendo que solo podrás poner en marcha el curso esta semana si tu equipo recibe los materiales a más tardar el jueves. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviar los materiales el jueves.",
+      "copied_text": "Entiendo que solo podrás poner en marcha el curso esta semana si tu equipo recibe los materiales a más tardar el jueves. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviar los materiales el jueves.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "tu equipo recibe los materiales"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the individual sender. The sender’s team performs the receiving action.",
+          "verdict": "PASS",
+          "observed_phrase": "podrás poner en marcha el curso"
+        },
+        {
+          "criterion": "Preserves receiving by Thursday as a necessary condition without guaranteeing launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Acknowledges the client’s concern first, then leaves Thursday unconfirmed and keeps the freelancer’s Tuesday review and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The sender launches the course and the sender’s team receives the materials. The two actors and the necessary condition remain distinct."
+    },
+    {
+      "id": "Separate-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes enviarnos los materiales el jueves? Solo podré poner en marcha el curso esta semana si mi equipo recibe los materiales a más tardar el jueves.",
+        "reply_goal": "Reconoce la condición que indica el cliente. El envío de los materiales el jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo enviar los materiales el jueves.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637307822847864_0000000062_798749e3e13c45b5bf4095be6e35d5d7",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "El curso solo podrás ponerlo en marcha esta semana si tu equipo recibe los materiales a más tardar el jueves. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviaros los materiales el jueves. El envío de los materiales el jueves sigue sin confirmarse."
+      },
+      "visible_text": "El curso solo podrás ponerlo en marcha esta semana si tu equipo recibe los materiales a más tardar el jueves. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviaros los materiales el jueves. El envío de los materiales el jueves sigue sin confirmarse.",
+      "copied_text": "El curso solo podrás ponerlo en marcha esta semana si tu equipo recibe los materiales a más tardar el jueves. El martes revisaré mi carga de trabajo y te avisaré de si puedo enviaros los materiales el jueves. El envío de los materiales el jueves sigue sin confirmarse.",
+      "criteria": [
+        {
+          "criterion": "The receiving party in the condition is explicit and is the group stated in the source.",
+          "verdict": "PASS",
+          "observed_phrase": "tu equipo recibe los materiales"
+        },
+        {
+          "criterion": "The launch actor is explicit and remains the individual sender. The sender’s team performs the receiving action.",
+          "verdict": "PASS",
+          "observed_phrase": "podrás ponerlo en marcha"
+        },
+        {
+          "criterion": "Preserves receiving by Thursday as a necessary condition without guaranteeing launch.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Acknowledges the client’s concern first, then leaves Thursday unconfirmed and keeps the freelancer’s Tuesday review and follow-up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The sender launches the course and the sender’s team receives the materials. The two actors and the necessary condition remain distinct."
+    },
+    {
+      "id": "Tentative-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Нам важно понимать, успеем ли запустить его на этой неделе.",
+        "reply_goal": "Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637318086133130_0000000081_3951136a08d5418090124df3b072cdba",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы хотите уточнить, возможна ли передача финального макета в четверг, и понять, успеете ли вы запустить его на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Вы хотите уточнить, возможна ли передача финального макета в четверг, и понять, успеете ли вы запустить его на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Вы хотите уточнить, возможна ли передача финального макета в четверг, и понять, успеете ли вы запустить его на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Treats Thursday delivery and this week’s launch planning as concerns the client raised. Does not invent a prerequisite or causal link between them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "id": "Tentative-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Нам важно понимать, успеем ли запустить его на этой неделе.",
+        "reply_goal": "Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637317708679310_0000000078_48f3a4eb06804abc8af4745dd1c0467f",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что вам важно знать, возможна ли передача финального макета в четверг и успеете ли вы запустить его на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Понимаю, что вам важно знать, возможна ли передача финального макета в четверг и успеете ли вы запустить его на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Понимаю, что вам важно знать, возможна ли передача финального макета в четверг и успеете ли вы запустить его на этой неделе. Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Treats Thursday delivery and this week’s launch planning as concerns the client raised. Does not invent a prerequisite or causal link between them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "id": "Tentative-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Сможете передать финальный макет в четверг? Нам важно понимать, успеем ли запустить его на этой неделе.",
+        "reply_goal": "Срок сдачи на четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637318390510156_0000000084_521d8a9d5cc94a71bbd8db939d8943d5",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок передачи финального макета в четверг вам важно уточнить, как и возможность запуска на этой неделе. Передачу финального макета в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг."
+      },
+      "visible_text": "Срок передачи финального макета в четверг вам важно уточнить, как и возможность запуска на этой неделе. Передачу финального макета в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "copied_text": "Срок передачи финального макета в четверг вам важно уточнить, как и возможность запуска на этой неделе. Передачу финального макета в четверг пока не подтверждаю. Во вторник проверю свою загрузку и сообщу, возможна ли передача финального макета в четверг.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Treats Thursday delivery and this week’s launch planning as concerns the client raised. Does not invent a prerequisite or causal link between them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "id": "Tentative-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Necesitamos saber si podemos lanzarla esta semana.",
+        "reply_goal": "La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637323230248376_0000000089_b4bbbb26c4e944378f32a40932db7a3d",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Necesitan saber si puedo entregar la maqueta final el jueves y si pueden lanzarla esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves."
+      },
+      "visible_text": "Necesitan saber si puedo entregar la maqueta final el jueves y si pueden lanzarla esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "copied_text": "Necesitan saber si puedo entregar la maqueta final el jueves y si pueden lanzarla esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Treats Thursday delivery and this week’s launch planning as concerns the client raised. Does not invent a prerequisite or causal link between them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "id": "Tentative-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Necesitamos saber si podemos lanzarla esta semana.",
+        "reply_goal": "La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637325396330369_0000000097_8374605c8f844af6b5cf3d2d887d6814",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que necesitan saber si puedo entregar la maqueta final el jueves y si pueden lanzarla esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves."
+      },
+      "visible_text": "Entiendo que necesitan saber si puedo entregar la maqueta final el jueves y si pueden lanzarla esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "copied_text": "Entiendo que necesitan saber si puedo entregar la maqueta final el jueves y si pueden lanzarla esta semana. La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y les avisaré de si puedo entregar la maqueta final el jueves.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Treats Thursday delivery and this week’s launch planning as concerns the client raised. Does not invent a prerequisite or causal link between them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "id": "Tentative-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "¿Puedes entregar la maqueta final el jueves? Necesitamos saber si podemos lanzarla esta semana.",
+        "reply_goal": "La entrega del jueves sigue sin confirmarse. El martes revisaré mi carga de trabajo y avisaré al cliente de si puedo entregar la maqueta final el jueves.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637326377893102_0000000101_e51075d4e3fa4982982f7fb6e6f4257d",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La entrega de la maqueta final el jueves es el punto que quieres aclarar, y necesitan saber si pueden lanzarla esta semana. No puedo confirmar todavía la entrega del jueves. El martes revisaré mi carga de trabajo y te avisaré de si puedo entregar la maqueta final el jueves."
+      },
+      "visible_text": "La entrega de la maqueta final el jueves es el punto que quieres aclarar, y necesitan saber si pueden lanzarla esta semana. No puedo confirmar todavía la entrega del jueves. El martes revisaré mi carga de trabajo y te avisaré de si puedo entregar la maqueta final el jueves.",
+      "copied_text": "La entrega de la maqueta final el jueves es el punto que quieres aclarar, y necesitan saber si pueden lanzarla esta semana. No puedo confirmar todavía la entrega del jueves. El martes revisaré mi carga de trabajo y te avisaré de si puedo entregar la maqueta final el jueves.",
+      "criteria": [
+        {
+          "criterion": "Keeps Thursday unconfirmed, without promising delivery or confirming the launch date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer will check their own workload on Tuesday and tell the client whether Thursday delivery is possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Treats Thursday delivery and this week’s launch planning as concerns the client raised. Does not invent a prerequisite or causal link between them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening acknowledges the client's stated concern. The author's decision and next step follow it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "On identical inputs, neutral and firm differ in the opening or decision while preserving the source meaning.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The delivery question and launch planning remain distinct. Thursday is unconfirmed and the freelancer commits to a Tuesday check."
+    },
+    {
+      "id": "S4-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637335667714348_0000000113_8c621598dfb0443a8d40f3219819851a",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы ожидали совсем другого результата, и главный экран кажется вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Вы ожидали совсем другого результата, и главный экран кажется вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Вы ожидали совсем другого результата, и главный экран кажется вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    },
+    {
+      "id": "S4-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637336305718238_0000000116_8f2576cab2be4ebbb7e981c09847d0ac",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что вы ожидали совсем другого и главный экран кажется вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Понимаю, что вы ожидали совсем другого и главный экран кажется вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Понимаю, что вы ожидали совсем другого и главный экран кажется вам скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    },
+    {
+      "id": "S4-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637337210966178_0000000119_ef61c88a7cae4cb2977decfae04eddd9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Главный экран кажется вам скучным и не соответствует вашим ожиданиям. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Главный экран кажется вам скучным и не соответствует вашим ожиданиям. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Главный экран кажется вам скучным и не соответствует вашим ожиданиям. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    },
+    {
+      "id": "S4-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637339876862795_0000000125_4c471c86d8ef4c698e63091589bbe131",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Esperabas algo muy distinto y la pantalla principal te parece apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Esperabas algo muy distinto y la pantalla principal te parece apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "Esperabas algo muy distinto y la pantalla principal te parece apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    },
+    {
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637342181590714_0000000130_c4643f2ff94741d3aee815735757ccbf",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que esperaras algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperaras algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "Entiendo que esperaras algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    },
+    {
+      "id": "S4-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795637345593982176_0000000138_4ba9da629abc4127a2befc4033745efc",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal te parece apagada y muy distinta de lo que esperabas. Te propongo dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "La pantalla principal te parece apagada y muy distinta de lo que esperabas. Te propongo dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "La pantalla principal te parece apagada y muy distinta de lo que esperabas. Te propongo dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The opening preserves individual perception, followed by the two-option offer within one revision round and then brief context."
+    }
+  ]
+}

@@ -1,0 +1,425 @@
+{
+  "cases": [
+    {
+      "id": "S1-neutral",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+      "criteria": [
+        "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+        "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+        "Even businesslike wording: no praise, no emotional words.",
+        "No added results, promises or deadlines."
+      ]
+    },
+    {
+      "id": "S1-warm",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+      "criteria": [
+        "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+        "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+        "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+        "No praise, enthusiasm or promise the input does not support.",
+        "No gendered first-person past tense."
+      ]
+    },
+    {
+      "id": "S2-warm",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos, exactly as S2-firm does.",
+        "No invented apology, concession or response deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S2-firm",
+      "language": "ru",
+      "tone": "firm",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos.",
+        "Direct wording without courtesy padding; no invented apology or deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S7-neutral",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+      "criteria": [
+        "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+        "Requests the trainer photos, as in S2-warm and S2-firm.",
+        "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+      "criteria": [
+        "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+        "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+        "Even businesslike wording: no praise, no emotional words.",
+        "No added results, promises or deadlines."
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+      "criteria": [
+        "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+        "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+        "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+        "No praise, enthusiasm or promise the input does not support.",
+        "No gendered first-person past tense."
+      ]
+    },
+    {
+      "id": "S2-warm-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos, exactly as S2-firm-en does.",
+        "No invented apology, concession or response deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S2-firm-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos.",
+        "Direct wording without courtesy padding; no invented apology or deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S7-neutral-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+      "criteria": [
+        "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+        "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+        "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S1-neutral-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+        "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+        "Even businesslike wording: no praise, no emotional words.",
+        "No added results, promises or deadlines."
+      ]
+    },
+    {
+      "id": "S1-warm-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+        "Preserves the same source facts, deadlines and commitments as the paired tone.",
+        "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+        "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+        "No praise, enthusiasm or promise the input does not support.",
+        "No gendered first-person past tense."
+      ]
+    },
+    {
+      "id": "S2-warm-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos, exactly as S2-firm-es does.",
+        "No invented apology, concession or response deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S2-firm-es",
+      "language": "es",
+      "tone": "firm",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+      "criteria": [
+        "Preserves the three-day shift, its reason and the Tuesday date.",
+        "Requests the trainer photos.",
+        "Direct wording without courtesy padding; no invented apology or deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S7-neutral-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+      "criteria": [
+        "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+        "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+        "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+        "The client sees exactly one request for the trainer photos.",
+        "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes."
+      ]
+    },
+    {
+      "id": "S2-resolved-ru",
+      "language": "ru",
+      "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник. Фотографии тренеров уже получены, повторно запрашивать их не нужно.",
+      "tone": "warm",
+      "criteria": [
+        "Keeps the client's earlier non-send as the cause of the three-day delay.",
+        "States Tuesday as the new date without making it a consequence of the photos arriving.",
+        "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-resolved-en",
+      "language": "en",
+      "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday. The trainer photos have since arrived and are no longer needed from the client.",
+      "tone": "warm",
+      "criteria": [
+        "Keeps the client's earlier non-send as the cause of the three-day delay.",
+        "States Tuesday as the new date without making it a consequence of the photos arriving.",
+        "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-resolved-es",
+      "language": "es",
+      "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes. Las fotos de los entrenadores ya se recibieron y no hace falta volver a pedírselas al cliente.",
+      "tone": "warm",
+      "criteria": [
+        "Keeps the client's earlier non-send as the cause of the three-day delay.",
+        "States Tuesday as the new date without making it a consequence of the photos arriving.",
+        "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-date-linked-ru",
+      "tone": "warm",
+      "language": "ru",
+      "progress_notes": "Из-за отсутствия фотографий тренеров первая версия была перенесена на пятницу. Дизайнер передал фотографии сегодня утром. Благодаря этому первую версию покажу в четверг вместо пятницы.",
+      "criteria": [
+        "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+        "Keeps the designer as the person who delivered the photos this morning.",
+        "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-date-linked-en",
+      "tone": "warm",
+      "language": "en",
+      "progress_notes": "The first version moved to Friday because the trainer photos were missing. The designer delivered the photos this morning. Because of that, I'll show the first version on Thursday instead of Friday.",
+      "criteria": [
+        "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+        "Keeps the designer as the person who delivered the photos this morning.",
+        "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-date-linked-es",
+      "tone": "warm",
+      "language": "es",
+      "progress_notes": "La primera versión se aplazó hasta el viernes porque faltaban las fotos de los entrenadores. El diseñador entregó las fotos esta mañana. Gracias a eso, mostraré la primera versión el jueves en vez del viernes.",
+      "criteria": [
+        "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+        "Keeps the designer as the person who delivered the photos this morning.",
+        "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+        "Makes no new request for the photos."
+      ]
+    },
+    {
+      "id": "S2-designer-neutral-ru",
+      "language": "ru",
+      "tone": "neutral",
+      "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-warm-ru",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-firm-ru",
+      "language": "ru",
+      "tone": "firm",
+      "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-neutral-en",
+      "language": "en",
+      "tone": "neutral",
+      "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-warm-en",
+      "language": "en",
+      "tone": "warm",
+      "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-firm-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-neutral-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-warm-es",
+      "language": "es",
+      "tone": "warm",
+      "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-designer-firm-es",
+      "language": "es",
+      "tone": "firm",
+      "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+        "Keeps the designer as the person who will send the photos on Monday.",
+        "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up."
+      ]
+    },
+    {
+      "id": "S2-mixed-ru",
+      "language": "ru",
+      "tone": "warm",
+      "progress_notes": "Фотографии тренеров и файл с ценами ещё не получены. Из-за этого срок первой версии сдвигается на три дня, на вторник. Клиент раньше отвечал за отправку фотографий, но теперь их отправит дизайнер в понедельник. Клиенту всё ещё нужно прислать файл с ценами. Биографии тренеров также нужны, их ещё нет и отправитель не назначен. Уже договорились, что клиент пришлёт логотип в понедельник.",
+      "criteria": [
+        "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+        "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+        "Asks the client to provide the pricing sheet once, with no added deadline.",
+        "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+        "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder."
+      ]
+    },
+    {
+      "id": "S2-mixed-en",
+      "language": "en",
+      "tone": "firm",
+      "progress_notes": "The trainer photos and the pricing sheet are still missing. Because of that, the first version is delayed by three days, to Tuesday. The client was previously responsible for sending the photos, but the designer took over and will send them on Monday. The client still needs to send the pricing sheet. The trainer bios are also needed and still missing. No sender has been assigned for them. The client is already scheduled to send the logo on Monday.",
+      "criteria": [
+        "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+        "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+        "Asks the client to provide the pricing sheet once, with no added deadline.",
+        "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+        "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder."
+      ]
+    },
+    {
+      "id": "S2-mixed-es",
+      "language": "es",
+      "tone": "neutral",
+      "progress_notes": "Todavía faltan las fotos de los entrenadores y la lista de precios. Por eso la primera versión se retrasa tres días y pasa al martes. Antes el cliente era responsable de enviar las fotos, pero el diseñador asumió esa tarea y las enviará el lunes. El cliente aún tiene que enviar la lista de precios. También hacen falta las biografías de los entrenadores. No se ha asignado a nadie para enviarlas. Ya está acordado que el cliente enviará el logotipo el lunes.",
+      "criteria": [
+        "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+        "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+        "Asks the client to provide the pricing sheet once, with no added deadline.",
+        "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+        "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6-luna",
+    "openai/gpt-6.1-terra",
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium",
+    "high"
+  ],
+  "repeats": 5,
+  "minimum_usable": 4,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}
