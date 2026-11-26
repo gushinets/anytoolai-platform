@@ -67,9 +67,10 @@ renderer_contract:
       - block_id: verdict
         scenarios:
           - acceptance_builder.check_v1
-        title: Verdict
         source: comparison.verdict
-        body: Localized verdict, then distinct nonempty rationale lines as findings for partial or mismatch.
+        body: >-
+          Localized verdict label and status on one line (`Verdict: <status>.` in English), without a
+          standalone title. Then distinct nonempty rationale lines as findings for partial or mismatch.
           Then all four localized per-delta labels/statuses with full evidence in schema order, followed by
           the ordinary rationale for all-match only. Never composed for insufficient_brief. The verdict
           concerns the four general criteria, not item by item acceptance criteria. Show the full copy text

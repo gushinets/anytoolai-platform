@@ -7,6 +7,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  composeCopyText,
+  extractCheckResult,
   LIST_FIELDS,
 } from "../src/products/acceptanceBuilder/parseAcceptanceBuilder";
 
@@ -45,9 +47,9 @@ const prose = CONTRACT.replace(/\s+/g, " ");
 describe("renderer_contract.yaml copy contract vs the web copy text", () => {
   const blocks = copyBlocks();
 
-  it("has the blocks in the order the renderer composes them, with the same titles", () => {
+  it("has the blocks in the renderer's order with only the titles it emits", () => {
     expect(blocks.map((b) => b.id)).toEqual(["verdict", "acceptance_criteria", "assumptions", "deliverables", "risks", "client_questions", "open_gaps"]);
-    expect(blocks[0]!.title).toBe("Verdict");
+    expect(blocks[0]!.title).toBeUndefined();
     for (const field of LIST_FIELDS) {
       expect(blocks.find((b) => b.id === field)?.title).toBe(WORDS.en!.lists[field]);
     }
@@ -66,7 +68,14 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
 
   it("specifies the Check reading order for findings, evidence, and all-match rationale", () => {
     expect(prose).toContain("show the verdict and distinct nonempty rationale lines in first-seen order before the scope note and collapsed recap");
-    expect(prose).toContain("Localized verdict, then distinct nonempty rationale lines as findings for partial or mismatch. Then all four localized per-delta labels/statuses with full evidence in schema order, followed by the ordinary rationale for all-match only.");
+    expect(prose).toContain("Localized verdict label and status on one line (`Verdict: <status>.` in English), without a standalone title. Then distinct nonempty rationale lines as findings for partial or mismatch. Then all four localized per-delta labels/statuses with full evidence in schema order, followed by the ordinary rationale for all-match only.");
+  });
+
+  it("starts Check copy with the combined localized verdict line specified by the contract", () => {
+    const fixtures = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../../tests/fixtures/brief_language_eval/canonical.json"), "utf8")) as Record<string, Record<string, unknown>>;
+    const result = extractCheckResult(fixtures["ANY761-AB-C-EN-basic"]!);
+    expect(result).not.toBeNull();
+    expect(composeCopyText(result!).split("\n")[0]).toBe("Verdict: does not meet expectations.");
   });
 
   it("uses the contract's fallbacks for an absent list and an empty gap list", () => {

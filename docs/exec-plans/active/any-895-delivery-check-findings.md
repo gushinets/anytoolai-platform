@@ -35,6 +35,10 @@ stored result contract, Draft presentation, and Copy behavior for the full Check
 - All 324 focused Python evaluator, API bundle and product tests passed.
 - `full-check` passed config, architecture and docs checks. The fail-fast run stopped at the
   pre-existing `test_prod_stack_running_reflects_compose_ps_output` failure after 313 passing tests.
+- Review round 1: align the copy contract and its drift guard with the existing combined verdict
+  lead. Removed the separate YAML title and asserted the actual first line of the composed clipboard
+  text. All 113 focused web tests and 43 Acceptance Builder Python tests passed, along with typecheck,
+  lint, configuration and documentation validation. The prompt and renderer are unaffected.
 
 ## Live verification
 
