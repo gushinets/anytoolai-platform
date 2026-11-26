@@ -240,6 +240,63 @@ it("visiting C preserves pending A and reload replays its original request and k
   expect(readAttachSessionId(productId)).toBeUndefined();
 });
 
+const pendingForms = [
+  {
+    mode: "Update", definition: updateDefinition, field: "progressNotes", label: "Progress notes",
+    regenerate: "Rewrite update", submitted: { progressNotes: "Original details", tone: "warm" },
+    inputs: [
+      { progress_notes: "Original details", tone: "warm" },
+      { progress_notes: "Original details", tone: "warm", output_layout: "single_text" },
+    ],
+  },
+  {
+    mode: "Reply Draft", definition: replyDraftDefinition, field: "clientMessage", label: "Client message",
+    regenerate: "Rewrite reply", submitted: { clientMessage: "Original details", replyGoal: "Explain the plan", tone: "warm" },
+    inputs: [
+      { client_message: "Original details", reply_goal: "Explain the plan", tone: "warm" },
+      { client_message: "Original details", reply_goal: "Explain the plan", tone: "warm", output_layout: "single_text" },
+    ],
+  },
+  {
+    mode: "Prepaid Request", definition: prepaidRequestDefinition, field: "billingNotes", label: "Billing notes",
+    regenerate: "Rewrite request", submitted: { billingNotes: "Original details", billingAmount: "400 EUR", billingDueDate: "", tone: "warm" },
+    inputs: [{ billing_context: { notes: "Original details", amount: "400 EUR" }, tone: "warm" }],
+  },
+];
+
+it.each(pendingForms.flatMap(({ inputs, ...form }) => inputs.flatMap((input, format) =>
+  [false, true].map((edited) => ({ ...form, input, format, edited })),
+)))("recovers a pending $mode request (format=$format, newer draft=$edited)", async ({
+  definition, field, label, regenerate, submitted, input, edited,
+}) => {
+  responseDefinitions = [definition];
+  const scenarioId = definition.scenarioId;
+  const key = productDraftKey(productId, definition.messageScope, owner);
+  saveDraftValues(key, { ...submitted, [field]: edited ? "Newer details" : "  Original details  " });
+  saveProductDraftScenario(productId, scenarioId, owner);
+  const request = { productId, scenarioId, frontendId: "web_mirror", input };
+  persistPaidStartRecovery(recovery(), {
+    version: 1, kind: "pending", owner, productId, scenarioId, idempotencyKey: "original_key", request,
+  });
+
+  const page = open();
+  await screen.findByText("Result A");
+  expect(starts).toHaveLength(1);
+  expect(new Headers(starts[0]!.headers).get("Idempotency-Key")).toBe("original_key");
+  expect(JSON.parse(starts[0]!.body as string).input).toEqual(input);
+  expect(readProductDraft(key)?.run?.input).toEqual(submitted);
+  expect(screen.getByRole("button", { name: regenerate })).toBeTruthy();
+  expect(Boolean(screen.queryByText("Created from previous details"))).toBe(edited);
+
+  fireEvent.change(screen.getByLabelText(label), { target: { value: "Edited after recovery" } });
+  expect(screen.getByText("Created from previous details")).toBeTruthy();
+  page.unmount();
+  open();
+  await screen.findByText("Result A");
+  expect(screen.getByText("Created from previous details")).toBeTruthy();
+  expect(starts).toHaveLength(1);
+});
+
 
 it("single-mode ProposalAI also restores explicit C over old completed recovery A", async () => {
   responseDefinitions = [proposalAiDefinition];

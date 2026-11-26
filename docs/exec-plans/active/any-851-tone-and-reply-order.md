@@ -493,3 +493,27 @@ the order of the reply and the two-option first-round offer. All 381 focused Pyt
 tests passed.
 
 [Round 11 live evidence](any-851-tone-and-reply-order-review-11.evidence.json)
+
+## Follow the active evaluator route and recover submitted paid details
+
+1. Resolve the evaluator's model group from the deployed product profile and provider
+   policy. Override that group by name, and include it in new collection manifests.
+2. Decode Client Update Writer's submitted form values from the saved paid request.
+   Replay the original request and idempotency key through the existing recovery path.
+3. Verify route overrides with both provider groups and recover requests with and without
+   the layout field. Cover the nested Prepaid Request payload and edits made before recovery.
+
+The Live profile selects `anytoolai.sol_text`. Three browser runs through that group
+returned results, and the worker ledger confirmed Luna at medium (RU), Terra at high
+(EN), and Sol at high (ES). The ledger records the configured effort from the deployment
+identified by the LiteLLM response when no effort was set on the request. The isolated
+worker's original router was restored after the runs.
+
+The web suite covered pending Update and Reply Draft requests both with and without
+`output_layout`, and the Prepaid Request payload with nested billing details. It checked
+the original request and idempotency key, the submitted values after reload, and the
+previous-details warning after editing.
+
+All 2,106 Python tests in the product, evaluator, config, API bundle and LiteLLM adapter
+selection passed. All 1,169 web tests passed, along with TypeScript, config, architecture
+and documentation checks.

@@ -105,6 +105,10 @@ function ClientUpdateWriterResultView({ result, onCopy, secondaryAction }: Produ
 
 type UpdateValues = { progressNotes: string; tone: Tone | "" };
 
+function normalizeUpdate(values: UpdateValues): UpdateValues {
+  return { ...values, progressNotes: trimBackendWhitespace(values.progressNotes) };
+}
+
 function validateUpdate(values: UpdateValues): Partial<Record<keyof UpdateValues, FieldError>> {
   return collectFieldErrors<UpdateValues>([
     ["progressNotes", requiredBackendTrimmedFieldError(values.progressNotes, LONG_FIELD_MAX_LENGTH)],
@@ -155,8 +159,15 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
     } : null,
   },
   validate: validateUpdate,
+  normalizeValues: normalizeUpdate,
+  parseInputValues: (input) => {
+    if (!isRecord(input) || typeof input.progress_notes !== "string" ||
+        typeof input.tone !== "string" || !isTone(input.tone)) return null;
+    const values = { progressNotes: input.progress_notes, tone: input.tone };
+    return Object.keys(validateUpdate(values)).length === 0 ? values : null;
+  },
   toInput: (values) => ({
-    progress_notes: trimBackendWhitespace(values.progressNotes),
+    progress_notes: normalizeUpdate(values).progressNotes,
     tone: values.tone,
     output_layout: "single_text",
   }),
@@ -168,6 +179,14 @@ export const updateDefinition: ProductDefinition<UpdateValues, ClientUpdateWrite
 // ---- Reply Draft mode: client_message + reply_goal + tone -> ...reply_draft_input_v1 ----
 
 type ReplyDraftValues = { clientMessage: string; replyGoal: string; tone: Tone | "" };
+
+function normalizeReplyDraft(values: ReplyDraftValues): ReplyDraftValues {
+  return {
+    ...values,
+    clientMessage: trimBackendWhitespace(values.clientMessage),
+    replyGoal: trimBackendWhitespace(values.replyGoal),
+  };
+}
 
 function validateReplyDraft(values: ReplyDraftValues): Partial<Record<keyof ReplyDraftValues, FieldError>> {
   return collectFieldErrors<ReplyDraftValues>([
@@ -236,12 +255,17 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
     } : null,
   },
   validate: validateReplyDraft,
-  toInput: (values) => ({
-    client_message: trimBackendWhitespace(values.clientMessage),
-    reply_goal: trimBackendWhitespace(values.replyGoal),
-    tone: values.tone,
-    output_layout: "single_text",
-  }),
+  normalizeValues: normalizeReplyDraft,
+  parseInputValues: (input) => {
+    if (!isRecord(input) || typeof input.client_message !== "string" ||
+        typeof input.reply_goal !== "string" || typeof input.tone !== "string" || !isTone(input.tone)) return null;
+    const values = { clientMessage: input.client_message, replyGoal: input.reply_goal, tone: input.tone };
+    return Object.keys(validateReplyDraft(values)).length === 0 ? values : null;
+  },
+  toInput: (values) => {
+    const { clientMessage, replyGoal, tone } = normalizeReplyDraft(values);
+    return { client_message: clientMessage, reply_goal: replyGoal, tone, output_layout: "single_text" };
+  },
   extractResult: extractComposeReplyResult,
   Fields: ReplyDraftFields,
   Result: ClientUpdateWriterResultView,
@@ -250,6 +274,15 @@ export const replyDraftDefinition: ProductDefinition<ReplyDraftValues, ClientUpd
 // ---- Prepaid Request mode: billing_context{notes,amount,due_date?} + tone -> ...prepaid_request_input_v1 ----
 
 type PrepaidRequestValues = { billingNotes: string; billingAmount: string; billingDueDate: string; tone: Tone | "" };
+
+function normalizePrepaidRequest(values: PrepaidRequestValues): PrepaidRequestValues {
+  return {
+    ...values,
+    billingNotes: trimBackendWhitespace(values.billingNotes),
+    billingAmount: trimBackendWhitespace(values.billingAmount),
+    billingDueDate: trimBackendWhitespace(values.billingDueDate),
+  };
+}
 
 function validatePrepaidRequest(values: PrepaidRequestValues): Partial<Record<keyof PrepaidRequestValues, FieldError>> {
   return collectFieldErrors<PrepaidRequestValues>([
@@ -334,14 +367,27 @@ export const prepaidRequestDefinition: ProductDefinition<PrepaidRequestValues, C
     } : null,
   },
   validate: validatePrepaidRequest,
-  toInput: (values) => ({
-    billing_context: {
-      notes: trimBackendWhitespace(values.billingNotes),
-      amount: trimBackendWhitespace(values.billingAmount),
-      ...(trimBackendWhitespace(values.billingDueDate) ? { due_date: trimBackendWhitespace(values.billingDueDate) } : {}),
-    },
-    tone: values.tone,
-  }),
+  normalizeValues: normalizePrepaidRequest,
+  parseInputValues: (input) => {
+    if (!isRecord(input) || !isRecord(input.billing_context) ||
+        typeof input.tone !== "string" || !isTone(input.tone)) return null;
+    const { notes, amount, due_date: dueDate } = input.billing_context;
+    if (typeof notes !== "string" || typeof amount !== "string" ||
+        (dueDate !== undefined && typeof dueDate !== "string")) return null;
+    const values = { billingNotes: notes, billingAmount: amount, billingDueDate: dueDate ?? "", tone: input.tone };
+    return Object.keys(validatePrepaidRequest(values)).length === 0 ? values : null;
+  },
+  toInput: (values) => {
+    const { billingNotes, billingAmount, billingDueDate, tone } = normalizePrepaidRequest(values);
+    return {
+      billing_context: {
+        notes: billingNotes,
+        amount: billingAmount,
+        ...(billingDueDate ? { due_date: billingDueDate } : {}),
+      },
+      tone,
+    };
+  },
   extractResult: extractComposeReplyResult,
   Fields: PrepaidRequestFields,
   Result: ClientUpdateWriterResultView,
