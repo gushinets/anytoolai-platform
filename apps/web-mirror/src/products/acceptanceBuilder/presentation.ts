@@ -86,6 +86,7 @@ type StructuredResult = Pick<AcceptanceBuilderResult, "lists" | "missingFields" 
 export function composeDocument(result: StructuredResult): AcceptanceBuilderResult["document"] {
   const words = WORDS[result.analysisLanguage.split("-")[0].toLowerCase()] ?? NEUTRAL;
   const sections: { title: string; content: string }[] = [];
+  let check: AcceptanceBuilderResult["document"]["check"];
   let summary = "";
   let partial = false;
   function display(text: string): string {
@@ -99,7 +100,11 @@ export function composeDocument(result: StructuredResult): AcceptanceBuilderResu
     const evidence = deltas.map((delta) =>
       `${words.criteria[delta.criterionId]}: ${words.statuses[delta.status]}. ${delta.evidence}`
     );
-    sections.push({ title: words.verdict, content: [summary, ...evidence, rationale].join("\n") });
+    const findings = verdict === "partially_meets" || verdict === "does_not_meet"
+      ? [...new Set(rationale.split(/\r\n|[\n\r\u0085\u2028\u2029]/u).map((line) => line.trim()).filter(hasAuthoredText))]
+      : [];
+    check = { findings, evidence };
+    if (verdict === "meets_expectations" && hasAuthoredText(rationale)) check.rationale = rationale;
   }
   for (const field of LIST_FIELDS) {
     sections.push({
@@ -136,9 +141,16 @@ export function composeDocument(result: StructuredResult): AcceptanceBuilderResu
     summary = words.partial;
     sections.unshift({ title: words.partial, content: words.unavailable });
   }
-  return { summary, sections };
+  return { summary, sections, ...(check ? { check } : {}) };
 }
 
-export function composeCopyText(result: StructuredResult): string {
-  return composeDocument(result).sections.map(({ title, content }) => `${title}\n${content}`).join("\n\n");
+export function composeCopyText({ document }: AcceptanceBuilderResult): string {
+  const { check, sections, summary } = document;
+  const blocks = sections.map(({ title, content }) => `${title}\n${content}`);
+  if (check) {
+    const lead = [summary, ...check.findings.map((line) => `- ${line}`)].join("\n");
+    const evidence = check.rationale ? [...check.evidence, check.rationale] : check.evidence;
+    blocks.unshift(lead, evidence.join("\n"));
+  }
+  return blocks.join("\n\n");
 }

@@ -27,7 +27,11 @@ renderer_contract:
         with `status` and `evidence`. The verdict is judged on those four general criteria only, NOT item
         by item on the extracted acceptance criteria; the renderer must not label it a check of the extracted
         list. A match confirms the criterion, partial means incomplete confirmation, and mismatch means a
-        contradiction or explicit failure. For insufficient_brief, regardless of the four delta statuses,
+        contradiction or explicit failure. For partial or mismatch verdicts, show the verdict and distinct
+        nonempty rationale lines in first-seen order before the scope note and collapsed recap. For all-match
+        verdicts, show the verdict and keep the ordinary rationale in the recap. The recap shows all four
+        labeled statuses and full evidence in schema order, then any detailed rationale, the extracted lists
+        and gaps. For insufficient_brief, regardless of the four delta statuses,
         the client asks for requirements at the brief field and shows no verdict, copy text or result view.'
     - part_id: acceptance_criteria
       field: extracted.values.acceptance_criteria
@@ -65,8 +69,11 @@ renderer_contract:
           - acceptance_builder.check_v1
         title: Verdict
         source: comparison.verdict
-        body: Localized verdict and per-delta label/status selected by enum, followed by unchanged evidence
-          and rationale. Never composed for insufficient_brief. The verdict concerns the four general criteria, not item by item acceptance criteria.
+        body: Localized verdict, then distinct nonempty rationale lines as findings for partial or mismatch.
+          Then all four localized per-delta labels/statuses with full evidence in schema order, followed by
+          the ordinary rationale for all-match only. Never composed for insufficient_brief. The verdict
+          concerns the four general criteria, not item by item acceptance criteria. Show the full copy text
+          on clipboard failure so it can be selected manually.
         also_uses:
           - comparison.deltas
           - comparison.rationale

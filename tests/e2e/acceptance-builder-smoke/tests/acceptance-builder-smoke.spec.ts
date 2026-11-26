@@ -102,7 +102,12 @@ function composeCopyText({ extracted, comparison, issues, questions }: Output): 
   const blocks: string[] = [];
   if (comparison) {
     const lines = comparison.deltas.map((d) => `${DELTA_LABELS[d.criterion_id]}: ${STATUS_LABELS[d.status]}. ${d.evidence}`);
-    blocks.push(`Verdict\n${[`Verdict: ${VERDICT_WORDS[comparison.verdict]}.`, ...lines, comparison.rationale].join("\n")}`);
+    const verdict = `Verdict: ${VERDICT_WORDS[comparison.verdict]}.`;
+    if (comparison.verdict === "meets_expectations") {
+      blocks.push(verdict, [...lines, comparison.rationale].join("\n"));
+    } else {
+      blocks.push(`${verdict}\n- ${comparison.rationale}`, lines.join("\n"));
+    }
   }
   for (const [field, title] of LISTS) {
     const items = extracted.values[field];

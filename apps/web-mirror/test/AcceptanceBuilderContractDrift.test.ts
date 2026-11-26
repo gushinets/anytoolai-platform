@@ -64,6 +64,11 @@ describe("renderer_contract.yaml copy contract vs the web copy text", () => {
     }
   });
 
+  it("specifies the Check reading order for findings, evidence, and all-match rationale", () => {
+    expect(prose).toContain("show the verdict and distinct nonempty rationale lines in first-seen order before the scope note and collapsed recap");
+    expect(prose).toContain("Localized verdict, then distinct nonempty rationale lines as findings for partial or mismatch. Then all four localized per-delta labels/statuses with full evidence in schema order, followed by the ordinary rationale for all-match only.");
+  });
+
   it("uses the contract's fallbacks for an absent list and an empty gap list", () => {
     for (const field of LIST_FIELDS) {
       expect(blocks.find((b) => b.id === field)?.whenAbsent).toBe("analysis_language.missing");
