@@ -39,6 +39,11 @@ stored result contract, Draft presentation, and Copy behavior for the full Check
   lead. Removed the separate YAML title and asserted the actual first line of the composed clipboard
   text. All 113 focused web tests and 43 Acceptance Builder Python tests passed, along with typecheck,
   lint, configuration and documentation validation. The prompt and renderer are unaffected.
+- Review round 2: normalize the independent smoke clipboard expectation and exercise multiple
+  distinct findings at 390 CSS px with the real fake-provider workflow and an overridden result.
+  The new case covers CRLF, whitespace, an invisible-only line and repeated findings. The entire
+  Acceptance Builder Chromium smoke suite passed (12/12), including clipboard, quota and handoff.
+  Production web build, smoke typecheck, lint and documentation validation passed.
 
 ## Live verification
 
