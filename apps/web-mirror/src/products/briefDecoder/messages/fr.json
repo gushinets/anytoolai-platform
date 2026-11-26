@@ -65,6 +65,7 @@
     "scope_risk": "Risque de périmètre",
     "timeline_risk": "Risque de délai",
     "budget_risk": "Risque budgétaire",
-    "contradiction": "Contradiction"
+    "contradiction": "Contradiction",
+    "missing_task_description": "Clarification de la demande du client"
   }
 }

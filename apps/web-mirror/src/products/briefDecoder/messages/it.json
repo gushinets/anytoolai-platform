@@ -65,6 +65,7 @@
     "scope_risk": "Rischio di ambito",
     "timeline_risk": "Rischio di tempistica",
     "budget_risk": "Rischio di budget",
-    "contradiction": "Contraddizione"
+    "contradiction": "Contraddizione",
+    "missing_task_description": "Chiarimento dell’incarico"
   }
 }

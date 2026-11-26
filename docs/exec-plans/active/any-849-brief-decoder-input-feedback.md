@@ -99,3 +99,30 @@ checked the visible field and result states on real provider runs.
 The updated browser and backend should ship together. A version 2 artifact saved before this
 change can render using its original categories. A previous web build rejects the new category
 through its closed parser.
+
+## Review follow-up
+
+1. Keep the submitted input and current form independent in the result-rejection path.
+   Use the correlated canonical artifact as the submitted-input baseline when it has a source.
+   Restore it only into an untouched form. Keep Brief Decoder's existing tab-storage behavior.
+2. Give A05 the ordinary question categories through its existing taxonomy input. Keep version 2
+   artifacts readable across both revisions and check localized labels for every readable category.
+3. Verify attachment and retry, editing and duplicate submission guards, and A05 membership
+   rejection. Recheck ordinary question output and loading of older artifacts.
+
+Both reported recovery paths reproduced before the change. After the fix, Chrome reopened
+both rejected live results by session link, restored the source and focused the brief field.
+Submitting the same text or editing only outer whitespace issued zero starts. Correcting each
+brief issued one start and rendered an analysis. Paid recovery tests also covered an accepted
+session and a pending start replayed with its original key.
+
+The web recovery and product suites passed 484 tests. TypeScript and ESLint passed. The
+selected Python suites passed 1,248 tests, including the worker rejecting an issue-only
+category in a new question and the version 2 schema accepting the stored legacy shape.
+
+On the isolated live worker, all 16 RU, EN and ES cases matched their expected outcomes.
+All four no-task inputs had the A04 marker and zero questions. The 12 positive controls
+published ordinary analyses. Every question in the new artifacts used an ordinary category.
+The 63 provider calls used Luna. The worker's A05 prompt SHA-256 was
+`a325382763259e06b9d282f1af6bac3f8559692d7db4027fe994647b090d7e8a` and its workflow SHA-256 was
+`964e68022708a94e586b77cdd6d267ab6847c7b67c7febbecf640bc37fa676be`.

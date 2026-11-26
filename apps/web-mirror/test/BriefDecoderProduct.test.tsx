@@ -5,7 +5,7 @@
 import { createTranslator } from "use-intl";
 import { BriefDecoderResultView } from "../src/products/briefDecoder/BriefDecoderResult";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
-import { useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
+import { chooseAttachSession, useAttachSession, readAttachSessionId } from "../src/products/runtime/attachSession";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,7 +74,7 @@ function fixture(action: string, suffix: string): Record<string, unknown> {
 /** The composed workflow output: brief = A01 whole, issues = A04's, questions = A05's, document =
  * A10. A05 is skipped for `.no_issues` (no question fixture exists), so questions is empty there. */
 // The backend now also returns the caller's original brief as `brief_text` (the handoff source,
-// excluded from the renderer contract): it must be accepted, never rendered and never copied.
+// excluded from the rendered analysis and its copy text).
 const RAW_BRIEF_SENTINEL = "RAW-BRIEF-SENTINEL-must-not-render";
 const MISSING_TASK_HINT = "Describe what the client wants you to do or deliver. For example, “Write a recipe for our newsletter.”";
 const reportedInputs = [
@@ -441,6 +441,7 @@ describe("Brief Decoder page", () => {
 
   it.each(reportedInputs)("shows accessible feedback instead of an analysis for %s", async (briefText) => {
     const output = composedOutput(".missing_task");
+    output.brief_text = briefText;
     if (briefText === reportedInputs[1]) {
       const goal = "Cook borscht for two hours";
       output.brief = { values: { project_goal: goal }, missing_fields: BRIEF_FIELDS.filter((field) => field !== "project_goal") };
@@ -464,11 +465,12 @@ describe("Brief Decoder page", () => {
     });
     render(<BriefDecoderProduct client={client} onEvent={(event) => events.push(event)} />);
     const field = await screen.findByLabelText<HTMLTextAreaElement>("Client brief");
-    fireEvent.change(field, { target: { value: briefText } });
+    const rawDraft = `  ${briefText}\n`;
+    fireEvent.change(field, { target: { value: rawDraft } });
     fireEvent.click(screen.getByRole("button", { name: "Decode brief" }));
 
     const hint = await screen.findByText(MISSING_TASK_HINT);
-    expect(field.value).toBe(briefText);
+    expect(field.value).toBe(rawDraft);
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(field.getAttribute("aria-describedby")?.split(" ")).toContain(hint.id);
     await waitFor(() => expect(document.activeElement).toBe(field));
@@ -507,7 +509,10 @@ describe("Brief Decoder page", () => {
       ...queues,
       [ROUTES.START]: [...queues[ROUTES.START], startResponse({ scenario_session_id: "session_2" })],
       "GET /v1/scenario-sessions/session_2": [sessionResponse({ scenario_session_id: "session_2" })],
-      [ROUTES.RESULT]: [...queues[ROUTES.RESULT], resultResponse(IDS, { output: composedOutput(".missing_task") })],
+      [ROUTES.RESULT]: [...queues[ROUTES.RESULT], resultResponse(IDS, {
+        scenario_session_id: "session_2",
+        output: { ...composedOutput(".missing_task"), brief_text: reportedInputs[0] },
+      })],
     });
     render(<BriefDecoderProduct client={client} />);
     const field = await screen.findByLabelText("Client brief");
@@ -691,13 +696,8 @@ function AttachedBriefDecoderProduct({ client, sessionId }: { client: PlatformAp
   return <BriefDecoderProduct client={client} {...attach} />;
 }
 
-it.each([false, true])("restores a version 2 result with ordinary gaps after reload (poll recovery=%s)", async (recover) => {
-  const historicalResult = () => resultResponse(IDS, {
-    output: composedOutput(".weak_input"),
-    schema_ref: "brief_decoder.decode_output_v1",
-    schema_version: 2,
-  });
-  const runtimeConfig = () => runtimeConfigResponse(IDS, {
+function versionTwoRuntimeConfig() {
+  return runtimeConfigResponse(IDS, {
     scenarios: [{
       scenario_id: IDS.scenarioId,
       version: 1,
@@ -706,13 +706,80 @@ it.each([false, true])("restores a version 2 result with ordinary gaps after rel
       output_renderer_hint: { renderer: "json_schema", schema_ref: "brief_decoder.decode_output_v1", schema_version: 2 },
     }],
   });
+}
+
+it.each([
+  { fromLink: true, briefText: reportedInputs[0] },
+  { fromLink: false, briefText: reportedInputs[1] },
+])("restores rejected input from a result link or tab recovery (link=$fromLink)", async ({ fromLink, briefText }) => {
+  if (!fromLink) expect(chooseAttachSession("brief_decoder", "session_1", "")).toBe(true);
+  const rejected = routes({ ...composedOutput(".missing_task"), brief_text: briefText });
+  const { client, calls } = makeClient({
+    ...rejected,
+    [ROUTES.RUNTIME_CONFIG]: [versionTwoRuntimeConfig()],
+    [ROUTES.START]: [startResponse({ scenario_session_id: "session_2" })],
+    [ROUTES.SESSION]: Array.from({ length: 3 }, () => sessionResponse({ scenario_id: IDS.scenarioId })),
+    "GET /v1/scenario-sessions/session_2": [sessionResponse({ scenario_session_id: "session_2" })],
+    [ROUTES.RESULT]: [
+      ...rejected[ROUTES.RESULT],
+      resultResponse(IDS, { scenario_session_id: "session_2", output: composedOutput(".weak_input") }),
+    ],
+  });
+  render(<AttachedBriefDecoderProduct client={client} sessionId={fromLink ? "session_1" : undefined} />);
+
+  const hint = await screen.findByText(MISSING_TASK_HINT);
+  const field = screen.getByLabelText<HTMLTextAreaElement>("Client brief");
+  expect(field.value).toBe(briefText);
+  expect(field.getAttribute("aria-describedby")?.split(" ")).toContain(hint.id);
+  await waitFor(() => expect(document.activeElement).toBe(field));
+  expect(readAttachSessionId("brief_decoder")).toBeUndefined();
+  expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+  const submit = () => fireEvent.click(screen.getByRole("button", { name: "Decode brief" }));
+  const starts = () => calls.filter((call) => call.key === ROUTES.START);
+  submit();
+  fireEvent.change(field, { target: { value: ` ${briefText}\n` } });
+  submit();
+  expect(screen.getByText(MISSING_TASK_HINT)).toBeTruthy();
+  expect(starts()).toHaveLength(0);
+
+  const corrected = "Write a borscht recipe.";
+  fireEvent.change(field, { target: { value: corrected } });
+  expect(screen.queryByText(MISSING_TASK_HINT)).toBeNull();
+  submit();
+  expect(await screen.findByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(starts()).toHaveLength(1);
+  expect(JSON.parse(starts()[0]!.init.body as string)).toMatchObject({ input: { brief_text: corrected } });
+});
+
+it.each(LOCALES)("renders a legacy question category as a localized label in %s", (locale) => {
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  const result = extractBriefDecoderResult({
+    ...composedOutput(".weak_input"),
+    questions: fixture("generate_questions", ".legacy_question_category").questions,
+  })!;
+  render(<BriefDecoderResultView result={result} onCopy={vi.fn()} />);
+  const label = BRIEF_DECODER_MESSAGES[locale].categories.missing_task_description;
+  const question = screen.getByText(result.questions[0]!.question, { selector: "li > div" });
+  expect(question.parentElement?.textContent).toContain(label);
+  expect(question.parentElement?.textContent).not.toContain("categories.missing_task_description");
+});
+
+it.each([false, true])("restores a version 2 result with ordinary gaps after reload (poll recovery=%s)", async (recover) => {
+  const historicalResult = () => resultResponse(IDS, {
+    output: {
+      ...composedOutput(".weak_input"),
+      questions: fixture("generate_questions", ".legacy_question_category").questions,
+    },
+    schema_ref: "brief_decoder.decode_output_v1",
+    schema_version: 2,
+  });
   const queues = {
     ...routes(composedOutput(".weak_input")),
     [ROUTES.RESULT]: [historicalResult(), historicalResult()],
   };
   const { client, calls } = makeClient({
     ...queues,
-    [ROUTES.RUNTIME_CONFIG]: [runtimeConfig(), runtimeConfig()],
+    [ROUTES.RUNTIME_CONFIG]: [versionTwoRuntimeConfig(), versionTwoRuntimeConfig()],
     [ROUTES.QUOTA]: Array.from({ length: 4 }, () => quotaResponse(IDS, { used_count: 1, remaining_count: 2 })),
     [ROUTES.SESSION]: [
       ...(recover ? [errorResponse(503, "internal_error")] : []),

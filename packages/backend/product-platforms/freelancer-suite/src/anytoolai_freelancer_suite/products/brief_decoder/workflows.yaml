@@ -25,7 +25,7 @@ workflows:
         action_config_id: brief_decoder.detect_issues_v1
         input_mapping:
           source_text: scenario.input.brief_text
-          taxonomy: &issue_taxonomy 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction","missing_task_description"]'
+          taxonomy: 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction","missing_task_description"]'
         output_mapping:
           context.workflow_output.issues: steps.detect_issues.output.issues
           # A05 requires at least one issue; seed the empty default it overrides below.
@@ -36,7 +36,8 @@ workflows:
         when: steps.detect_issues.output.issues
         input_mapping:
           issues: steps.detect_issues.output.issues
-          taxonomy: *issue_taxonomy
+          # The input issues may carry the rejection marker. It is not a question category.
+          taxonomy: 'literal:["missing_information","ambiguity","scope_risk","timeline_risk","budget_risk","contradiction"]'
           context: scenario.input.brief_text
           target_audience: 'literal:"the client who wrote the brief"'
           # Explicit (not A05's implicit default) so decode_output_v1's questions.maxItems can be

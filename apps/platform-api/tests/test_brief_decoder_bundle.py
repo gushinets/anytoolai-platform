@@ -196,6 +196,10 @@ def test_output_schema_accepts_the_fixtures_and_rejects_open_shapes() -> None:
 
     for suffix in ("", ".weak_input"):
         jsonschema.validate(_expected_output(suffix), schema)
+    legacy_output = _expected_output(".weak_input", WEAK_BRIEF_TEXT)
+    legacy_output["questions"] = _fixture(QUESTIONS + ".legacy_question_category")["questions"]
+    jsonschema.validate(legacy_output, schema)
+
     no_issues_output = {
         "brief_text": CLEAN_BRIEF_TEXT,
         "brief": _fixture(EXTRACT + ".no_issues"),
@@ -477,6 +481,23 @@ def test_missing_task_marker_publishes_with_original_brief_and_empty_questions(
     assert_summary_matches_sources(
         output["document"], output["brief"], output["issues"], output["questions"], "en"
     )
+
+
+def test_question_generation_rejects_issue_only_category_on_valid_brief(
+    app: Any, request_platform_api, session_factory: SessionFactory
+) -> None:
+    suffix = ".weak_input"
+    variants = dict.fromkeys(STEP_ORDER, suffix)
+    variants[QUESTIONS] = ".legacy_question_category"
+    adapter = RecordingProviderAdapter(FIXTURE_ROOT, variants=variants)
+    started = _start(app, request_platform_api, WEAK_BRIEF_TEXT)
+    assert started.status_code == HTTPStatus.OK
+    processed = _run_worker(session_factory, adapter)
+
+    assert processed is not None and processed.status is JobStatus.failed
+    assert processed.result_artifact_id is None
+    assert tuple(call.action_config_id for call in adapter.calls) == (EXTRACT, DETECT, QUESTIONS)
+    assert "missing_task_description" not in adapter.input_payload(2)["taxonomy"]
 
 
 def test_no_issues_skips_question_generation_and_still_produces_a_consistent_document(

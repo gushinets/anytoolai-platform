@@ -41,7 +41,9 @@ Rules:
 - `priority` must be `low`, `medium`, or `high`, reflecting the referenced issue's `severity` (a
   `high`-severity issue should normally yield a `high`-priority question, and so on) unless the
   specific question is materially less or more urgent than the issue itself.
-- `category` should reuse the referenced issue's `category`; use a different taxonomy value only when the question itself more precisely fits that category.
+- Use only `taxonomy` values for a question's `category`. Skip issues whose category is outside
+  that list. Otherwise reuse the referenced issue's category unless another allowed category
+  more precisely describes the question.
 - Return at most `max_questions` items (default 5); when there are more actionable issues, keep the
   highest-priority ones.
 - Order `questions` by `priority` (`high`, then `medium`, then `low`) and, within the same priority,

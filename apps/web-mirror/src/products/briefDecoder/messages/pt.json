@@ -65,6 +65,7 @@
     "scope_risk": "Risco de escopo",
     "timeline_risk": "Risco de prazo",
     "budget_risk": "Risco de orçamento",
-    "contradiction": "Contradição"
+    "contradiction": "Contradição",
+    "missing_task_description": "Esclarecimento da tarefa do cliente"
   }
 }

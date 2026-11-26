@@ -26,6 +26,7 @@ export type IssueCategory = (typeof ISSUE_CATEGORIES)[number];
 export type BriefIssue = { category: IssueCategory; severity: Level; description: string; evidence?: string };
 export type ClarifyingQuestion = { question: string; rationale: string; priority: Level; category: IssueCategory };
 export type BriefDecoderResult = {
+  sourceBriefText: string | null;
   // Fields the brief does not state are simply absent from `values` (rendered as "not provided").
   brief: { values: Partial<Record<BriefField, string | string[]>>; missingFields: BriefField[] };
   issues: BriefIssue[];
@@ -119,6 +120,7 @@ export function extractBriefDecoderResult(output: Record<string, unknown>): Brie
     return null;
   }
   return {
+    sourceBriefText: typeof output.brief_text === "string" ? output.brief_text : null,
     brief: { values, missingFields },
     issues,
     questions,

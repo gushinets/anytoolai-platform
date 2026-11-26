@@ -65,6 +65,7 @@
     "scope_risk": "Umfangsrisiko",
     "timeline_risk": "Terminrisiko",
     "budget_risk": "Budgetrisiko",
-    "contradiction": "Widerspruch"
+    "contradiction": "Widerspruch",
+    "missing_task_description": "Klärung des Kundenauftrags"
   }
 }
