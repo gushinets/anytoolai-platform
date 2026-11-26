@@ -6,7 +6,7 @@
 - Owner: agent
 - Linear: ANY-851
 - Created: 2026-11-23
-- Last updated: 2026-11-25
+- Last updated: 2026-11-26
 - Review date: 2026-11-25
 - Next action: review the latest regression evidence, then verify the public release.
 - Blocker: none
@@ -25,11 +25,25 @@ concern, before any explanation.
   the existing rules for concrete intent facts, scope limits and speaker identity.
 - Add Python prompt-contract checks and a tone evaluation suite. Keep the frozen screening fixture
   intact and exercise Reply Draft through the client form.
+- Select the Client Update Writer deployment route when collecting live runs. Read the product's
+  provider policy alias from the deployment profile and override that named alias instead of the
+  router's first entry, so a requested model and effort reach the deployment the product actually
+  uses.
+- Attest which deployment served a run. Let the LiteLLM adapter report the deployment's configured
+  reasoning effort for a policy-alias request, so the worker ledger can record model and effort
+  when the request sets neither.
+- Recover submitted paid results. Decode the stored form values from either supported request shape
+  and replay the original request and idempotency key in Update, Reply Draft and Prepaid Request,
+  including after an edit or a deployment change.
 
 ## Out of scope
 
 - UI helper text under the tone selector and em-dash style.
-- Provider Gateway and default model routing.
+- Global default model group, cross-product provider policy and Provider Gateway orchestration.
+  The product-specific work above reads and overrides the existing Client Update Writer alias for
+  evaluation runs and adds deployment metadata to an existing provider response; it does not change
+  the default route, any other product's policy, or gateway retry semantics. The ledger records one
+  additional deployment field and keeps its existing retry and attempt behavior.
 
 ## Verification
 
