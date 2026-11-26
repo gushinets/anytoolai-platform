@@ -106,6 +106,30 @@ def make_router_response(**overrides: object) -> object:
     return SimpleNamespace(**values)
 
 
+@pytest.mark.parametrize(("deployment_id", "effort"), [
+    ("first", "medium"),
+    ("second", "high"),
+    ("unknown", None),
+])
+def test_litellm_records_effort_from_the_selected_deployment(
+    deployment_id: str, effort: str | None
+) -> None:
+    deployments = [
+        {
+            "model_name": "anytoolai.default_text",
+            "model_info": {"id": identifier},
+            "litellm_params": {"reasoning_effort": configured_effort},
+        }
+        for identifier, configured_effort in (("first", "medium"), ("second", "high"))
+    ]
+    router = RecordingRouter(
+        make_router_response(_hidden_params={"model_id": deployment_id}), deployments
+    )
+    response = asyncio.run(LiteLLMProviderAdapter(router).complete(make_request()))
+
+    assert response.metadata["litellm"]["deployment_reasoning_effort"] == effort
+
+
 def test_litellm_adapter_maps_messages_to_router_acompletion() -> None:
     router = RecordingRouter(make_router_response())
     adapter = LiteLLMProviderAdapter(router)
@@ -771,11 +795,12 @@ def test_litellm_wire_routes_the_default_alias_to_luna_at_medium(
 ) -> None:
     bodies: list[dict[str, object]] = []
 
-    asyncio.run(_wire_adapter(monkeypatch, bodies).complete(make_request()))
+    response = asyncio.run(_wire_adapter(monkeypatch, bodies).complete(make_request()))
 
     assert len(bodies) == 1
     assert bodies[0]["model"] == "gpt-6-luna"
     assert bodies[0]["reasoning_effort"] == "medium"
+    assert response.metadata["litellm"]["deployment_reasoning_effort"] == "medium"
     assert "temperature" not in bodies[0]
 
 

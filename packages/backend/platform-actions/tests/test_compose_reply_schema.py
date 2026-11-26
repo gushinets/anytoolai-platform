@@ -26,6 +26,7 @@ class TestComposeReplyInputSchema:
                 "situation": "The client asked for a status update on the project.",
                 "intent": "Reassure the client and confirm the new delivery date.",
                 "tone": "warm",
+                "output_layout": "single_text",
                 "constraints": {
                     "language": "en-US",
                     "max_length": 500,
@@ -34,6 +35,18 @@ class TestComposeReplyInputSchema:
             },
             schema=COMPOSE_REPLY_INPUT,
         )
+
+    def test_unknown_output_layout_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            validate(
+                instance={
+                    "situation": "The client asked for a status update.",
+                    "intent": "Confirm the date.",
+                    "tone": "neutral",
+                    "output_layout": "separate_request",
+                },
+                schema=COMPOSE_REPLY_INPUT,
+            )
 
     def test_missing_required_property_rejected(self) -> None:
         with pytest.raises(ValidationError):

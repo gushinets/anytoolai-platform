@@ -522,19 +522,17 @@ def test_profile_cli_build_and_check_fail_closed(monkeypatch, tmp_path, capsys):
 
 
 @pytest.mark.parametrize("unmetered", [False, True])
-def test_ab_live_profile_uses_sol_without_changing_bd_or_fake_sources(tmp_path, unmetered):
+def test_live_profile_uses_sol_only_for_selected_products(tmp_path, unmetered):
     output_dir = tmp_path / "profile"
     source_fingerprint = validate_configs.tree_fingerprint(PRODUCTS_ROOT)
+    products = ["acceptance_builder", "client_update_writer", "brief_decoder"]
     manifest = validate_configs.build_deployment_profile(
-        output_dir, ["acceptance_builder", "brief_decoder"],
-        {"acceptance_builder", "brief_decoder"} if unmetered else set(),
+        output_dir, products, set(products) if unmetered else set(),
     )
-    assert generated_action_refs(output_dir, "acceptance_builder") == {"sol_text_generation_v1"}
+    for product_id in ("acceptance_builder", "client_update_writer"):
+        assert generated_action_refs(output_dir, product_id) == {"sol_text_generation_v1"}
+        assert manifest.enabled_products[product_id].provider_policy_ref == "sol_text_generation_v1"
     assert generated_action_refs(output_dir, "brief_decoder") == {"default_text_generation_v1"}
-    assert (
-        manifest.enabled_products["acceptance_builder"].provider_policy_ref
-        == "sol_text_generation_v1"
-    )
     registry = validate_configs.ConfigLoader(
         validate_configs.ROOT / "configs/kernel",
         extra_product_roots=sorted((output_dir / "products").iterdir()),

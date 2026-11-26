@@ -368,7 +368,7 @@ describe("Client Update Writer product definitions", () => {
     await waitFor(() => expect(calls.some((call) => call.key === routes.START)).toBe(true));
     const startCall = calls.find((call) => call.key === routes.START);
     expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
-      input: { progress_notes: "Redesign is done.", tone: "warm" },
+      input: { progress_notes: "Redesign is done.", tone: "warm", output_layout: "single_text" },
     });
   });
 
@@ -405,7 +405,11 @@ describe("Client Update Writer product definitions", () => {
     );
     const startCall = calls.find((call) => call.key === routes.START);
     expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
-      input: { progress_notes: "Homepage redesign is done and ready for review by Friday.", tone: "warm" },
+      input: {
+        progress_notes: "Homepage redesign is done and ready for review by Friday.",
+        tone: "warm",
+        output_layout: "single_text",
+      },
     });
   });
 
@@ -451,7 +455,12 @@ describe("Client Update Writer product definitions", () => {
     );
     const startCall = calls.find((call) => call.key === routes.START);
     expect(JSON.parse(startCall?.init.body as string)).toMatchObject({
-      input: { client_message: "When will this ship?", reply_goal: "Give a concrete date.", tone: "neutral" },
+      input: {
+        client_message: "When will this ship?",
+        reply_goal: "Give a concrete date.",
+        tone: "neutral",
+        output_layout: "single_text",
+      },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
