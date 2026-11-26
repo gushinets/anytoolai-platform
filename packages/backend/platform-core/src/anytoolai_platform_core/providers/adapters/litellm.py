@@ -183,7 +183,7 @@ class LiteLLMProviderAdapter:
             else self._router.acompletion
         )
         response = await completion(**kwargs)
-        return _normalize_litellm_response(request, response)
+        return _normalize_litellm_response(request, response, self._router)
 
     def _sends_temperature(self, request: ResolvedProviderRequest) -> bool:
         """A reasoning request takes the model's own temperature: OpenAI's reasoning models document
@@ -305,6 +305,7 @@ def _schema_guidance_message(schema: Mapping[str, Any]) -> dict[str, str]:
 def _normalize_litellm_response(
     request: ResolvedProviderRequest,
     response: Any,
+    router: Router,
 ) -> ProviderResponse:
     usage = _mapping_like(_value_from(response, "usage"))
     hidden_params = _mapping_like(_value_from(response, "_hidden_params"))
@@ -357,6 +358,14 @@ def _normalize_litellm_response(
     actual_model = _string_like(_value_from(response, "model") or hidden_params.get("model"))
     actual_provider = _string_like(hidden_params.get("custom_llm_provider"))
     model_id = _string_like(hidden_params.get("model_id"))
+    deployment_effort = None
+    if model_id and request.model_addressing is ProviderModelAddressing.policy_alias:
+        for deployment in router.model_list:
+            if (deployment.get("model_info") or {}).get("id") == model_id:
+                deployment_effort = _string_like(
+                    (deployment.get("litellm_params") or {}).get("reasoning_effort")
+                )
+                break
     response_id = _string_like(_value_from(response, "id") or hidden_params.get("response_id"))
     http_status = _int_like(
         hidden_params.get("status_code")
@@ -381,6 +390,7 @@ def _normalize_litellm_response(
                 "actual_model": actual_model,
                 "actual_provider": actual_provider,
                 "model_id": model_id,
+                "deployment_reasoning_effort": deployment_effort,
                 "response_id": response_id,
                 "http_status": http_status or None,
                 "response_cost": estimated_cost if estimated_cost > 0 else None,

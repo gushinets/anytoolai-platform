@@ -1,0 +1,2263 @@
+{
+  "issue": "ANY-851",
+  "round": 4,
+  "date": "2026-11-24",
+  "reviewer": "Codex agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form backed by an isolated live-provider stack.",
+    "base_source_sha": "852a05a11d48e4b0a157a783a338e42c18b79240",
+    "configured_reasoning_effort": "medium",
+    "profile_fingerprint": "5e964bdeef3790c34aeff1a6b74ab120da8a977e3757d86bbaf7b7bf4d4f6d50",
+    "prompt_sha256": {
+      "reply_draft_compose_reply.v1.md": "a32fc1d3e54e767fc62c94b6ff1a4deb4fa36076a7047c4f6af6525284f91afa",
+      "update_compose_reply.v1.md": "1e6578445a67d82209d173910d4cb13f11e8ba4d265f531fd191bd8c330f9e79"
+    }
+  },
+  "prior_evidence_corrections": [
+    {
+      "artifact": "any-851-tone-and-reply-order-review-3.evidence.json",
+      "id": "S1-warm",
+      "corrected_verdict": "FAIL",
+      "reason": "The draft omitted the freelancer as the stated actor of the Friday presentation."
+    },
+    {
+      "artifact": "any-851-tone-and-reply-order-review-3.evidence.json",
+      "id": "S1-warm-es",
+      "corrected_verdict": "FAIL",
+      "reason": "The draft omitted the freelancer as the stated actor of the Friday presentation."
+    }
+  ],
+  "runs": [
+    {
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545536466513680_0000000009_0d300defeb9545358c2fb67b3ee22781",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Лендинг студии йоги: главный экран и расписание готовы, тренеры и цены в работе. Работа идёт по плану. Первую версию покажу в пятницу."
+      },
+      "visible_text": "Лендинг студии йоги: главный экран и расписание готовы, тренеры и цены в работе. Работа идёт по плану. Первую версию покажу в пятницу.",
+      "copied_text": "Лендинг студии йоги: главный экран и расписание готовы, тренеры и цены в работе. Работа идёт по плану. Первую версию покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Первую версию покажу в пятницу."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545534838292960_0000000004_df1b6942b6b5499f95638e678c965a62",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Главный экран и расписание лендинга студии йоги готовы — это важный этап. Разделы с тренерами и ценами в работе. Всё идёт по плану; первую версию покажу в пятницу."
+      },
+      "visible_text": "Главный экран и расписание лендинга студии йоги готовы — это важный этап. Разделы с тренерами и ценами в работе. Всё идёт по плану; первую версию покажу в пятницу.",
+      "copied_text": "Главный экран и расписание лендинга студии йоги готовы — это важный этап. Разделы с тренерами и ценами в работе. Всё идёт по плану; первую версию покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Всё идёт по плану; первую версию покажу в пятницу."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545536555320204_0000000012_74b908285be74125975d57fad80fa1e6",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня, поскольку вы неделю не присылали фотографии тренеров. Пожалуйста, пришлите фотографии тренеров. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня, поскольку вы неделю не присылали фотографии тренеров. Пожалуйста, пришлите фотографии тренеров. Новый срок первой версии — вторник.",
+      "copied_text": "Срок первой версии сдвигается на три дня, поскольку вы неделю не присылали фотографии тренеров. Пожалуйста, пришлите фотографии тренеров. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-firm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545547245984475_0000000019_239bfd7956974d32a9e4afb8f0965923",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Фотографии тренеров не поступали от вас в течение недели, поэтому срок первой версии сдвигается на три дня. Пришлите фотографии тренеров. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Фотографии тренеров не поступали от вас в течение недели, поэтому срок первой версии сдвигается на три дня. Пришлите фотографии тренеров. Новый срок первой версии — вторник.",
+      "copied_text": "Фотографии тренеров не поступали от вас в течение недели, поэтому срок первой версии сдвигается на три дня. Пришлите фотографии тренеров. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S7-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545552130988575_0000000025_e5ab573b53b94671be6839e0367cbfd9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня, поскольку вы не присылали фотографии тренеров в течение недели. Новый срок первой версии — вторник. Пожалуйста, пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня, поскольку вы не присылали фотографии тренеров в течение недели. Новый срок первой версии — вторник. Пожалуйста, пришлите фотографии тренеров.",
+      "copied_text": "Срок первой версии сдвигается на три дня, поскольку вы не присылали фотографии тренеров в течение недели. Новый срок первой версии — вторник. Пожалуйста, пришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm and S2-firm.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545553870260387_0000000031_92ef708704154e4cb21e5765f42a7fe2",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The landing page for a yoga studio has its main screen and schedule ready; the trainers and pricing sections are in progress. The project is on track. I'll show the first version on Friday."
+      },
+      "visible_text": "The landing page for a yoga studio has its main screen and schedule ready; the trainers and pricing sections are in progress. The project is on track. I'll show the first version on Friday.",
+      "copied_text": "The landing page for a yoga studio has its main screen and schedule ready; the trainers and pricing sections are in progress. The project is on track. I'll show the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "I'll show the first version on Friday."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545559657247182_0000000038_8173194051ab4c968a618d1c95b39e7c",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. The trainers and pricing sections are in progress. Everything is on track, and I'll show you the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. The trainers and pricing sections are in progress. Everything is on track, and I'll show you the first version on Friday.",
+      "copied_text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. The trainers and pricing sections are in progress. Everything is on track, and I'll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Everything is on track, and I'll show you the first version on Friday."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545565003246266_0000000044_d461d3cf56f14096acd3c14818a44585",
+      "semantic_attempts": [
+        1,
+        2
+      ],
+      "output": {
+        "text": "The first-version deadline has moved back by three days to Tuesday because you haven't sent the trainer photos for a week. Could you please send the trainer photos?"
+      },
+      "visible_text": "The first-version deadline has moved back by three days to Tuesday because you haven't sent the trainer photos for a week. Could you please send the trainer photos?",
+      "copied_text": "The first-version deadline has moved back by three days to Tuesday because you haven't sent the trainer photos for a week. Could you please send the trainer photos?",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-en does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545567276440618_0000000049_3190d3ed40de42f69e9e0b71009502bc",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. Please send the trainer photos. The new deadline for the first version is Tuesday."
+      },
+      "visible_text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. Please send the trainer photos. The new deadline for the first version is Tuesday.",
+      "copied_text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. Please send the trainer photos. The new deadline for the first version is Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545572551778716_0000000054_11d8e6b709894d7db31c84f58ba6e5ff",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version deadline has moved back by three days to Tuesday because you haven’t sent the trainer photos for a week. Please send the trainer photos."
+      },
+      "visible_text": "The first version deadline has moved back by three days to Tuesday because you haven’t sent the trainer photos for a week. Please send the trainer photos.",
+      "copied_text": "The first version deadline has moved back by three days to Tuesday because you haven’t sent the trainer photos for a week. Please send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545580282834739_0000000062_04866b5da884487db01c8c035387d7e0",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La página de aterrizaje de un estudio de yoga tiene lista la pantalla principal y el horario; las secciones de entrenadores y precios están en curso. El proyecto va según lo previsto; mostraré la primera versión el viernes."
+      },
+      "visible_text": "La página de aterrizaje de un estudio de yoga tiene lista la pantalla principal y el horario; las secciones de entrenadores y precios están en curso. El proyecto va según lo previsto; mostraré la primera versión el viernes.",
+      "copied_text": "La página de aterrizaje de un estudio de yoga tiene lista la pantalla principal y el horario; las secciones de entrenadores y precios están en curso. El proyecto va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "El proyecto va según lo previsto; mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545583658724243_0000000070_71572cf6400a4a8fbe41a9369d651fde",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga ya están listos, un buen avance. Las secciones de entrenadores y precios siguen en curso. Todo va según lo previsto. Mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga ya están listos, un buen avance. Las secciones de entrenadores y precios siguen en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga ya están listos, un buen avance. Las secciones de entrenadores y precios siguen en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545583654105372_0000000069_8a4a8a0c4572469394dc5f378b15a658",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La nueva fecha para la primera versión es el martes; se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. Por favor, envía las fotos."
+      },
+      "visible_text": "La nueva fecha para la primera versión es el martes; se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. Por favor, envía las fotos.",
+      "copied_text": "La nueva fecha para la primera versión es el martes; se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. Por favor, envía las fotos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-es does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-firm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545588702564606_0000000078_f82e5bb9ceb545ca939eeeb4cb652a12",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Envíen las fotos de los entrenadores. La nueva fecha para la primera versión es el martes."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Envíen las fotos de los entrenadores. La nueva fecha para la primera versión es el martes.",
+      "copied_text": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Envíen las fotos de los entrenadores. La nueva fecha para la primera versión es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S7-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545596228132727_0000000085_057664139312426b8311f98f674f76a2",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. Por favor, envía las fotos. La nueva fecha para la primera versión es el martes."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. Por favor, envía las fotos. La nueva fecha para la primera versión es el martes.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. Por favor, envía las fotos. La nueva fecha para la primera versión es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-resolved-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник. Фотографии тренеров уже получены, повторно запрашивать их не нужно.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545597924238278_0000000091_00979a2fe1e447cfa9d1c6acb284f18a",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Фотографии тренеров уже получены — хорошо, что этот материал теперь на месте. Поскольку вы не присылали их в течение недели, срок первой версии сдвигается на три дня. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Фотографии тренеров уже получены — хорошо, что этот материал теперь на месте. Поскольку вы не присылали их в течение недели, срок первой версии сдвигается на три дня. Новый срок первой версии — вторник.",
+      "copied_text": "Фотографии тренеров уже получены — хорошо, что этот материал теперь на месте. Поскольку вы не присылали их в течение недели, срок первой версии сдвигается на три дня. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, Tuesday and the earlier source of the delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have since arrived and no longer asks the client to send them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender in the history of the delay and reports that the photos arrived without inventing a receiver.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-resolved-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday. The trainer photos have since arrived and are no longer needed from the client.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545600615499906_0000000096_f11cde397bfe42a9b789b9de130b1de5",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The trainer photos have now arrived—thanks; no further photos are needed from you. The first version is moving back by three days because the photos had not arrived from you for a week. The first version is now due Tuesday."
+      },
+      "visible_text": "The trainer photos have now arrived—thanks; no further photos are needed from you. The first version is moving back by three days because the photos had not arrived from you for a week. The first version is now due Tuesday.",
+      "copied_text": "The trainer photos have now arrived—thanks; no further photos are needed from you. The first version is moving back by three days because the photos had not arrived from you for a week. The first version is now due Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, Tuesday and the earlier source of the delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have since arrived and no longer asks the client to send them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender in the history of the delay and reports that the photos arrived without inventing a receiver.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-resolved-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes. Las fotos de los entrenadores ya se recibieron y no hace falta volver a pedírselas al cliente.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545603839929354_0000000102_ae09012d94b74399bfd09e2b0e215c16",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasó tres días porque el cliente tardó una semana en enviar las fotos de los entrenadores. Las fotos ya llegaron, así que la nueva fecha para la primera versión es el martes."
+      },
+      "visible_text": "La primera versión se retrasó tres días porque el cliente tardó una semana en enviar las fotos de los entrenadores. Las fotos ya llegaron, así que la nueva fecha para la primera versión es el martes.",
+      "copied_text": "La primera versión se retrasó tres días porque el cliente tardó una semana en enviar las fotos de los entrenadores. Las fotos ya llegaron, así que la nueva fecha para la primera versión es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, Tuesday and the earlier source of the delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have since arrived and no longer asks the client to send them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender in the history of the delay and reports that the photos arrived without inventing a receiver.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545614630749950_0000000109_e43a6ef7abf04ef8a4cdff5785d5de71",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что результат оказался не таким, как вы ожидали, и главный экран кажется вам скучным. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. Вы пишете, что просили что-то яркое и что мы так не договаривались."
+      },
+      "visible_text": "Понимаю, что результат оказался не таким, как вы ожидали, и главный экран кажется вам скучным. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. Вы пишете, что просили что-то яркое и что мы так не договаривались.",
+      "copied_text": "Понимаю, что результат оказался не таким, как вы ожидали, и главный экран кажется вам скучным. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. Вы пишете, что просили что-то яркое и что мы так не договаривались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "This round sampled warm only for claim status, attribution and offer order."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-author-plural-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Llevamos una semana esperando las fotos de los entrenadores. Como faltan las fotos, la primera versión se retrasa tres días. La nueva fecha de entrega es el martes.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545618559392249_0000000115_78333f9f8e0b4553a0ccc55569757fac",
+      "semantic_attempts": [
+        1,
+        2
+      ],
+      "output": {
+        "text": "Llevamos una semana esperando las fotos de los entrenadores. Envíenlas para que podamos continuar. La primera versión se retrasa tres días por la falta de las fotos; la nueva fecha de entrega es el martes."
+      },
+      "visible_text": "Llevamos una semana esperando las fotos de los entrenadores. Envíenlas para que podamos continuar. La primera versión se retrasa tres días por la falta de las fotos; la nueva fecha de entrega es el martes.",
+      "copied_text": "Llevamos una semana esperando las fotos de los entrenadores. Envíenlas para que podamos continuar. La primera versión se retrasa tres días por la falta de las fotos; la nueva fecha de entrega es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the freelancer's explicit first-person plural when describing the week's wait for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Retains the missing photos as the cause of the three-day delay and Tuesday as the new deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes one request for the trainer photos in the complete text.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-author-singular-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Llevo una semana esperando las fotos de los entrenadores. Como faltan las fotos, la primera versión se retrasa tres días. La nueva fecha de entrega es el martes.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545622167748542_0000000121_768819c8b0354f9f9d0dd69345171f46",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Llevo una semana esperando las fotos de los entrenadores. Envíame las fotos. La falta de estas fotos retrasa tres días la primera versión. La nueva fecha de entrega es el martes."
+      },
+      "visible_text": "Llevo una semana esperando las fotos de los entrenadores. Envíame las fotos. La falta de estas fotos retrasa tres días la primera versión. La nueva fecha de entrega es el martes.",
+      "copied_text": "Llevo una semana esperando las fotos de los entrenadores. Envíame las fotos. La falta de estas fotos retrasa tres días la primera versión. La nueva fecha de entrega es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the freelancer's explicit first-person singular when describing the week's wait for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Retains the missing photos as the cause of the three-day delay and Tuesday as the new deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes one request for the trainer photos in the complete text.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545628365812404_0000000126_85912b2637ca4d5481487220d03dee94",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Para atender esa preocupación, puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; tomo en cuenta que señalas que los pidieron y que esto no es lo que acordaron."
+      },
+      "visible_text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Para atender esa preocupación, puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; tomo en cuenta que señalas que los pidieron y que esto no es lo que acordaron.",
+      "copied_text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Para atender esa preocupación, puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; tomo en cuenta que señalas que los pidieron y que esto no es lo que acordaron.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "This round sampled warm only for claim status, attribution and offer order."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545635829294958_0000000133_97dc86c3aed443cab985b4aeccfcb90e",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I hear that the main screen feels dull to you and that you expected something completely different. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief. You also said you asked for something bright and that this isn’t what you agreed on."
+      },
+      "visible_text": "I hear that the main screen feels dull to you and that you expected something completely different. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief. You also said you asked for something bright and that this isn’t what you agreed on.",
+      "copied_text": "I hear that the main screen feels dull to you and that you expected something completely different. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief. You also said you asked for something bright and that this isn’t what you agreed on.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "This round sampled warm only for claim status, attribution and offer order."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "По счёту INV-104 вы просите 1 250 USD, но у нас в смете 1 250 EUR. Подтвердите валюту и что включены две версии ролика по 30 секунд. Можно перенести сдачу с 15 октября на 10 октября?",
+        "reply_goal": "Признать опечатку в счёте: верно 1 250 EUR, отправлю исправленный счёт, не утверждать что уже отправлен. Включены ровно 2 версии по 30 секунд и один раунд правок. Согласованный срок 15 октября 2026, перенос на 10 октября не подтверждён; сначала нужно проверить загрузку, обещать лишь сообщить о возможности переноса. Не конвертировать EUR в USD.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545641313097573_0000000139_081f70fbd262493489f78019abafe3c9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "В счёте INV-104 допущена опечатка. Верная сумма — 1 250 EUR; отправлю исправленный счёт. Включены ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года; перенос на 10 октября пока не подтверждён. Сначала проверю загрузку и сообщу, возможен ли перенос."
+      },
+      "visible_text": "В счёте INV-104 допущена опечатка. Верная сумма — 1 250 EUR; отправлю исправленный счёт. Включены ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года; перенос на 10 октября пока не подтверждён. Сначала проверю загрузку и сообщу, возможен ли перенос.",
+      "copied_text": "В счёте INV-104 допущена опечатка. Верная сумма — 1 250 EUR; отправлю исправленный счёт. Включены ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года; перенос на 10 октября пока не подтверждён. Сначала проверю загрузку и сообщу, возможен ли перенос.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer explicitly responsible in first person for sending the corrected invoice.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Invoice INV-104 asks for 1,250 USD, but our estimate says 1,250 EUR. Please confirm the currency and that two 30-second versions are included. Can we move delivery from October 15 to October 10?",
+        "reply_goal": "Acknowledge the typo in the invoice: the correct amount is 1,250 EUR and I will send a corrected invoice. Do not say it has already been sent. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026. October 10 is unconfirmed. I need to check my workload first and only promise to say whether the new date is possible. Do not convert EUR to USD.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545644940558482_0000000145_6504b718440b49d7b29ff18d39c617e9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The currency on invoice INV-104 is a typo. The correct amount is 1,250 EUR, and I will send a corrected invoice. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026; October 10 is unconfirmed. I need to check my workload first, then I will let you know whether October 10 is possible."
+      },
+      "visible_text": "The currency on invoice INV-104 is a typo. The correct amount is 1,250 EUR, and I will send a corrected invoice. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026; October 10 is unconfirmed. I need to check my workload first, then I will let you know whether October 10 is possible.",
+      "copied_text": "The currency on invoice INV-104 is a typo. The correct amount is 1,250 EUR, and I will send a corrected invoice. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026; October 10 is unconfirmed. I need to check my workload first, then I will let you know whether October 10 is possible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer explicitly responsible in first person for sending the corrected invoice.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "En la factura INV-104 nos pides 1.250 USD, pero el presupuesto indica 1.250 EUR. Confirma la moneda y que se incluyen dos versiones de 30 segundos. ¿Podemos adelantar la entrega del 15 al 10 de octubre?",
+        "reply_goal": "Reconocer el error tipográfico de la factura: el importe correcto es 1.250 EUR y enviaré la factura corregida. No decir que ya se envió. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada es el 15 de octubre de 2026. El 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y solo prometer que informaré si el cambio es posible. No convertir euros a dólares.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545650119040181_0000000152_e5b2bc303c704f92b819cd8ab39ec057",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Reconozco el error tipográfico en el importe de la factura INV-104. El importe correcto es 1.250 EUR y enviaré la factura corregida. El trabajo incluye exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha de entrega acordada es el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad e informaré si es posible adelantar la entrega."
+      },
+      "visible_text": "Reconozco el error tipográfico en el importe de la factura INV-104. El importe correcto es 1.250 EUR y enviaré la factura corregida. El trabajo incluye exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha de entrega acordada es el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad e informaré si es posible adelantar la entrega.",
+      "copied_text": "Reconozco el error tipográfico en el importe de la factura INV-104. El importe correcto es 1.250 EUR y enviaré la factura corregida. El trabajo incluye exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha de entrega acordada es el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad e informaré si es posible adelantar la entrega.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer explicitly responsible in first person for sending the corrected invoice.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-author-singular-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Я уже неделю жду фотографии тренеров. Из-за отсутствия фотографий срок первой версии сдвигается на три дня. Новый срок — вторник.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545652111066066_0000000157_aa3e42cab09b49c9890d818812abde0e",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Я уже неделю жду фотографии тренеров. Из-за их отсутствия срок первой версии сдвигается на три дня. Пришлите фотографии тренеров. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Я уже неделю жду фотографии тренеров. Из-за их отсутствия срок первой версии сдвигается на три дня. Пришлите фотографии тренеров. Новый срок первой версии — вторник.",
+      "copied_text": "Я уже неделю жду фотографии тренеров. Из-за их отсутствия срок первой версии сдвигается на три дня. Пришлите фотографии тренеров. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the freelancer's explicit first-person singular when describing the week's wait for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Retains the missing photos as the cause of the three-day delay and Tuesday as the new deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes one request for the trainer photos in the complete text.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-author-plural-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Мы уже неделю ждём фотографии тренеров. Из-за отсутствия фотографий срок первой версии сдвигается на три дня. Новый срок — вторник.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545654536410841_0000000162_a35e28c8db56431880c6efef937c46da",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Мы уже неделю ждём фотографии тренеров. Из-за их отсутствия срок первой версии сдвигается на три дня; новый срок — вторник. Пришлите фотографии тренеров."
+      },
+      "visible_text": "Мы уже неделю ждём фотографии тренеров. Из-за их отсутствия срок первой версии сдвигается на три дня; новый срок — вторник. Пришлите фотографии тренеров.",
+      "copied_text": "Мы уже неделю ждём фотографии тренеров. Из-за их отсутствия срок первой версии сдвигается на три дня; новый срок — вторник. Пришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the freelancer's explicit first-person plural when describing the week's wait for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Retains the missing photos as the cause of the three-day delay and Tuesday as the new deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes one request for the trainer photos in the complete text.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-author-singular-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "I've been waiting a week for the trainer photos. The first version is delayed by three days because the photos are still missing. The new deadline is Tuesday.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545662726366624_0000000170_fe490271fdd5491391183259262f03e9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I've been waiting a week for the trainer photos. The first version is delayed by three days because they're still missing. Please send the photos. The new deadline is Tuesday."
+      },
+      "visible_text": "I've been waiting a week for the trainer photos. The first version is delayed by three days because they're still missing. Please send the photos. The new deadline is Tuesday.",
+      "copied_text": "I've been waiting a week for the trainer photos. The first version is delayed by three days because they're still missing. Please send the photos. The new deadline is Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the freelancer's explicit first-person singular when describing the week's wait for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Retains the missing photos as the cause of the three-day delay and Tuesday as the new deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes one request for the trainer photos in the complete text.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-author-plural-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "We've been waiting a week for the trainer photos. The first version is delayed by three days because the photos are still missing. The new deadline is Tuesday.",
+        "tone": "firm"
+      },
+      "session_id": "scenario_session_01795545664386801059_0000000175_e6d849f0ccb2454aa556472620da4101",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "We’ve been waiting a week for the trainer photos, so the first version is delayed by three days. Please send the trainer photos. The new deadline for the first version is Tuesday."
+      },
+      "visible_text": "We’ve been waiting a week for the trainer photos, so the first version is delayed by three days. Please send the trainer photos. The new deadline for the first version is Tuesday.",
+      "copied_text": "We’ve been waiting a week for the trainer photos, so the first version is delayed by three days. Please send the trainer photos. The new deadline for the first version is Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the freelancer's explicit first-person plural when describing the week's wait for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Retains the missing photos as the cause of the three-day delay and Tuesday as the new deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes one request for the trainer photos in the complete text.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-mixed-actors-neutral-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. Клиент пришлёт отзывы в понедельник.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545665561460251_0000000180_2fc76e13e37b4128b8c65f414b10e0eb",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Для лендинга студии йоги готовы главный экран и расписание. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. В понедельник вы пришлёте отзывы."
+      },
+      "visible_text": "Для лендинга студии йоги готовы главный экран и расписание. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. В понедельник вы пришлёте отзывы.",
+      "copied_text": "Для лендинга студии йоги готовы главный экран и расписание. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. В понедельник вы пришлёте отзывы.",
+      "criteria": [
+        {
+          "criterion": "Keeps the yoga studio landing page and the ready main screen and schedule, with no invented actor for that status.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both the author and the designer responsible for preparing the trainer section by Thursday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday.",
+          "verdict": "PASS",
+          "excerpt": "Первую версию покажу в пятницу."
+        },
+        {
+          "criterion": "Keeps the client responsible for sending feedback on Monday, phrased as the client's planned action.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone and preserves the same facts and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-mixed-actors-warm-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. Клиент пришлёт отзывы в понедельник.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545670479289530_0000000187_dbce58ef9b6e417995e8d6209a6e8b56",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Хорошая новость: для лендинга студии йоги уже готовы главный экран и расписание. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. Вы пришлёте отзывы в понедельник."
+      },
+      "visible_text": "Хорошая новость: для лендинга студии йоги уже готовы главный экран и расписание. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. Вы пришлёте отзывы в понедельник.",
+      "copied_text": "Хорошая новость: для лендинга студии йоги уже готовы главный экран и расписание. Мы с дизайнером подготовим раздел о тренерах к четвергу. Первую версию покажу в пятницу. Вы пришлёте отзывы в понедельник.",
+      "criteria": [
+        {
+          "criterion": "Keeps the yoga studio landing page and the ready main screen and schedule, with no invented actor for that status.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both the author and the designer responsible for preparing the trainer section by Thursday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday.",
+          "verdict": "PASS",
+          "excerpt": "Первую версию покажу в пятницу."
+        },
+        {
+          "criterion": "Keeps the client responsible for sending feedback on Monday, phrased as the client's planned action.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone and preserves the same facts and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-mixed-actors-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The designer and I will prepare the trainer section by Thursday. I'll show the first version on Friday. The client will send feedback on Monday.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545671842038619_0000000192_02073abf38424c60bcf56171453957f0",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The landing page for the yoga studio has its main screen and schedule ready. The designer and I will prepare the trainer section by Thursday. I’ll show the first version on Friday, and you will send feedback on Monday."
+      },
+      "visible_text": "The landing page for the yoga studio has its main screen and schedule ready. The designer and I will prepare the trainer section by Thursday. I’ll show the first version on Friday, and you will send feedback on Monday.",
+      "copied_text": "The landing page for the yoga studio has its main screen and schedule ready. The designer and I will prepare the trainer section by Thursday. I’ll show the first version on Friday, and you will send feedback on Monday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the yoga studio landing page and the ready main screen and schedule, with no invented actor for that status.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both the author and the designer responsible for preparing the trainer section by Thursday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday.",
+          "verdict": "PASS",
+          "excerpt": "I’ll show the first version on Friday, and you will send feedback on Monday."
+        },
+        {
+          "criterion": "Keeps the client responsible for sending feedback on Monday, phrased as the client's planned action.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone and preserves the same facts and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-mixed-actors-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The designer and I will prepare the trainer section by Thursday. I'll show the first version on Friday. The client will send feedback on Monday.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545680590204537_0000000199_a0e80138100340dfb44a956f3121d26b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready—a solid milestone. The designer and I will prepare the trainer section by Thursday. I’ll show the first version on Friday, and you’ll send feedback on Monday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready—a solid milestone. The designer and I will prepare the trainer section by Thursday. I’ll show the first version on Friday, and you’ll send feedback on Monday.",
+      "copied_text": "The main screen and schedule for the yoga studio landing page are ready—a solid milestone. The designer and I will prepare the trainer section by Thursday. I’ll show the first version on Friday, and you’ll send feedback on Monday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the yoga studio landing page and the ready main screen and schedule, with no invented actor for that status.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both the author and the designer responsible for preparing the trainer section by Thursday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday.",
+          "verdict": "PASS",
+          "excerpt": "I’ll show the first version on Friday, and you’ll send feedback on Monday."
+        },
+        {
+          "criterion": "Keeps the client responsible for sending feedback on Monday, phrased as the client's planned action.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone and preserves the same facts and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-mixed-actors-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes. El cliente enviará sus comentarios el lunes.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545685761476381_0000000208_595308f57b4c434b8872016feef52a4e",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes. El cliente enviará sus comentarios el lunes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes. El cliente enviará sus comentarios el lunes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes. El cliente enviará sus comentarios el lunes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the yoga studio landing page and the ready main screen and schedule, with no invented actor for that status.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both the author and the designer responsible for preparing the trainer section by Thursday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday.",
+          "verdict": "PASS",
+          "excerpt": "Mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Keeps the client responsible for sending feedback on Monday, phrased as the client's planned action.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone and preserves the same facts and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-mixed-actors-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes. El cliente enviará sus comentarios el lunes.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545686070389554_0000000211_9129ab72503342cea30e52ec12a7d61b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La página de aterrizaje del estudio de yoga ya tiene lista la pantalla principal y el horario: un hito concreto. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes y enviarás tus comentarios el lunes."
+      },
+      "visible_text": "La página de aterrizaje del estudio de yoga ya tiene lista la pantalla principal y el horario: un hito concreto. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes y enviarás tus comentarios el lunes.",
+      "copied_text": "La página de aterrizaje del estudio de yoga ya tiene lista la pantalla principal y el horario: un hito concreto. El diseñador y yo prepararemos la sección de entrenadores para el jueves. Mostraré la primera versión el viernes y enviarás tus comentarios el lunes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the yoga studio landing page and the ready main screen and schedule, with no invented actor for that status.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps both the author and the designer responsible for preparing the trainer section by Thursday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday.",
+          "verdict": "PASS",
+          "excerpt": "Mostraré la primera versión el viernes y enviarás tus comentarios el lunes."
+        },
+        {
+          "criterion": "Keeps the client responsible for sending feedback on Monday, phrased as the client's planned action.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone and preserves the same facts and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545713314095759_0000000228_f3330c94fd514f0e95dec8f81e90191b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "В лендинге студии йоги главный экран и расписание готовы, разделы «Тренеры» и «Цены» в работе. Всё идёт по плану. Первую версию я покажу в пятницу."
+      },
+      "visible_text": "В лендинге студии йоги главный экран и расписание готовы, разделы «Тренеры» и «Цены» в работе. Всё идёт по плану. Первую версию я покажу в пятницу.",
+      "copied_text": "В лендинге студии йоги главный экран и расписание готовы, разделы «Тренеры» и «Цены» в работе. Всё идёт по плану. Первую версию я покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Первую версию я покажу в пятницу."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545713226567804_0000000222_e97535452d734305880fabe46f1a2cf5",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Главный экран и расписание лендинга студии йоги уже готовы — это важный этап. Разделы с тренерами и ценами в работе. Всё идёт по плану, первую версию я покажу в пятницу."
+      },
+      "visible_text": "Главный экран и расписание лендинга студии йоги уже готовы — это важный этап. Разделы с тренерами и ценами в работе. Всё идёт по плану, первую версию я покажу в пятницу.",
+      "copied_text": "Главный экран и расписание лендинга студии йоги уже готовы — это важный этап. Разделы с тренерами и ценами в работе. Всё идёт по плану, первую версию я покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Всё идёт по плану, первую версию я покажу в пятницу."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545713262445161_0000000225_689a4009ec464b1bbb95910062b10359",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "For the yoga studio landing page, the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show the first version on Friday."
+      },
+      "visible_text": "For the yoga studio landing page, the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show the first version on Friday.",
+      "copied_text": "For the yoga studio landing page, the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Everything is on track, and I’ll show the first version on Friday."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545724263675033_0000000235_c465e458445d4c839f15969fd61b13f5",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "A good milestone for the yoga studio landing page: the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "A good milestone for the yoga studio landing page: the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "copied_text": "A good milestone for the yoga studio landing page: the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Everything is on track, and I’ll show you the first version on Friday."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545726816216646_0000000241_ff418781986c424c8756148be23c7891",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Todo va según lo previsto; mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545728864512450_0000000246_f2e47466090f45629d77b4f39b527f9e",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: un buen avance. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: un buen avance. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: un buen avance. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Todo va según lo previsto; mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545745972501642_0000000264_f2359fe56fba4bc8a5e83e0351317840",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Для лендинга студии йоги готовы главный экран и расписание. Разделы «Тренеры» и «Цены» в работе. Всё идёт по плану. Первую версию я покажу в пятницу."
+      },
+      "visible_text": "Для лендинга студии йоги готовы главный экран и расписание. Разделы «Тренеры» и «Цены» в работе. Всё идёт по плану. Первую версию я покажу в пятницу.",
+      "copied_text": "Для лендинга студии йоги готовы главный экран и расписание. Разделы «Тренеры» и «Цены» в работе. Всё идёт по плану. Первую версию я покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Первую версию я покажу в пятницу."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545745477212616_0000000261_c08d2cb0f8ea460881532556fe51a1c3",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "В лендинге для студии йоги уже готовы главный экран и расписание — это хороший шаг вперёд. Разделы о тренерах и ценах в работе. Всё идёт по плану, первую версию я покажу в пятницу."
+      },
+      "visible_text": "В лендинге для студии йоги уже готовы главный экран и расписание — это хороший шаг вперёд. Разделы о тренерах и ценах в работе. Всё идёт по плану, первую версию я покажу в пятницу.",
+      "copied_text": "В лендинге для студии йоги уже готовы главный экран и расписание — это хороший шаг вперёд. Разделы о тренерах и ценах в работе. Всё идёт по плану, первую версию я покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Всё идёт по плану, первую версию я покажу в пятницу."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545745184588690_0000000258_e7a49b1544164b1bbe4c39fdba33b9c2",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "For the yoga studio landing page, the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "For the yoga studio landing page, the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "copied_text": "For the yoga studio landing page, the main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Everything is on track, and I’ll show you the first version on Friday."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545755308105355_0000000272_0621e60af833431da51d55ba87249eeb",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready—a nice milestone. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready—a nice milestone. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "copied_text": "The main screen and schedule for the yoga studio landing page are ready—a nice milestone. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Everything is on track, and I’ll show you the first version on Friday."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "neutral"
+      },
+      "session_id": "scenario_session_01795545757644144249_0000000277_2ae86e8ef9434ea38f7e11ce0566a52c",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795545759496336993_0000000282_3d11f37e2d9b498fa1e2998a0918e5e8",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: un buen avance. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; te mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: un buen avance. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; te mostraré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: un buen avance. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; te mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS",
+          "excerpt": "Todo va según lo previsto; te mostraré la primera versión el viernes."
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ]
+}

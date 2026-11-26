@@ -34,6 +34,19 @@ def windows_default_text_encoding(monkeypatch):
     monkeypatch.setattr(Path, "open", legacy_open)
 
 
+def worker_file(path, router, prompt="prompt", policy_ref="default_text_generation_v1"):
+    if path == eval_module.LIVE_PROFILE:
+        return json.dumps({"enabled_products": {
+            "client_update_writer": {"provider_policy_ref": policy_ref}
+        }})
+    if path == eval_module.POLICIES:
+        return (ROOT / "configs/kernel/provider_policies.yaml").read_text(encoding="utf-8")
+    if path == eval_module.ROUTER:
+        return router
+    assert path.endswith("/prompts/update_compose_reply.v1.md"), path
+    return prompt
+
+
 def record():
     return {
         "origin": {"ui_outcome": "result", "ui_latency_ms": 1000},
@@ -104,6 +117,11 @@ def test_frozen_matrix_preserves_originals():
                 hashlib.sha256(case["progress_notes"].encode()).hexdigest()
                 == original_hashes[case["id"]]
             )
+
+
+def test_tone_matrix_suite_is_valid():
+    path = eval_module.FIXTURE.with_name("tone_matrix.json")
+    eval_module.validate_suite(json.loads(path.read_text(encoding="utf-8")))
 
 
 def test_ledger_rejects_invalid_session_before_docker():
@@ -292,7 +310,9 @@ def test_termination_triggers_normal_unwinding():
 
 @pytest.mark.parametrize("repeats", [5, None])
 def test_orphaned_journal_blocks_retry_and_restores_router(tmp_path, repeats):
-    baseline = "model_list:\n  - litellm_params:\n      model: openai/gpt-6-luna\n"
+    baseline = json.dumps({"model_list": [{
+        "model_name": "anytoolai.default_text", "litellm_params": {"model": "openai/gpt-6-luna"}
+    }]})
     (tmp_path / "U01-ru-1.zip.journal.json").write_text('{"phase":"started"}', encoding="utf-8")
     args = SimpleNamespace(
         suite=eval_module.FIXTURE,
@@ -308,7 +328,7 @@ def test_orphaned_journal_blocks_retry_and_restores_router(tmp_path, repeats):
         patch.object(
             eval_module,
             "_docker",
-            side_effect=lambda *a: "prompt" if a[-1].endswith(".md") else baseline,
+            side_effect=lambda *a: worker_file(a[-1], baseline),
         ),
         patch.object(
             eval_module, "_git_state",
@@ -342,6 +362,69 @@ def test_configuration_outside_frozen_matrix_is_rejected_before_collecting():
         eval_module.collect(
             SimpleNamespace(suite=eval_module.FIXTURE, model="openai/unknown", reasoning="medium")
         )
+
+
+@pytest.mark.parametrize(("policy_ref", "group"), [
+    ("default_text_generation_v1", "anytoolai.default_text"),
+    ("sol_text_generation_v1", "anytoolai.sol_text"),
+])
+@pytest.mark.parametrize(("model", "effort"), [
+    ("openai/gpt-6-luna", "medium"),
+    ("openai/gpt-6.1-terra", "high"),
+    ("openai/gpt-6.1-sol", "high"),
+])
+def test_collector_overrides_only_deployed_product_group(
+    tmp_path, policy_ref, group, model, effort
+):
+    original = (ROOT / "configs/kernel/litellm_router.yaml").read_text(encoding="utf-8")
+    args = SimpleNamespace(
+        suite=eval_module.FIXTURE, model=model, reasoning=effort, repeats=None,
+        out=tmp_path, resume=True, project="local", max_attempts=0,
+    )
+    with (
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     worker_file(a[-1], original, policy_ref=policy_ref)),
+        patch.object(eval_module, "collection_revision", return_value={
+            "git_sha": "a" * 40, "git_dirty": False,
+        }),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+    ):
+        eval_module.collect(args)
+        browser.assert_not_called()
+    selected, restored = write.call_args_list
+    expected = eval_module.yaml.safe_load(original)
+    entry = next(e for e in expected["model_list"] if e["model_name"] == group)
+    entry["litellm_params"].update(model=model, reasoning_effort=effort)
+    assert eval_module.yaml.safe_load(selected.args[1]) == expected
+    assert restored.args == ("local", original)
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["model_group"] == group
+    assert eval_module.configuration_problems(manifest) == []
+
+
+def test_missing_active_group_rejected_before_worker_mutation(tmp_path):
+    original = json.dumps({"model_list": [{
+        "model_name": "anytoolai.default_text", "litellm_params": {"model": "openai/gpt-6-luna"},
+    }]})
+    args = SimpleNamespace(
+        suite=eval_module.FIXTURE, model="openai/gpt-6.1-terra", reasoning="high", repeats=None,
+        out=tmp_path, resume=True, project="local", max_attempts=1,
+    )
+    with (
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     worker_file(a[-1], original, policy_ref="sol_text_generation_v1")),
+        patch.object(eval_module, "collection_revision", return_value={
+            "git_sha": "a" * 40, "git_dirty": False,
+        }),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+        pytest.raises(ValueError, match="active model group .* missing"),
+    ):
+        eval_module.collect(args)
+    write.assert_not_called()
+    browser.assert_not_called()
+    assert not (tmp_path / "manifest.json").exists()
 
 
 def review_directory(tmp_path, *, questions=None):
@@ -677,6 +760,7 @@ def resume_collection(tmp_path):
     baseline = {
         "model_list": [
             {
+                "model_name": "anytoolai.default_text",
                 "litellm_params": {
                     "model": "openai/gpt-6-luna",
                     "reasoning_effort": "medium",
@@ -689,6 +773,7 @@ def resume_collection(tmp_path):
     manifest = {
         "suite_sha256": eval_module.digest(suite),
         "model": "openai/gpt-6.1-sol",
+        "model_group": "anytoolai.default_text",
         "reasoning_effort": "medium",
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
         "original_router": baseline,
@@ -697,7 +782,8 @@ def resume_collection(tmp_path):
     }
     manifest["suite"] = suite
     manifest["router"] = eval_module.selected_router(
-        baseline, manifest["model"], manifest["reasoning_effort"]
+        baseline, manifest["model"], manifest["reasoning_effort"],
+        model_group=manifest["model_group"],
     )
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     args = SimpleNamespace(
@@ -735,7 +821,7 @@ def test_collector_preserves_utf8_and_resumes_with_legacy_encoding(tmp_path):
     with (
         patch.object(
             eval_module, "_docker",
-            side_effect=lambda *a: prompt if a[-1].endswith(".md") else state["router"],
+            side_effect=lambda *a: worker_file(a[-1], state["router"], prompt),
         ),
         patch.object(
             eval_module, "_git_state",
@@ -775,7 +861,7 @@ def test_resume_rejects_live_router_drift_before_writes_or_submissions(
         patch.object(
             eval_module,
             "_docker",
-            side_effect=lambda *a: prompt if a[-1].endswith(".md") else json.dumps(current),
+            side_effect=lambda *a: worker_file(a[-1], json.dumps(current), prompt),
         ),
         patch.object(
             eval_module, "_git_state",
@@ -804,7 +890,7 @@ def test_resume_accepts_equivalent_baseline_and_restores_actual_entry_text(tmp_p
         patch.object(
             eval_module,
             "_docker",
-            side_effect=lambda *a: prompt if a[-1].endswith(".md") else original,
+            side_effect=lambda *a: worker_file(a[-1], original, prompt),
         ),
         patch.object(
             eval_module, "_git_state",
@@ -836,7 +922,7 @@ def test_resume_still_restores_entry_baseline_after_orphaned_attempt(tmp_path):
         patch.object(
             eval_module,
             "_docker",
-            side_effect=lambda *a: prompt if a[-1].endswith(".md") else original,
+            side_effect=lambda *a: worker_file(a[-1], original, prompt),
         ),
         patch.object(
             eval_module, "_git_state",
@@ -899,6 +985,23 @@ def test_provider_query_preserves_effort_metadata():
     assert "metadata" in docker.call_args.args[-1]
 
 
+@pytest.mark.parametrize(("requested", "deployment", "expected"), [
+    (None, "high", "PASS"),
+    (None, "medium", "FAIL"),
+    (None, None, "PENDING"),
+    ("high", "medium", "PASS"),
+])
+def test_evidence_checks_effort_used_by_the_router(tmp_path, requested, deployment, expected):
+    run = record()
+    run["reasoning_effort"] = "high"
+    run["provider_calls"][0]["metadata"] = {
+        "reasoning_effort": requested,
+        "litellm": {"deployment_reasoning_effort": deployment},
+    }
+    with patch.object(eval_module, "evidence_problems", return_value=[]):
+        assert eval_module.evidence_status(run, tmp_path)[0] == expected
+
+
 @pytest.mark.parametrize(
     "recorded,expected", [("medium", "FAIL"), (None, "PENDING"), ("high", "PASS")]
 )
@@ -934,7 +1037,7 @@ def test_resume_rejects_unverifiable_or_changed_revision_before_mutation(tmp_pat
         patch.object(eval_module, "_git_state", return_value=revision),
         patch.object(
             eval_module, "_docker",
-            side_effect=lambda *a: prompt if a[-1].endswith(".md") else json.dumps(baseline),
+            side_effect=lambda *a: worker_file(a[-1], json.dumps(baseline), prompt),
         ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run") as submit,
@@ -988,8 +1091,10 @@ def test_resume_rejects_legacy_manifest_without_revision(tmp_path, missing):
         patch.object(eval_module, "_git_state", return_value={
             "git_sha": "a" * 40, "git_dirty": False,
         }),
-        patch.object(eval_module, "_docker", side_effect=lambda *a:
-                     prompt if a[-1].endswith(".md") else json.dumps(baseline)),
+        patch.object(
+            eval_module, "_docker",
+            side_effect=lambda *a: worker_file(a[-1], json.dumps(baseline), prompt),
+        ),
         patch.object(eval_module, "write_router") as write,
         pytest.raises(ValueError, match=missing),
     ):
@@ -1087,8 +1192,10 @@ def test_driver_failures_are_persisted_and_stop_collection(tmp_path, failure):
         patch.object(eval_module, "_git_state", return_value={
             "git_sha": "a" * 40, "git_dirty": False,
         }),
-        patch.object(eval_module, "_docker", side_effect=lambda *a:
-                     prompt if a[-1].endswith(".md") else state["router"]),
+        patch.object(
+            eval_module, "_docker",
+            side_effect=lambda *a: worker_file(a[-1], state["router"], prompt),
+        ),
         patch.object(eval_module, "write_router", side_effect=lambda _p, content:
                      state.update(router=content)) as write,
         patch.object(eval_module, "provider_calls", return_value=[]),
@@ -1137,8 +1244,10 @@ def test_unknown_process_outcome_restores_router_and_blocks_blind_retry(tmp_path
         patch.object(eval_module, "_git_state", return_value={
             "git_sha": "a" * 40, "git_dirty": False,
         }),
-        patch.object(eval_module, "_docker", side_effect=lambda *a:
-                     prompt if a[-1].endswith(".md") else json.dumps(baseline)),
+        patch.object(
+            eval_module, "_docker",
+            side_effect=lambda *a: worker_file(a[-1], json.dumps(baseline), prompt),
+        ),
         patch.object(eval_module, "write_router") as write,
         patch.object(eval_module.subprocess, "run", side_effect=crash) as submit,
     ):
@@ -1520,7 +1629,10 @@ def test_resume_validates_imported_runs_before_mutating_worker(tmp_path, change)
     manifest.update(
         original_router=baseline, prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest()
     )
-    manifest["router"] = eval_module.selected_router(baseline, args.model, args.reasoning)
+    manifest["model_group"] = "anytoolai.default_text"
+    manifest["router"] = eval_module.selected_router(
+        baseline, args.model, args.reasoning, model_group=manifest["model_group"]
+    )
     runs[0]["prompt_sha256"] = manifest["prompt_sha256"]
     if change == "source":
         runs[0]["git_sha"] = "b" * 40
@@ -1536,8 +1648,10 @@ def test_resume_validates_imported_runs_before_mutating_worker(tmp_path, change)
         patch.object(eval_module, "_git_state", return_value={
             "git_sha": "a" * 40, "git_dirty": False,
         }),
-        patch.object(eval_module, "_docker", side_effect=lambda *a:
-                     prompt if a[-1].endswith(".md") else json.dumps(baseline)),
+        patch.object(
+            eval_module, "_docker",
+            side_effect=lambda *a: worker_file(a[-1], json.dumps(baseline), prompt),
+        ),
         patch.object(eval_module, "write_router") as write,
         pytest.raises(ValueError),
     ):

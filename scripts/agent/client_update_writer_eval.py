@@ -52,6 +52,8 @@ PRODUCT = (
     "anytoolai_freelancer_suite/products/client_update_writer"
 )
 ROUTER = "/app/configs/kernel/litellm_router.yaml"
+POLICIES = "/app/configs/kernel/provider_policies.yaml"
+LIVE_PROFILE = "/app/live-profile-manifest.json"
 DRIVER = ROOT / "tests/e2e/client-update-writer-smoke/collect-live.mjs"
 DRIVER_TIMEOUT_SECONDS = 180
 WORKER_RESTART_TIMEOUT_SECONDS = 90
@@ -136,11 +138,36 @@ def baseline_router(manifest: dict) -> dict | None:
     return router
 
 
-def selected_router(baseline: dict, model: str, effort: str) -> dict:
+def active_model_group(project: str) -> str:
+    try:
+        manifest = json.loads(_docker(project, "platform-worker", "cat", LIVE_PROFILE))
+        policies = yaml.safe_load(_docker(project, "platform-worker", "cat", POLICIES))
+        ref = manifest["enabled_products"]["client_update_writer"]["provider_policy_ref"]
+        matches = [p for p in policies["provider_policies"] if p["provider_policy_ref"] == ref]
+        (policy,) = matches
+        group = policy["model"]
+        if policy["provider"] == "litellm" and isinstance(group, str) and group.strip():
+            return group
+    except (KeyError, TypeError, ValueError, yaml.YAMLError, subprocess.CalledProcessError) as exc:
+        raise ValueError("cannot resolve Client Update Writer provider policy") from exc
+    raise ValueError("Client Update Writer requires an active LiteLLM model group")
+
+
+def selected_router(
+    baseline: dict, model: str, effort: str, *, model_group: str | None = None
+) -> dict:
     if baseline_router({"original_router": baseline}) is None:
         raise ValueError("baseline router missing or malformed")
     router = deepcopy(baseline)
-    router["model_list"][0]["litellm_params"].update(model=model, reasoning_effort=effort)
+    entries = router["model_list"]
+    # Older evidence recorded the first-entry override and did not carry a model group.
+    matched = entries[:1] if model_group is None else [
+        entry for entry in entries if entry.get("model_name") == model_group
+    ]
+    if not matched:
+        raise ValueError(f"active model group {model_group!r} is missing from the worker router")
+    for entry in matched:
+        entry["litellm_params"].update(model=model, reasoning_effort=effort)
     return router
 
 
@@ -151,7 +178,10 @@ def router_problems(manifest: dict) -> list[str]:
     actual = manifest.get("router")
     if not isinstance(actual, dict):
         return ["selected router missing or malformed"]
-    expected = selected_router(baseline, manifest["model"], manifest["reasoning_effort"])
+    expected = selected_router(
+        baseline, manifest["model"], manifest["reasoning_effort"],
+        model_group=manifest.get("model_group"),
+    )
     if digest(actual) != digest(expected):
         raise ValueError("selected router differs from baseline model/effort override")
     return []
@@ -172,7 +202,7 @@ def validate_manifest_identity(manifests: Iterable[dict]) -> None:
     for manifest in manifests:
         if "suite" in manifest and manifest.get("suite_sha256") != digest(manifest["suite"]):
             raise ValueError("suite manifest digest mismatch")
-    for field in ("suite_sha256", "prompt_sha256"):
+    for field in ("suite_sha256", "prompt_sha256", "model_group"):
         values = {digest(m[field]) for m in manifests if m.get(field) is not None}
         if len(values) > 1:
             raise ValueError(f"experiment {field.removesuffix('_sha256')} mismatch")
@@ -225,6 +255,8 @@ def validate_resume_manifest(saved: dict, snapshot: dict) -> None:
     ):
         if saved.get(field) != snapshot[field]:
             raise ValueError(f"resume manifest mismatch: {field}")
+    if saved.get("model_group") != snapshot.get("model_group"):
+        raise ValueError("resume manifest mismatch: model_group")
     validate_manifest_identity((saved, snapshot))
     if configuration_problems(saved):
         raise ValueError("resume manifest mismatch: unverified router or prompt")
@@ -267,7 +299,11 @@ def evidence_status(record: dict, directory: Path) -> tuple[EvaluationStatus, li
     effort = record.get("reasoning_effort")
     for call in calls:
         metadata = call.get("metadata")
-        recorded = metadata.get("reasoning_effort") if isinstance(metadata, dict) else None
+        metadata = metadata if isinstance(metadata, dict) else {}
+        recorded = metadata.get("reasoning_effort")
+        litellm = metadata.get("litellm")
+        if recorded is None and isinstance(litellm, dict):
+            recorded = litellm.get("deployment_reasoning_effort")
         if not effort or not recorded:
             problems.append("provider reasoning effort evidence missing")
         elif recorded != effort:
@@ -368,9 +404,12 @@ def collect(args: argparse.Namespace) -> None:
     args.out.mkdir(parents=True, exist_ok=args.resume)
     completed = read_jsonl(args.out / "runs.jsonl")
     completed_ids = {row["id"] for row in completed}
-    original = _docker(args.project, "platform-worker", "cat", ROUTER)
+    original, model_group = (
+        _docker(args.project, "platform-worker", "cat", ROUTER),
+        active_model_group(args.project),
+    )
     baseline = yaml.safe_load(original)
-    router = selected_router(baseline, args.model, args.reasoning)
+    router = selected_router(baseline, args.model, args.reasoning, model_group=model_group)
     selected = yaml.safe_dump(router)
     prompt = _docker(
         args.project, "platform-worker", "cat", f"/app/{PRODUCT}/prompts/update_compose_reply.v1.md"
@@ -381,6 +420,7 @@ def collect(args: argparse.Namespace) -> None:
         **revision,
         "model": args.model,
         "reasoning_effort": args.reasoning,
+        "model_group": model_group,
         "router": router,
         "original_router": baseline,
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
