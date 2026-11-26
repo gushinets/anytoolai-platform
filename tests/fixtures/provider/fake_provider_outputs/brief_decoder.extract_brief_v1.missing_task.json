@@ -1,0 +1,20 @@
+{
+  "response_json": {
+    "values": {},
+    "missing_fields": [
+      "project_goal",
+      "deliverables",
+      "deadline",
+      "budget",
+      "target_audience",
+      "constraints"
+    ]
+  },
+  "input_tokens": 100,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.extract_brief_v1.missing_task"
+  }
+}

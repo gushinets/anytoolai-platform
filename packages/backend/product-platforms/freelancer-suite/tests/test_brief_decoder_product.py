@@ -2162,6 +2162,8 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     # every output field is either a rendered part or explicitly excluded (brief_text is the
     # verbatim input echoed for the handoff, never rendered)
     assert contract["excluded_fields"] == ["brief_text"]
+    issues_part = next(part for part in contract["parts"] if part["part_id"] == "issues")
+    assert "missing_task_description" in issues_part["description"]
     assert {part["field"] for part in contract["parts"]} | set(contract["excluded_fields"]) == set(
         output_schema["properties"]
     )

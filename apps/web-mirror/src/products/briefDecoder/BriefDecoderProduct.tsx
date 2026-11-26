@@ -25,6 +25,10 @@ function validate(values: BriefDecoderValues): Partial<Record<keyof BriefDecoder
   return collectFieldErrors<BriefDecoderValues>([["briefText", requiredBackendTrimmedFieldError(values.briefText, BRIEF_TEXT_MAX_LENGTH)]]);
 }
 
+function normalizeValues(values: BriefDecoderValues): BriefDecoderValues {
+  return { briefText: trimBackendWhitespace(values.briefText) };
+}
+
 function BriefDecoderFields({ values, errors, disabled, onChange }: ProductFieldsProps<BriefDecoderValues>) {
   const t = useProductT();
   return (
@@ -63,8 +67,12 @@ export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, Brief
   hasDescription: true,
   emptyValues: { briefText: "" },
   validate,
-  toInput: (values) => ({ brief_text: trimBackendWhitespace(values.briefText) }),
+  normalizeValues,
+  toInput: (values) => ({ brief_text: normalizeValues(values).briefText }),
   extractResult: extractBriefDecoderResult,
+  resultFieldErrors: (result) => result.issues.some((issue) => issue.category === "missing_task_description")
+    ? { briefText: { code: "product", key: "validation.missing_task_description" } }
+    : {},
   emitsResultViewed: hasQuestions,
   // `handoffs.yaml`: `brief_decoder_to_acceptance_builder_v1` (immediate, user-confirmed).
   handoff: { handoffDefinitionId: "brief_decoder_to_acceptance_builder_v1", targetProductId: "acceptance_builder" },

@@ -14,6 +14,9 @@ renderer_contract:
       description: >-
         Risks and gaps, each with `category`, `severity`, `description` and optional `evidence`.
         An empty list is valid and renders as "no issues found".
+        If any issue has category `missing_task_description`, the product page shows a
+        localized error on the brief field and hides the result, Copy and Acceptance Builder
+        handoff. The artifact still has all four parts and ordinary run accounting.
     - part_id: clarifying_questions
       field: questions
       description: >-

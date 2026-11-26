@@ -1,0 +1,12 @@
+{
+  "response_json": {
+    "questions": []
+  },
+  "input_tokens": 100,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_questions_v1.missing_task"
+  }
+}

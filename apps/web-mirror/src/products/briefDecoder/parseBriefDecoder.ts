@@ -16,6 +16,7 @@ export const ISSUE_CATEGORIES = [
   "timeline_risk",
   "budget_risk",
   "contradiction",
+  "missing_task_description",
 ] as const;
 
 export type BriefField = (typeof BRIEF_FIELDS)[number];

@@ -7,6 +7,9 @@
     "briefTextPlaceholder": "Cole o briefing, o pedido ou o anúncio do cliente.",
     "briefTextHelp": "Cole o briefing como está. Um briefing mais longo gera perguntas mais precisas."
   },
+  "validation": {
+    "missing_task_description": "Descreva o que o cliente quer que você faça ou entregue. Por exemplo: “Escreva uma receita para o nosso boletim informativo.”"
+  },
   "decode": {
     "submit": "Decodificar briefing",
     "running": "Decodificando seu briefing…",

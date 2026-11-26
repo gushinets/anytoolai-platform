@@ -55,6 +55,7 @@ GUEST_ID = "guest_brief_decoder"
 SCENARIO_ID = "brief_decoder.decode_v1"
 INPUT_SCHEMA_REF = "brief_decoder.decode_input_v1"
 OUTPUT_SCHEMA_REF = "brief_decoder.decode_output_v1"
+OUTPUT_SCHEMA_VERSION = 2
 
 EXTRACT = "brief_decoder.extract_brief_v1"
 DETECT = "brief_decoder.detect_issues_v1"
@@ -367,6 +368,7 @@ def _run_to_result(
     assert result.status_code == HTTPStatus.OK
     body = result.json()
     assert body["schema_ref"] == OUTPUT_SCHEMA_REF
+    assert body["schema_version"] == OUTPUT_SCHEMA_VERSION
     return started, body["output"]
 
 
@@ -445,6 +447,36 @@ def test_weak_input_fixtures_are_reachable_end_to_end(
     assert output == _expected_output(".weak_input", WEAK_BRIEF_TEXT)
     assert output["brief"]["missing_fields"]  # a vague brief reports gaps instead of failing
     assert adapter.input_payload(-1)["data"]["source_brief"] == WEAK_BRIEF_TEXT
+
+
+@pytest.mark.parametrize(
+    "brief_text",
+    [
+        "asdf ::: 12345 !!!",
+        "Рецепт борща: свёкла, капуста, говядина. Варить два часа.",
+    ],
+)
+def test_missing_task_marker_publishes_with_original_brief_and_empty_questions(
+    app: Any, request_platform_api, session_factory: SessionFactory, brief_text: str
+) -> None:
+    suffix = ".missing_task"
+    adapter = RecordingProviderAdapter(FIXTURE_ROOT, variants=dict.fromkeys(STEP_ORDER, suffix))
+    _, output = _run_to_result(app, request_platform_api, session_factory, brief_text, adapter)
+
+    assert tuple(call.action_config_id for call in adapter.calls) == STEP_ORDER
+    assert output == _expected_output(suffix, brief_text)
+    assert output["brief_text"] == brief_text
+    (issue,) = output["issues"]
+    assert issue["category"] == "missing_task_description"
+    assert issue["severity"] == "high"
+    assert "evidence" not in issue
+    assert output["questions"] == []
+    assert adapter.input_payload(1)["source_text"] == brief_text
+    assert adapter.input_payload(2)["issues"] == output["issues"]
+    assert adapter.input_payload(3)["data"]["questions"] == []
+    assert_summary_matches_sources(
+        output["document"], output["brief"], output["issues"], output["questions"], "en"
+    )
 
 
 def test_no_issues_skips_question_generation_and_still_produces_a_consistent_document(
