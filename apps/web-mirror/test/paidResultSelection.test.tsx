@@ -42,6 +42,12 @@ function saveAccepted(id = "A") {
 function fulfilled<T>(value: T): Promise<T> {
   return Object.assign(Promise.resolve(value), { status: "fulfilled", value });
 }
+function parseBody(body: BodyInit | null | undefined): Record<string, unknown> {
+  if (typeof body !== "string") throw new Error("Expected a JSON request body");
+  const parsed: unknown = JSON.parse(body);
+  if (typeof parsed !== "object" || parsed === null) throw new Error("Expected a JSON request object");
+  return parsed as Record<string, unknown>;
+}
 function open(query?: string, selectedProductId = productId) {
   if (query !== undefined) window.history.replaceState(null, "", `/products/${selectedProductId}${query}`);
   const params = Object.fromEntries(new URL(window.location.href).searchParams);
@@ -235,7 +241,7 @@ it("visiting C preserves pending A and reload replays its original request and k
   expect(new Headers(starts[0].headers).get("Idempotency-Key")).toBe("original_key");
   const body = starts[0].body;
   if (typeof body !== "string") throw new Error("Expected a JSON request body");
-  expect(JSON.parse(body)).toMatchObject({ input: request.input });
+  expect(parseBody(body)).toMatchObject({ input: request.input });
   fireEvent.click(screen.getByRole("button", { name: "New task" }));
   expect(readAttachSessionId(productId)).toBeUndefined();
 });
@@ -283,7 +289,7 @@ it.each(pendingForms.flatMap(({ inputs, ...form }) => inputs.flatMap((input, for
   await screen.findByText("Result A");
   expect(starts).toHaveLength(1);
   expect(new Headers(starts[0]!.headers).get("Idempotency-Key")).toBe("original_key");
-  expect(JSON.parse(starts[0]!.body as string).input).toEqual(input);
+  expect(parseBody(starts[0]!.body).input).toEqual(input);
   expect(readProductDraft(key)?.run?.input).toEqual(submitted);
   expect(screen.getByRole("button", { name: regenerate })).toBeTruthy();
   expect(Boolean(screen.queryByText("Created from previous details"))).toBe(edited);

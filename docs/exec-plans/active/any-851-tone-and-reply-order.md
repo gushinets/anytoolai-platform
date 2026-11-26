@@ -517,3 +517,28 @@ previous-details warning after editing.
 All 2,106 Python tests in the product, evaluator, config, API bundle and LiteLLM adapter
 selection passed. All 1,169 web tests passed, along with TypeScript, config, architecture
 and documentation checks.
+
+## Keep the paid recovery evidence lint-safe and cover English S4
+
+1. Parse replay request bodies through a typed helper so the paid recovery assertions stay
+   inside the frontend lint contract without weakening the exact-input comparison.
+2. Collect the English S4 neutral, warm and firm runs on the current Reply Draft prompt,
+   which the tracked evidence still lacks.
+
+`apps/web-mirror/test/paidResultSelection.test.tsx` now reads request bodies through a
+`parseBody` helper typed as `Record<string, unknown>`, so no assertion reads a member of an
+`any`. The replayed input is still compared exactly with `toEqual`, and the frozen-request
+check uses the same helper. Workspace lint and typecheck pass, and all 1,169 web tests pass.
+
+The English S4 pair is now collected. The current prompt `reply_draft_compose_reply.v1.md`
+fingerprints at `c10147a0`, and S4 runs on that fingerprint existed only in Russian and Spanish;
+the English S4 runs in the final live evidence used the earlier prompt `23b5ddc8`. Three runs
+through the public Reply Draft form on the patched stack closed that gap: the isolated worker
+served `anytoolai.sol_text` (`openai/gpt-6.1-sol`, medium effort) for neutral, warm and firm on
+identical inputs. All eleven round-11 S4 criteria pass, the visible and copied text match the API
+output, and neither the group request nor the claimed agreement is carried into any reply. Firm
+leads with the point at issue and proposes directly, so it is distinguishable from neutral, though
+it repeats the neutral expectation clause verbatim instead of rephrasing it as Russian and Spanish
+do.
+
+[Round 13 live evidence](any-851-tone-and-reply-order-review-13.evidence.json)

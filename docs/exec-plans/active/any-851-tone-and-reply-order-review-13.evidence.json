@@ -1,0 +1,224 @@
+{
+  "issue": "ANY-851",
+  "round": 13,
+  "date": "2026-11-26",
+  "reviewer": "Claude Code agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form backed by an isolated live-provider stack.",
+    "base_source_sha": "ec1cc112d714e5a3727983f95cb420cf8fa62822",
+    "working_tree_note": "Only the web paid-recovery test and the execution plan differ from the base revision; neither changes the deployment profile.",
+    "profile_fingerprint": "9076f0a0dda6e4d0757dd8825bb61fc901dc1a7179310135da42bc702899edc3",
+    "source_fingerprint": "2c6a5fe362b989aa5f01d60903c35aaed9f56eaed5443282fb551371684bf602",
+    "prompt_sha256": {
+      "reply_draft_compose_reply.v1.md": "c10147a008dfcbe6fe193a4f6b96b06f2e6e0ca0bfbbd5bf6896c61b462b8983"
+    },
+    "configured_reasoning_effort": "medium",
+    "client_update_writer_provider_policy": "sol_text_generation_v1",
+    "served_model_group": "anytoolai.sol_text",
+    "served_model": "openai/gpt-6.1-sol"
+  },
+  "scope": "The English S4 pair that review 13 reported missing: neutral, warm and firm on identical inputs through the public Reply Draft form on the current prompt fingerprint. Criteria and their wording are carried over from round 11 so the three languages stay comparable.",
+  "runs": [
+    {
+      "id": "S4-neutral-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795678391295964274_0000000021_63ebe56761b54a21b4aa9b3438b8263d",
+      "result_artifact_id": "artifact_01795678396672357076_0000000045_525026c9546d48219b866ba47eecad82",
+      "ui_latency_ms": 7533,
+      "output": {
+        "text": "You expected something completely different and find the main screen dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief."
+      },
+      "visible_text": "You expected something completely different and find the main screen dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "copied_text": "You expected something completely different and find the main screen dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Neutral opens with the client as the grammatical subject of the expectation and of the dullness (\"you expected... and find the main screen dull\"). The scoped two-option offer follows in the second sentence, the brief context closes the reply, and the group request and the claimed agreement are neither relayed nor restated as facts."
+    },
+    {
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795678403096574227_0000000027_2d894d3c361944f1a2d2cdb5f11a75c2",
+      "result_artifact_id": "artifact_01795678408248069232_0000000061_6f9065653b644048b3b7e45fe536e374",
+      "ui_latency_ms": 7441,
+      "output": {
+        "text": "I understand that you expected something completely different and that the main screen looks dull to you. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand that you expected something completely different and that the main screen looks dull to you. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "I understand that you expected something completely different and that the main screen looks dull to you. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Warm opens with first-person empathy (\"I understand that...\") tied to the client's stated experience and keeps the dullness inside the client's perception (\"looks dull to you\"). Same offer and brief order as neutral, with no apology or concession added."
+    },
+    {
+      "id": "S4-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795678414750529861_0000000033_26f6297fb65e4164a8f5919bd1c26e42",
+      "result_artifact_id": "artifact_01795678421016933825_0000000077_5772c9f8542d40b1a6932dbe203977cb",
+      "ui_latency_ms": 7440,
+      "output": {
+        "text": "The main screen looks dull to you, and you expected something completely different. I propose two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "The main screen looks dull to you, and you expected something completely different. I propose two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "The main screen looks dull to you, and you expected something completely different. I propose two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "The individual remains the person who expected a different result and the singular addressee. The earlier group request does not change that.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The assessment itself stays inside the explicit client perception, including under an expression of empathy. It does not become a fact about the work.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes the authorized two-option offer within the first revision round, after the acknowledgement and before any background.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Neutral and firm differ meaningfully on identical inputs. Warm keeps a personal acknowledgement.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. The next sentence makes the scoped offer. Brief context and any reported dispute begin in later sentences.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Firm makes the point at issue the subject of the opening (\"The main screen looks dull to you\") and proposes directly (\"I propose\") instead of neutral's \"I can offer\". The register change is structural rather than lexical, but the second clause repeats the neutral expectation wording verbatim, so the pair is distinguishable without matching the lexical rephrasing used in Russian and Spanish."
+    }
+  ]
+}
