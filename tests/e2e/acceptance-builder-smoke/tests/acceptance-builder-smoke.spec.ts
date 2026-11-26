@@ -327,7 +327,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await page.goto(BRIEF_DECODER_URL);
     await page.locator("#brief-decoder-brief-text").fill(BRIEF_DECODER_BRIEF);
     await page.getByRole("button", { name: "Decode brief" }).click();
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     const sourceSessionId = run.sessionId();
     expect(sourceSessionId).toBeTruthy();
     await page.getByRole("button", { name: "Create acceptance criteria" }).click();
@@ -484,7 +484,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await page.goto(BRIEF_DECODER_URL);
     await page.locator("#brief-decoder-brief-text").fill(BRIEF_DECODER_BRIEF);
     await page.getByRole("button", { name: "Decode brief" }).click();
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     await page.getByRole("button", { name: "Create acceptance criteria" }).click();
     await page.waitForURL(/\/handoff\/[^/?]+$/);
     await page.getByRole("button", { name: "Decline" }).click();

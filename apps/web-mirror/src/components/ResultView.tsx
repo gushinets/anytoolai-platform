@@ -16,12 +16,13 @@ export type ResultViewProps = {
    * iff the clipboard write itself succeeded. Product-specific (e.g. which next action to fire),
    * so it stays out of this shared component -- see `ProductDefinition.onCopy`. */
   onCopy?: (text: string) => Promise<boolean>;
+  copyLabels?: { idle: string; copied: string };
   secondaryAction?: ReactNode;
 };
 
 /** Canonical text result plus a copy-to-clipboard button. The result stays visible and copyable
  * even if the copy fails -- only `onCopy`'s own outcome gates the "Copied" state. */
-export function ResultView({ text, onCopy, embedded = false, hideText = false, secondaryAction }: ResultViewProps) {
+export function ResultView({ text, onCopy, embedded = false, hideText = false, copyLabels, secondaryAction }: ResultViewProps) {
   const t = useHostT();
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "error">("idle");
   const anchorRef = useRef<HTMLSpanElement>(null);
@@ -69,7 +70,9 @@ export function ResultView({ text, onCopy, embedded = false, hideText = false, s
   const Container = embedded ? "div" : Card;
   const copyButton = (
     <Button variant="secondary" onClick={handleCopy} disabled={copyState === "copying"}>
-      {copyState === "copied" ? t("result.copied") : copyState === "copying" ? t("result.copying") : t("result.copy")}
+      {copyState === "copied"
+        ? (copyLabels?.copied ?? t("result.copied"))
+        : copyState === "copying" ? t("result.copying") : (copyLabels?.idle ?? t("result.copy"))}
     </Button>
   );
   // "Select text" sits in the same row as Copy: it is the fallback for the same action.

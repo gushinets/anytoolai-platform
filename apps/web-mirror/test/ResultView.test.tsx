@@ -30,6 +30,18 @@ describe("ResultView", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/could not copy to clipboard/i));
   });
 
+  it("uses optional action labels while preserving the pending and disabled state", async () => {
+    let finishCopy: (value: boolean) => void = () => {};
+    const onCopy = vi.fn(() => new Promise<boolean>((resolve) => (finishCopy = resolve)));
+    render(<ResultView text="Question?" onCopy={onCopy} copyLabels={{ idle: "Copy questions", copied: "Questions copied" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy questions" }));
+    const pending = screen.getByRole<HTMLButtonElement>("button", { name: "Copying…" });
+    expect(pending.disabled).toBe(true);
+    finishCopy(true);
+    expect(await screen.findByRole("button", { name: "Questions copied" })).toBeTruthy();
+    expect(onCopy).toHaveBeenCalledExactlyOnceWith("Question?");
+  });
+
   it.each([true, false])(
     "leaves focus where the user moved it while the copy was pending (copied: %s)",
     async (copied) => {

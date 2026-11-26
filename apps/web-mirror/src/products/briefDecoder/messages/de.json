@@ -35,6 +35,8 @@
     "document": "Zusammenfassung"
   },
   "copy": {
+    "questions": "Rückfragen kopieren",
+    "questionsCopied": "Rückfragen kopiert",
     "missingFields": "Im Briefing nicht angegeben",
     "hint": "Kopiert werden Briefing, Probleme und Rückfragen oben im Wortlaut. Die Zusammenfassung wird nicht kopiert."
   },

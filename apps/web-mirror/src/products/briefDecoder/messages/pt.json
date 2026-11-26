@@ -35,6 +35,8 @@
     "document": "Documento-resumo"
   },
   "copy": {
+    "questions": "Copiar perguntas",
+    "questionsCopied": "Perguntas copiadas",
     "missingFields": "Não indicado no briefing",
     "hint": "São copiados literalmente o briefing, os problemas e as perguntas acima. O documento-resumo não é copiado."
   },

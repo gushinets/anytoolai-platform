@@ -24,7 +24,10 @@ renderer_contract:
         `brief.missing_fields`, not this part alone). Only `summary_document` makes a readiness
         call, and it must weigh all three signals, not the empty question list alone. An empty
         list is also not an activation (activation = first rendering of a non-empty question
-        list).
+        list). A separate questions-only copy action copies authored `question` strings in
+        array order, one plain-text line per question, folding embedded line breaks and
+        trimming line ends. No headings, numbering, rationale, category, priority or styling
+        are included. The action is hidden when no authored questions are available.
     - part_id: summary_document
       field: document
       description: >-

@@ -4,7 +4,7 @@ import { ResultView } from "../../components/ResultView";
 import { useProductT } from "../../i18n";
 import type { ProductResultProps } from "../runtime/productDefinition";
 import styles from "./BriefDecoderProduct.module.css";
-import { BRIEF_FIELDS, composeCopyText, type BriefDecoderResult } from "./parseBriefDecoder";
+import { BRIEF_FIELDS, composeCopyText, composeQuestionsCopyText, type BriefDecoderResult } from "./parseBriefDecoder";
 
 /** The four contract parts in `renderer_contract.yaml` order, embedded in the workspace's result
  * card (whose `h2` they sit under, hence `h3`) and separated by rules, not nested cards. Severity
@@ -13,6 +13,7 @@ import { BRIEF_FIELDS, composeCopyText, type BriefDecoderResult } from "./parseB
 export function BriefDecoderResultView({ result, onCopy, secondaryAction }: ProductResultProps<BriefDecoderResult>) {
   const t = useProductT();
   const { brief, issues, questions, document } = result;
+  const questionsText = composeQuestionsCopyText(questions);
   return (
     <div className={styles.result}>
       <section className={styles.section} aria-labelledby="brief-decoder-brief-heading">
@@ -67,6 +68,15 @@ export function BriefDecoderResultView({ result, onCopy, secondaryAction }: Prod
 
       <section className={styles.section} aria-labelledby="brief-decoder-questions-heading">
         <h3 id="brief-decoder-questions-heading">{t("result.questions", { count: questions.length })}</h3>
+        {questionsText ? (
+          <ResultView
+            text={questionsText}
+            onCopy={onCopy}
+            copyLabels={{ idle: t("copy.questions"), copied: t("copy.questionsCopied") }}
+            embedded
+            hideText
+          />
+        ) : null}
         {questions.length === 0 ? (
           <p>{t("result.noQuestions")}</p>
         ) : (

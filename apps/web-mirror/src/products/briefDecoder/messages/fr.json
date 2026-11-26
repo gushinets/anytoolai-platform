@@ -35,6 +35,8 @@
     "document": "Document de synthèse"
   },
   "copy": {
+    "questions": "Copier les questions",
+    "questionsCopied": "Questions copiées",
     "missingFields": "Non précisé dans le brief",
     "hint": "La copie reprend mot pour mot le brief, les problèmes et les questions ci-dessus. Le document de synthèse n’est pas copié."
   },

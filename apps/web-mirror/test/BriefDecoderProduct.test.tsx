@@ -17,8 +17,10 @@ import {
   ISSUE_CATEGORIES,
   LEVELS,
   composeCopyText,
+  composeQuestionsCopyText,
   extractBriefDecoderResult,
   hasQuestions,
+  type ClarifyingQuestion,
 } from "../src/products/briefDecoder/parseBriefDecoder";
 import { BRIEF_DECODER_MESSAGES } from "../src/products/briefDecoder/messages";
 import { ProductRunPage } from "../src/products/runtime/ProductRunPage";
@@ -363,6 +365,50 @@ describe("Brief Decoder definition", () => {
     expect(copy).not.toContain("excluded");
   });
 
+  it("copies only authored question text in input order, without adding numbering or a trailing line", () => {
+    const question: ClarifyingQuestion = { question: "What is the budget?", rationale: "excluded", priority: "low", category: "ambiguity" };
+    const other = { ...question, question: "Who signs off?", priority: "high" } as const;
+    expect(composeQuestionsCopyText([])).toBe("");
+    expect(composeQuestionsCopyText([question])).toBe("What is the budget?");
+    expect(composeQuestionsCopyText([question, other, question])).toBe("What is the budget?\nWho signs off?\nWhat is the budget?");
+    const invisible = { ...question, question: " \u200b\u00ad\r\n\u2060 " };
+    expect(composeQuestionsCopyText([invisible])).toBe("");
+    expect(composeQuestionsCopyText([invisible, question, invisible])).toBe("What is the budget?");
+    expect(composeQuestionsCopyText([
+      { ...question, question: '  ¿Cuál es el {presupuesto}? \r\n\t¿En euros?\n\n  ¿Con IVA?  ' },
+      { ...other, question: " Кто\v\f\u0085\u2028\u2029 утверждает?" },
+    ])).toBe("¿Cuál es el {presupuesto}? ¿En euros? ¿Con IVA?\nКто утверждает?");
+  });
+
+  it("does not offer question copy for historical invisible-only entries", () => {
+    const result = extractBriefDecoderResult(composedOutput(""))!;
+    result.questions = [{ ...result.questions[0]!, question: "\u200b" }];
+    render(<BriefDecoderResultView result={result} onCopy={vi.fn().mockResolvedValue(true)} />);
+    expect(screen.queryByRole("button", { name: "Copy questions" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+  });
+
+  it.each([false, true])("keeps the questions fallback local and allows retry (rejection=%s)", async (rejection) => {
+    const result = extractBriefDecoderResult(composedOutput(".weak_input"))!;
+    const expected = result.questions.map(({ question }) => question).join("\n");
+    const onCopy = vi.fn<(text: string) => Promise<boolean>>().mockResolvedValue(true);
+    if (rejection) onCopy.mockRejectedValueOnce(new Error("Clipboard blocked"));
+    else onCopy.mockResolvedValueOnce(false);
+    render(<BriefDecoderResultView result={result} onCopy={onCopy} />);
+    const section = within(screen.getByRole("region", { name: "4 clarifying questions" }));
+    fireEvent.click(section.getByRole("button", { name: "Copy questions" }));
+    expect((await section.findByRole("alert")).textContent).toMatch(/could not copy to clipboard/i);
+    const select = section.getByRole("button", { name: "Select text" });
+    expect(screen.getAllByRole("button", { name: "Select text" })).toHaveLength(1);
+    fireEvent.click(select);
+    expect(window.getSelection()?.toString()).toBe(expected);
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    fireEvent.click(section.getByRole("button", { name: "Copy questions" }));
+    expect(await section.findByRole("button", { name: "Questions copied" })).toBeTruthy();
+    expect(section.queryByRole("alert")).toBeNull();
+    expect(onCopy.mock.calls).toEqual([[expected], [expected]]);
+  });
+
   it.each(["", ".weak_input"] as const)("copy contains every value and every question verbatim, and nothing from document (%s)", async (suffix) => {
     const output = composedOutput(suffix);
     const sentinel = "LLM_DOCUMENT_ONLY_SENTINEL";
@@ -500,6 +546,7 @@ describe("Brief Decoder page", () => {
     // Generation: the four parts sit in the result card, the brief stays in its own card.
     await screen.findByRole("heading", { name: /clarifying questions/, level: 3 });
     const resultCard = screen.getByRole("heading", { name: "Decoded brief", level: 2 }).closest("section")!;
+    expect(within(resultCard).getByRole("button", { name: "Copy questions" })).toBeTruthy();
     expect(within(resultCard).getAllByRole("heading", { level: 3 })).toHaveLength(4);
     expect(brief.value).toBe("Need a website by the holidays.");
     expect(document.querySelectorAll("section[aria-labelledby] section[aria-labelledby]").length).toBe(4);
@@ -519,6 +566,8 @@ describe("Brief Decoder page", () => {
     expect(completedEvents(events)).toHaveLength(1);
     routed.resolveCall(ROUTES.RESULT, 1, resultResponse(IDS, { output: composedOutput(".no_issues") }));
     await screen.findByText("No issues found.");
+    expect(screen.getByText("No clarifying questions were generated.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy questions" })).toBeNull();
     expect(screen.queryByText("Created from previous details")).toBeNull();
     // One completion per session; the zero-question rerun does not count as a viewed result.
     await waitFor(() => expect(completedEvents(events).map((e) => (e as { resultViewed: boolean }).resultViewed)).toEqual([true, false]));
@@ -540,15 +589,30 @@ describe("Brief Decoder page", () => {
     expect(completedEvents(events)).toHaveLength(2);
   });
 
-  it("renders the weak-input fixtures as a full, activating result", async () => {
+  it("renders the weak-input fixtures, and copies only the four questions with one activation", async () => {
     const events: ProductRunEvent[] = [];
-    await decode(routes(composedOutput(".weak_input")), events);
+    const { calls } = await decode(routes(composedOutput(".weak_input")), events);
     await waitFor(() => expect(screen.getByRole("heading", { name: /clarifying questions/ })).toBeTruthy());
     expect(screen.getByRole("heading", { name: "4 clarifying questions" })).toBeTruthy();
     expect(screen.queryByText("No clarifying questions were generated.")).toBeNull();
     await waitFor(() =>
       expect(completedEvents(events).map((event) => (event as { resultViewed: boolean }).resultViewed)).toEqual([true]),
     );
+    const section = within(screen.getByRole("region", { name: "4 clarifying questions" }));
+    fireEvent.click(section.getByRole("button", { name: "Copy questions" }));
+    expect(await section.findByRole("button", { name: "Questions copied" })).toBeTruthy();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith([
+      "What should the website do, and which pages or features do you need?",
+      "When do you need the website to be ready?",
+      "What budget do you have in mind for this project?",
+      'What does "nice" mean to you -- can you share an example of a website you like?',
+    ].join("\n"));
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    const nextAction = calls.filter((call) => call.key === ROUTES.NEXT_ACTION);
+    expect(nextAction).toHaveLength(1);
+    expect(JSON.parse(nextAction[0]!.init.body as string)).toEqual({ checkpoint_id: "checkpoint_1" });
+    expect(completedEvents(events)).toHaveLength(1);
   });
 
   it("renders both empty states for no issues, reports resultViewed false, and still copies", async () => {
@@ -563,6 +627,7 @@ describe("Brief Decoder page", () => {
     );
     // The empty question list must not read as a readiness claim; the rationale/priority chrome is absent.
     expect(document.querySelector("ol")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy questions" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy());
