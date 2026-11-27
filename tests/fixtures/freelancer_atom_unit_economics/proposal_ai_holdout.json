@@ -1,0 +1,704 @@
+[
+  {
+    "case_id": "pa-h01-saas-guide-a04",
+    "scenario_case_id": "pa-h01-saas-guide",
+    "atom_id": "A04",
+    "prompt_ref": "proposal_ai.detect_experience_gaps.v1",
+    "calibration": false,
+    "difficulty": "Средний запрос с явным требованием опыта, покрытым в смежной отрасли.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/technical-writing/saas-project-doucment-with-full",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ заказа на руководство для пользователей SaaS. Составлены контекст бронирования, перечень разделов и условия доступа. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Нужно руководство для пользователей сервиса бронирования помещений. Обязателен опыт написания пользовательской документации SaaS в Markdown. В руководство входят создание профиля, первое бронирование и перенос брони. Нужны исходник Markdown, готовый PDF и отдельные снимки экрана. Перед началом клиент выдаст тестовую учётную запись. Согласован один раунд правок. Документация API и публикация в базе знаний исключены. Стоимость и дата пока открыты.",
+        "context": "Пишу пользовательские руководства SaaS в Markdown. В сервисе учёта оборудования у меня готово руководство для новых клиентов по созданию профиля, первой операции и отмене операции. Подготовлены снимки экрана и PDF.",
+        "taxonomy": [
+          "experience_gap",
+          "missing_task_description",
+          "missing_profile_information"
+        ]
+      },
+      "en": {
+        "source_text": "We need a user guide for room-booking software. Experience writing SaaS user documentation in Markdown is required. Cover profile setup, making the first booking, and rescheduling a booking. Deliver the Markdown source, a PDF and separate screenshots. The client will provide a test account before work starts. One revision round is agreed. API documentation and publishing to the knowledge base are excluded. The fee and date are still open.",
+        "context": "I write SaaS user guides in Markdown. For an equipment-tracking service I produced a guide for new customers covering profile setup, the first operation and undoing it. The guide included screenshots and a PDF.",
+        "taxonomy": [
+          "experience_gap",
+          "missing_task_description",
+          "missing_profile_information"
+        ]
+      }
+    },
+    "rubric": {
+      "outcome": "experience_gaps",
+      "facts": [
+        "Markdown и пользовательская SaaS-документация прямо подтверждены, включая PDF и снимки. Опыт именно в бронировании не запрошен."
+      ],
+      "required": [
+        "Выход {issues: []}."
+      ],
+      "prohibited": [
+        "Пробел по бронированию, обычным разделам руководства, цене, сроку, API или публикации."
+      ],
+      "allowed": [
+        "Пустой список означает, что все запрошенные предпосылки закрыты профилем."
+      ],
+      "expected_issue_categories": [],
+      "expected_issue_count": 0,
+      "expected_evidence": {
+        "ru": [],
+        "en": []
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Нужно руководство для пользователей сервиса бронирования помещений. Обязателен опыт написания пользовательской документации SaaS в Markdown. В руководство входят создание профиля, первое бронирование и перенос брони. Нужны исходник Markdown, готовый PDF и отдельные снимки экрана. Перед началом клиент выдаст тестовую учётную запись. Согласован один раунд правок. Документация API и публикация в базе знаний исключены. Стоимость и дата пока открыты.",
+        "freelancer_positioning": "Пишу пользовательские руководства SaaS в Markdown. В сервисе учёта оборудования у меня готово руководство для новых клиентов по созданию профиля, первой операции и отмене операции. Подготовлены снимки экрана и PDF.",
+        "tone": "neutral"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "We need a user guide for room-booking software. Experience writing SaaS user documentation in Markdown is required. Cover profile setup, making the first booking, and rescheduling a booking. Deliver the Markdown source, a PDF and separate screenshots. The client will provide a test account before work starts. One revision round is agreed. API documentation and publishing to the knowledge base are excluded. The fee and date are still open.",
+        "freelancer_positioning": "I write SaaS user guides in Markdown. For an equipment-tracking service I produced a guide for new customers covering profile setup, the first operation and undoing it. The guide included screenshots and a PDF.",
+        "tone": "neutral"
+      }
+    },
+    "scenario_rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [],
+      "expected_gap_count": 0,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-h01-saas-guide-a06",
+    "scenario_case_id": "pa-h01-saas-guide",
+    "atom_id": "A06",
+    "prompt_ref": "proposal_ai.compose_persuasive_text.v1",
+    "calibration": false,
+    "difficulty": "Средний запрос с явным требованием опыта, покрытым в смежной отрасли.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/technical-writing/saas-project-doucment-with-full",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ заказа на руководство для пользователей SaaS. Составлены контекст бронирования, перечень разделов и условия доступа. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Нужно руководство для пользователей сервиса бронирования помещений. Обязателен опыт написания пользовательской документации SaaS в Markdown. В руководство входят создание профиля, первое бронирование и перенос брони. Нужны исходник Markdown, готовый PDF и отдельные снимки экрана. Перед началом клиент выдаст тестовую учётную запись. Согласован один раунд правок. Документация API и публикация в базе знаний исключены. Стоимость и дата пока открыты.",
+          "freelancer_positioning": "Пишу пользовательские руководства SaaS в Markdown. В сервисе учёта оборудования у меня готово руководство для новых клиентов по созданию профиля, первой операции и отмене операции. Подготовлены снимки экрана и PDF.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "We need a user guide for room-booking software. Experience writing SaaS user documentation in Markdown is required. Cover profile setup, making the first booking, and rescheduling a booking. Deliver the Markdown source, a PDF and separate screenshots. The client will provide a test account before work starts. One revision round is agreed. API documentation and publishing to the knowledge base are excluded. The fee and date are still open.",
+          "freelancer_positioning": "I write SaaS user guides in Markdown. For an equipment-tracking service I produced a guide for new customers covering profile setup, the first operation and undoing it. The guide included screenshots and a PDF.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "facts": [
+        "Объём: профиль, первое бронирование, перенос. Отдельные артефакты: Markdown, PDF и снимки экрана.",
+        "Подтверждены один раунд правок и тестовый аккаунт до начала. API и публикация исключены. Цена и дата открыты.",
+        "Пример только из учёта оборудования, с руководством для новой аудитории, снимками и PDF."
+      ],
+      "required": [
+        "Близкий пример назван конкретно. В отклике есть все три темы, все три артефакта и условие доступа до начала.",
+        "Один раунд явно подтверждён. API и публикация за пределами работ, цена и дата открыты.",
+        "Следующий шаг касается тестового аккаунта или проверки маршрута первого бронирования."
+      ],
+      "prohibited": [
+        "Опыт руководств для систем бронирования, принятая цена или дата, обещание публикации, разработки или документации API."
+      ],
+      "allowed": [
+        "Можно предложить проверять шаги на тестовой учётной записи и подбирать снимки без добавления объёма."
+      ],
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Нужно руководство для пользователей сервиса бронирования помещений. Обязателен опыт написания пользовательской документации SaaS в Markdown. В руководство входят создание профиля, первое бронирование и перенос брони. Нужны исходник Markdown, готовый PDF и отдельные снимки экрана. Перед началом клиент выдаст тестовую учётную запись. Согласован один раунд правок. Документация API и публикация в базе знаний исключены. Стоимость и дата пока открыты.",
+        "freelancer_positioning": "Пишу пользовательские руководства SaaS в Markdown. В сервисе учёта оборудования у меня готово руководство для новых клиентов по созданию профиля, первой операции и отмене операции. Подготовлены снимки экрана и PDF.",
+        "tone": "neutral"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "We need a user guide for room-booking software. Experience writing SaaS user documentation in Markdown is required. Cover profile setup, making the first booking, and rescheduling a booking. Deliver the Markdown source, a PDF and separate screenshots. The client will provide a test account before work starts. One revision round is agreed. API documentation and publishing to the knowledge base are excluded. The fee and date are still open.",
+        "freelancer_positioning": "I write SaaS user guides in Markdown. For an equipment-tracking service I produced a guide for new customers covering profile setup, the first operation and undoing it. The guide included screenshots and a PDF.",
+        "tone": "neutral"
+      }
+    },
+    "scenario_rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [],
+      "expected_gap_count": 0,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-h02-accessibility-pilot-a04",
+    "scenario_case_id": "pa-h02-accessibility-pilot",
+    "atom_id": "A04",
+    "prompt_ref": "proposal_ai.detect_experience_gaps.v1",
+    "calibration": false,
+    "difficulty": "Пограничный заказ с обязательным инструментом и узким предложением исполнителя.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/accessibility-testing/Page-WCAG-Audit",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ заказа о ручном аудите с двумя скринридерами. Составлены форма бронирования и условия предварительной проверки. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Нужен ручной аудит формы бронирования по WCAG 2.2 AA. Для полного аудита обязателен предыдущий опыт с NVDA в Chrome на Windows и VoiceOver в Safari на macOS. Без проверки в NVDA полный аудит не принимается. Моё предложение клиенту ограничено предварительной проверкой формы с клавиатуры и в VoiceOver в Safari на macOS. Предоставлю отчёт с шагами воспроизведения, ссылками на критерии и приоритетом каждой проблемы. Нужен доступ к тестовой форме до начала. Исправления и проверка в NVDA в моё предложение не входят.",
+        "context": "Провожу ручные проверки доступности веб-форм по WCAG 2.2 AA. В проекте для формы записи на занятия проверены клавиатура и VoiceOver в Safari на macOS, а в отчёте указаны шаги, критерии и приоритеты. Практики проверки с NVDA у меня нет.",
+        "taxonomy": [
+          "experience_gap",
+          "missing_task_description",
+          "missing_profile_information"
+        ]
+      },
+      "en": {
+        "source_text": "The client needs a manual WCAG 2.2 AA audit of a booking form. The full audit requires previous experience using NVDA in Chrome on Windows and VoiceOver in Safari on macOS. The client will not accept a full audit without NVDA testing. My offer is limited to a preliminary form review using the keyboard and VoiceOver in Safari on macOS. I will deliver a report with reproduction steps, criterion references and priority per issue. Access to the test form is required before work starts. Fixes and NVDA testing are outside my offer.",
+        "context": "I manually test web forms against WCAG 2.2 AA. For a class enrollment form I tested keyboard navigation and VoiceOver in Safari on macOS and documented reproduction steps, criteria and priorities. I haven't tested with NVDA.",
+        "taxonomy": [
+          "experience_gap",
+          "missing_task_description",
+          "missing_profile_information"
+        ]
+      }
+    },
+    "rubric": {
+      "outcome": "experience_gaps",
+      "facts": [
+        "Для полного аудита оба режима обязательны. Профиль подтверждает аудит WCAG 2.2 AA, клавиатуру и VoiceOver в Safari на macOS; NVDA не подтверждён."
+      ],
+      "required": [
+        "Ровно один experience_gap уровня high с конкретным сочетанием NVDA, Chrome и Windows.",
+        "Описание на языке профиля. evidence — прямая цитата исходной формулировки обязательного опыта с NVDA."
+      ],
+      "prohibited": [
+        "Пропуск NVDA, второй пробел по VoiceOver или по обычной части отчёта, подмена проверки пробелом в общем опыте WCAG."
+      ],
+      "allowed": [
+        "Цитата evidence может быть длиннее ожидаемой и включать VoiceOver, если description ограничен отсутствующим опытом NVDA."
+      ],
+      "expected_issue_categories": [
+        "experience_gap"
+      ],
+      "expected_issue_count": 1,
+      "expected_evidence": {
+        "ru": [
+          "обязателен предыдущий опыт с NVDA в Chrome на Windows"
+        ],
+        "en": [
+          "requires previous experience using NVDA in Chrome on Windows"
+        ]
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Нужен ручной аудит формы бронирования по WCAG 2.2 AA. Для полного аудита обязателен предыдущий опыт с NVDA в Chrome на Windows и VoiceOver в Safari на macOS. Без проверки в NVDA полный аудит не принимается. Моё предложение клиенту ограничено предварительной проверкой формы с клавиатуры и в VoiceOver в Safari на macOS. Предоставлю отчёт с шагами воспроизведения, ссылками на критерии и приоритетом каждой проблемы. Нужен доступ к тестовой форме до начала. Исправления и проверка в NVDA в моё предложение не входят.",
+        "freelancer_positioning": "Провожу ручные проверки доступности веб-форм по WCAG 2.2 AA. В проекте для формы записи на занятия проверены клавиатура и VoiceOver в Safari на macOS, а в отчёте указаны шаги, критерии и приоритеты. Практики проверки с NVDA у меня нет.",
+        "tone": "firm"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "The client needs a manual WCAG 2.2 AA audit of a booking form. The full audit requires previous experience using NVDA in Chrome on Windows and VoiceOver in Safari on macOS. The client will not accept a full audit without NVDA testing. My offer is limited to a preliminary form review using the keyboard and VoiceOver in Safari on macOS. I will deliver a report with reproduction steps, criterion references and priority per issue. Access to the test form is required before work starts. Fixes and NVDA testing are outside my offer.",
+        "freelancer_positioning": "I manually test web forms against WCAG 2.2 AA. For a class enrollment form I tested keyboard navigation and VoiceOver in Safari on macOS and documented reproduction steps, criteria and priorities. I haven't tested with NVDA.",
+        "tone": "firm"
+      }
+    },
+    "scenario_rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [
+        "experience_gap"
+      ],
+      "expected_gap_count": 1,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-h02-accessibility-pilot-a06",
+    "scenario_case_id": "pa-h02-accessibility-pilot",
+    "atom_id": "A06",
+    "prompt_ref": "proposal_ai.compose_persuasive_text.v1",
+    "calibration": false,
+    "difficulty": "Пограничный заказ с обязательным инструментом и узким предложением исполнителя.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/accessibility-testing/Page-WCAG-Audit",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ заказа о ручном аудите с двумя скринридерами. Составлены форма бронирования и условия предварительной проверки. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Нужен ручной аудит формы бронирования по WCAG 2.2 AA. Для полного аудита обязателен предыдущий опыт с NVDA в Chrome на Windows и VoiceOver в Safari на macOS. Без проверки в NVDA полный аудит не принимается. Моё предложение клиенту ограничено предварительной проверкой формы с клавиатуры и в VoiceOver в Safari на macOS. Предоставлю отчёт с шагами воспроизведения, ссылками на критерии и приоритетом каждой проблемы. Нужен доступ к тестовой форме до начала. Исправления и проверка в NVDA в моё предложение не входят.",
+          "freelancer_positioning": "Провожу ручные проверки доступности веб-форм по WCAG 2.2 AA. В проекте для формы записи на занятия проверены клавиатура и VoiceOver в Safari на macOS, а в отчёте указаны шаги, критерии и приоритеты. Практики проверки с NVDA у меня нет.",
+          "tone": "firm"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "firm",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": [
+            {
+              "category": "experience_gap",
+              "severity": "high",
+              "description": "Нет подтверждённого опыта проверки с NVDA в Chrome на Windows, обязательного для полного аудита.",
+              "evidence": "обязателен предыдущий опыт с NVDA в Chrome на Windows"
+            }
+          ]
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "The client needs a manual WCAG 2.2 AA audit of a booking form. The full audit requires previous experience using NVDA in Chrome on Windows and VoiceOver in Safari on macOS. The client will not accept a full audit without NVDA testing. My offer is limited to a preliminary form review using the keyboard and VoiceOver in Safari on macOS. I will deliver a report with reproduction steps, criterion references and priority per issue. Access to the test form is required before work starts. Fixes and NVDA testing are outside my offer.",
+          "freelancer_positioning": "I manually test web forms against WCAG 2.2 AA. For a class enrollment form I tested keyboard navigation and VoiceOver in Safari on macOS and documented reproduction steps, criteria and priorities. I haven't tested with NVDA.",
+          "tone": "firm"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "firm",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": [
+            {
+              "category": "experience_gap",
+              "severity": "high",
+              "description": "No verified experience using NVDA in Chrome on Windows, which is required for the full audit.",
+              "evidence": "requires previous experience using NVDA in Chrome on Windows"
+            }
+          ]
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "facts": [
+        "Полный аудит заказчика шире предложения. Исполнитель предлагает только предварительную ручную проверку формы.",
+        "Клавиатура, VoiceOver + Safari + macOS, отчёт с шагами, критериями и приоритетом. Тестовый доступ необходим. Исправления и NVDA исключены.",
+        "В профиле подтверждён аналог формы записи на занятия, а не полный аудит на обеих платформах."
+      ],
+      "required": [
+        "Открытие с релевантным примером. Предварительная проверка ограничена формой, клавиатурой и VoiceOver в заданной среде.",
+        "Названы три части отчёта и оба исключения. Старт зависит от тестового доступа. Есть следующий шаг вокруг его выдачи."
+      ],
+      "prohibited": [
+        "Утверждение об опыте NVDA, обещание теста в NVDA, исправлений, полного аудита или сертификации; выдуманная ставка или дата."
+      ],
+      "allowed": [
+        "Разрешено нейтрально обозначить границы предложения без пересказа внутреннего отчёта о пробелах."
+      ],
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Нужен ручной аудит формы бронирования по WCAG 2.2 AA. Для полного аудита обязателен предыдущий опыт с NVDA в Chrome на Windows и VoiceOver в Safari на macOS. Без проверки в NVDA полный аудит не принимается. Моё предложение клиенту ограничено предварительной проверкой формы с клавиатуры и в VoiceOver в Safari на macOS. Предоставлю отчёт с шагами воспроизведения, ссылками на критерии и приоритетом каждой проблемы. Нужен доступ к тестовой форме до начала. Исправления и проверка в NVDA в моё предложение не входят.",
+        "freelancer_positioning": "Провожу ручные проверки доступности веб-форм по WCAG 2.2 AA. В проекте для формы записи на занятия проверены клавиатура и VoiceOver в Safari на macOS, а в отчёте указаны шаги, критерии и приоритеты. Практики проверки с NVDA у меня нет.",
+        "tone": "firm"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "The client needs a manual WCAG 2.2 AA audit of a booking form. The full audit requires previous experience using NVDA in Chrome on Windows and VoiceOver in Safari on macOS. The client will not accept a full audit without NVDA testing. My offer is limited to a preliminary form review using the keyboard and VoiceOver in Safari on macOS. I will deliver a report with reproduction steps, criterion references and priority per issue. Access to the test form is required before work starts. Fixes and NVDA testing are outside my offer.",
+        "freelancer_positioning": "I manually test web forms against WCAG 2.2 AA. For a class enrollment form I tested keyboard navigation and VoiceOver in Safari on macOS and documented reproduction steps, criteria and priorities. I haven't tested with NVDA.",
+        "tone": "firm"
+      }
+    },
+    "scenario_rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [
+        "experience_gap"
+      ],
+      "expected_gap_count": 1,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-h03-signage-drawing-a04",
+    "scenario_case_id": "pa-h03-signage-drawing",
+    "atom_id": "A04",
+    "prompt_ref": "proposal_ai.detect_experience_gaps.v1",
+    "calibration": false,
+    "difficulty": "Заказ на производственные файлы с подтверждённым инструментом и встречной ценой.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/coreldraw/coreldraw-acrylic-signage-designer",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ части заказа о векторных файлах вывески. Составлены размеры, условия, ограничение одним макетом и цены. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Клиенту нужен один макет букв для акриловой вывески шириной 720 мм. Нужен опыт подготовки таких файлов в CorelDRAW 2021. Сдать редактируемый CDR и PDF с замкнутыми контурами, текстом в кривых и раздельными слоями резки и гравировки. Изготовление и монтаж исключены. До начала клиент передаст логотип и подтвердит размеры. Один раунд правок согласован. Клиент предложил EUR 210. Мой ответ по цене: EUR 210 не принимаю, предлагаю EUR 240 за этот макет. Дата не согласована.",
+        "context": "Готовлю файлы для акриловых вывесок в CorelDRAW 2021. Для вывески кофейни есть готовый комплект CDR и PDF с замкнутыми контурами, текстом в кривых и отдельными слоями резки и гравировки.",
+        "taxonomy": [
+          "experience_gap",
+          "missing_task_description",
+          "missing_profile_information"
+        ]
+      },
+      "en": {
+        "source_text": "The client needs one letter layout for an acrylic sign that is 720 mm wide. Prior experience preparing these files in CorelDRAW 2021 is required. Deliver an editable CDR and a PDF with closed paths, text converted to curves and separate cutting and engraving layers. Fabrication and installation are excluded. Before work starts the client will supply the logo and confirm the dimensions. One revision round is agreed. The client proposed EUR 210. My pricing decision: I decline EUR 210 and offer EUR 240 for this layout. No date has been agreed.",
+        "context": "I prepare files for acrylic signs in CorelDRAW 2021. For a cafe sign I produced a CDR and PDF package with closed paths, text converted to curves and separate cutting and engraving layers.",
+        "taxonomy": [
+          "experience_gap",
+          "missing_task_description",
+          "missing_profile_information"
+        ]
+      }
+    },
+    "rubric": {
+      "outcome": "experience_gaps",
+      "facts": [
+        "В профиле закрыто требование CorelDRAW 2021 и подтверждены оба формата, акриловая вывеска и названные свойства файлов."
+      ],
+      "required": [
+        "Выход {issues: []}."
+      ],
+      "prohibited": [
+        "Пробел по CorelDRAW, формату и обычной работе с кривыми. Производство, монтаж, цена и дата не становятся пробелами опыта."
+      ],
+      "allowed": [
+        "Особенности заказа и коммерческие условия остаются в исходных данных, без issues."
+      ],
+      "expected_issue_categories": [],
+      "expected_issue_count": 0,
+      "expected_evidence": {
+        "ru": [],
+        "en": []
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Клиенту нужен один макет букв для акриловой вывески шириной 720 мм. Нужен опыт подготовки таких файлов в CorelDRAW 2021. Сдать редактируемый CDR и PDF с замкнутыми контурами, текстом в кривых и раздельными слоями резки и гравировки. Изготовление и монтаж исключены. До начала клиент передаст логотип и подтвердит размеры. Один раунд правок согласован. Клиент предложил EUR 210. Мой ответ по цене: EUR 210 не принимаю, предлагаю EUR 240 за этот макет. Дата не согласована.",
+        "freelancer_positioning": "Готовлю файлы для акриловых вывесок в CorelDRAW 2021. Для вывески кофейни есть готовый комплект CDR и PDF с замкнутыми контурами, текстом в кривых и отдельными слоями резки и гравировки.",
+        "tone": "neutral"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "The client needs one letter layout for an acrylic sign that is 720 mm wide. Prior experience preparing these files in CorelDRAW 2021 is required. Deliver an editable CDR and a PDF with closed paths, text converted to curves and separate cutting and engraving layers. Fabrication and installation are excluded. Before work starts the client will supply the logo and confirm the dimensions. One revision round is agreed. The client proposed EUR 210. My pricing decision: I decline EUR 210 and offer EUR 240 for this layout. No date has been agreed.",
+        "freelancer_positioning": "I prepare files for acrylic signs in CorelDRAW 2021. For a cafe sign I produced a CDR and PDF package with closed paths, text converted to curves and separate cutting and engraving layers.",
+        "tone": "neutral"
+      }
+    },
+    "scenario_rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [],
+      "expected_gap_count": 0,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-h03-signage-drawing-a06",
+    "scenario_case_id": "pa-h03-signage-drawing",
+    "atom_id": "A06",
+    "prompt_ref": "proposal_ai.compose_persuasive_text.v1",
+    "calibration": false,
+    "difficulty": "Заказ на производственные файлы с подтверждённым инструментом и встречной ценой.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/coreldraw/coreldraw-acrylic-signage-designer",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ части заказа о векторных файлах вывески. Составлены размеры, условия, ограничение одним макетом и цены. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Клиенту нужен один макет букв для акриловой вывески шириной 720 мм. Нужен опыт подготовки таких файлов в CorelDRAW 2021. Сдать редактируемый CDR и PDF с замкнутыми контурами, текстом в кривых и раздельными слоями резки и гравировки. Изготовление и монтаж исключены. До начала клиент передаст логотип и подтвердит размеры. Один раунд правок согласован. Клиент предложил EUR 210. Мой ответ по цене: EUR 210 не принимаю, предлагаю EUR 240 за этот макет. Дата не согласована.",
+          "freelancer_positioning": "Готовлю файлы для акриловых вывесок в CorelDRAW 2021. Для вывески кофейни есть готовый комплект CDR и PDF с замкнутыми контурами, текстом в кривых и отдельными слоями резки и гравировки.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "The client needs one letter layout for an acrylic sign that is 720 mm wide. Prior experience preparing these files in CorelDRAW 2021 is required. Deliver an editable CDR and a PDF with closed paths, text converted to curves and separate cutting and engraving layers. Fabrication and installation are excluded. Before work starts the client will supply the logo and confirm the dimensions. One revision round is agreed. The client proposed EUR 210. My pricing decision: I decline EUR 210 and offer EUR 240 for this layout. No date has been agreed.",
+          "freelancer_positioning": "I prepare files for acrylic signs in CorelDRAW 2021. For a cafe sign I produced a CDR and PDF package with closed paths, text converted to curves and separate cutting and engraving layers.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "facts": [
+        "Один макет букв шириной 720 мм, редактируемый CDR и PDF. Замкнутые контуры, текст в кривых, раздельные резка и гравировка.",
+        "Логотип и подтверждение размеров нужны до старта. Согласован один раунд правок, изготовление и монтаж исключены.",
+        "EUR 210 отклонены, EUR 240 — встречная цена за этот макет. Дата открыта. Подтверждён пример вывески кофейни в CorelDRAW 2021."
+      ],
+      "required": [
+        "Есть релевантный пример и внятное предложение по всем форматам, размерам и свойствам файла.",
+        "Указаны обе предпосылки начала, один согласованный раунд и оба исключения.",
+        "Названы отказ от EUR 210 и встречные EUR 240 за один макет. Следующий шаг по логотипу или размерам."
+      ],
+      "prohibited": [
+        "Согласие на EUR 210, EUR 240 как согласованная цена, срок из воздуха, предложение изготовить или смонтировать вывеску, утверждения о других неподтверждённых работах."
+      ],
+      "allowed": [
+        "Допустимо говорить о проверке контуров и размеров перед сдачей, без обещания физического тестового реза."
+      ],
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Клиенту нужен один макет букв для акриловой вывески шириной 720 мм. Нужен опыт подготовки таких файлов в CorelDRAW 2021. Сдать редактируемый CDR и PDF с замкнутыми контурами, текстом в кривых и раздельными слоями резки и гравировки. Изготовление и монтаж исключены. До начала клиент передаст логотип и подтвердит размеры. Один раунд правок согласован. Клиент предложил EUR 210. Мой ответ по цене: EUR 210 не принимаю, предлагаю EUR 240 за этот макет. Дата не согласована.",
+        "freelancer_positioning": "Готовлю файлы для акриловых вывесок в CorelDRAW 2021. Для вывески кофейни есть готовый комплект CDR и PDF с замкнутыми контурами, текстом в кривых и отдельными слоями резки и гравировки.",
+        "tone": "neutral"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "The client needs one letter layout for an acrylic sign that is 720 mm wide. Prior experience preparing these files in CorelDRAW 2021 is required. Deliver an editable CDR and a PDF with closed paths, text converted to curves and separate cutting and engraving layers. Fabrication and installation are excluded. Before work starts the client will supply the logo and confirm the dimensions. One revision round is agreed. The client proposed EUR 210. My pricing decision: I decline EUR 210 and offer EUR 240 for this layout. No date has been agreed.",
+        "freelancer_positioning": "I prepare files for acrylic signs in CorelDRAW 2021. For a cafe sign I produced a CDR and PDF package with closed paths, text converted to curves and separate cutting and engraving layers.",
+        "tone": "neutral"
+      }
+    },
+    "scenario_rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [],
+      "expected_gap_count": 0,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    }
+  }
+]

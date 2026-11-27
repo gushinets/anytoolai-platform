@@ -1,0 +1,782 @@
+[
+  {
+    "case_id": "bd-01-crm",
+    "calibration": true,
+    "difficulty": "normal",
+    "sources": [
+      {
+        "ref": "tests/fixtures/brief_decoder_eval/deadline_status.json#BD-RU-05",
+        "date": "2026-11-18",
+        "date_basis": "git:06d79037",
+        "adaptation": "Сохранены суть задания и статус срока. Уточнена аудитория, пример адреса формы заменён указанием на одну действующую форму, подготовлена пара RU/EN."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Нужно связать одну действующую форму заявки сайта онлайн-курсов с amoCRM, чтобы администратор курсов видел новые заявки. При новой заявке создаются контакт и сделка с названием курса. Повторная заявка на тот же email не должна дублировать контакт. Нужны журнал ошибок и инструкция запуска. Перенос старых заявок, рассылки и телефония исключены. Тестовый аккаунт CRM предоставляет заказчик. Нужно проверить успешную заявку, повторный email и недоступность CRM. Желаемый срок клиента — 10 дней; окончательную оценку исполнитель ещё не давал.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Connect one existing application form on the online-course website to amoCRM so the course administrator can see new applications. A new application creates a contact and a deal with the course name. A second application with the same email must not create a duplicate contact. Deliver an error log and setup instructions. Migration of old applications, mailings and telephony are out of scope. The client provides the CRM test account. Test a successful application, a repeated email and an unavailable CRM. The client's preferred timeline is 10 days; the freelancer has not provided a final estimate yet.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Одна действующая форма и amoCRM, пользователи результата — администратор курсов.",
+        "Создание контакта и сделки, название курса, дедупликация контакта по email.",
+        "Журнал ошибок, инструкция запуска, три теста и тестовый аккаунт от заказчика."
+      ],
+      "required": [
+        "Показать цель и администратора курсов. Отдельно перечислить интеграцию, журнал ошибок и инструкцию.",
+        "Указать запись названия курса, запрет дублей контактов по email, три проверки, три исключения и источник тестового аккаунта.",
+        "В одном значении deadline оставить желаемые 10 дней вместе с тем, что исполнитель не дал окончательной оценки."
+      ],
+      "prohibited": [
+        "Согласованный дедлайн. Запрет создания второй сделки при повторе email. Миграция старых заявок, рассылка или телефония в составе работ. Любой бюджет."
+      ],
+      "allowed": [
+        "Краткие переформулировки всех фактов, кроме формулировки срока. Три теста могут быть перечислены в одном пункте про проверку."
+      ],
+      "term_status": {
+        "deadline": "желаемый, оценка исполнителя отсутствует",
+        "budget": "не указан"
+      },
+      "objective": {
+        "missing_fields": [
+          "budget"
+        ],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "10 дней"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "10 days"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-02-yoga",
+    "calibration": false,
+    "difficulty": "normal",
+    "sources": [
+      {
+        "ref": "tests/fixtures/brief_decoder_eval/deadline_status.json#BD-EN-PREFERRED",
+        "date": "2026-11-18",
+        "date_basis": "git:06d79037",
+        "adaptation": "Пара подготовлена из EN-фикстуры. Явно указаны аудитория и английский язык сайта для проверки языка анализа."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Сделайте одностраничный сайт про новые вечерние занятия нашей студии йоги для взрослых новичков. Нужны первый экран, расписание, биографии инструкторов и форма записи, которая отправляет заявки студии. Тексты сайта должны быть на английском. Тексты и фотографии предоставим мы. Предпочтительный график: три недели от старта, запуск к 10 декабря.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Build a one-page site about our yoga studio's new evening classes for adult beginners. Include a hero section, a timetable, instructor bios and a sign-up form that sends submissions to the studio. The site copy must be in English. We will supply the copy and photos. Preferred schedule: three weeks from kickoff, with launch by December 10.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Одностраничный сайт для взрослых новичков, вечерняя йога.",
+        "Первый экран, расписание, биографии, форма с отправкой студии.",
+        "Английские тексты и фотографии предоставляет заказчик. Срок предпочтительный."
+      ],
+      "required": [
+        "Указать аудиторию и четыре составляющие страницы, сохранив получателя заявки.",
+        "Сохранить английский язык текстов как требование к сайту, не меняя язык анализа. Зафиксировать, что контент даёт заказчик.",
+        "Перенести оба компонента предпочтительного графика: три недели от старта, запуск к 10 декабря."
+      ],
+      "prohibited": [
+        "Подтверждённый дедлайн. Русский вариант сайта как обязательство. Утрата одного из двух сроков. Написание исходных текстов и фотосъёмка как поручение исполнителю. Любой бюджет."
+      ],
+      "allowed": [
+        "Главный экран / первый экран, hero / introductory section. Не требуется выводить актуальную дату старта."
+      ],
+      "term_status": {
+        "deadline": "предпочтительный, период и дата",
+        "budget": "не указан"
+      },
+      "objective": {
+        "missing_fields": [
+          "budget"
+        ],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "три недели",
+              "10 декабря"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "three weeks",
+              "December 10"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-03-photos",
+    "calibration": false,
+    "difficulty": "normal",
+    "sources": [
+      {
+        "ref": "https://www.br.freelancer.com/projects/image-processing/product-photos-retouching-40828281",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки Freelancer, project_id=40828281",
+        "adaptation": "Пересказ карточки заказа без профилей и заявок исполнителей. Аудитория результата, команда товарного каталога, указана для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Обработайте 105 фотографий товаров для команды товарного каталога. Нужны 105 JPEG высокого разрешения на чистом белом фоне. При редактировании сохраняйте маску на прозрачном слое. Уберите пыль, следы и складки, выровняйте цвет, подчистите контуры. При масштабе 100% у краёв не должно быть ореолов, а свет и тени должны выглядеть естественно. Имена файлов и размеры в пикселях должны совпасть с исходными. Предлагаемая ставка: $15-25 USD в час. Срок пока не определили, сообщите, когда сможете сдать.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Retouch 105 product photos for the catalog team. Deliver 105 high-resolution JPEGs on pure white. Keep the mask on a transparent layer while editing. Remove dust, marks and wrinkles, correct the color and clean up the outlines. At 100% zoom the edges must have no halos, and the lighting and shadows should stay natural. Keep the original filenames and pixel dimensions. Proposed rate: $15-25 USD per hour. We have not set a delivery date, so tell us when you could deliver.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "105 JPEG высокого разрешения на белом фоне для команды каталога. Прозрачный слой относится к монтажу.",
+        "Ретушь дефектов и цвета, естественные свет и тени, края без ореолов при 100%, размеры и имена сохраняются.",
+        "Предлагаемая почасовая ставка $15-25 USD. Дедлайн не установлен."
+      ],
+      "required": [
+        "Извлечь точный объём, формат, фон и аудиторию.",
+        "Отразить критерии качества и запрет менять размеры/имена. Прозрачный слой сохранить как способ редактирования.",
+        "В budget перенести весь предложенный диапазон с валютой и оплатой за час."
+      ],
+      "prohibited": [
+        "Сдача PSD или прозрачных файлов. Ровный фон вместо белого. Переименование или изменение размера файлов. Фиксированная общая цена либо согласованная ставка. Любая дата сдачи."
+      ],
+      "allowed": [
+        "Слова «маска» и «слой» можно описать иначе при сохранении неразрушающего процесса. Клиентский запрос назвать срок можно передать как уточнение, не как срок."
+      ],
+      "term_status": {
+        "deadline": "не указан",
+        "budget": "предлагаемый диапазон, за час"
+      },
+      "objective": {
+        "missing_fields": [
+          "deadline"
+        ],
+        "value_fragments": {
+          "ru": {
+            "budget": [
+              "$15-25 USD",
+              "в час"
+            ]
+          },
+          "en": {
+            "budget": [
+              "$15-25 USD",
+              "per hour"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-04-sheets",
+    "calibration": false,
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/data-management/merge-deduplicate-excel-sheets",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки Freelancer, project_id=40677313",
+        "adaptation": "Пересказ карточки заказа. Назначение для отдела учёта составлено для теста. Статус объявления и сведения об откликах в бриф не перенесены."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Отделу учёта нужен один общий файл .xlsx из нескольких рабочих книг. Сортируйте записи по столбцу Start Date, в котором даты уже записаны как DD/MM/YYYY. Удалите полностью пустые строки. Если строки совпадают по всем столбцам, оставьте одну. Если хотя бы одна ячейка отличается, сохраните обе строки и отметьте только отличающиеся ячейки заливкой одного цвета. Выходной файл должен сохранить все остальные данные. Планируемый бюджет: $30-250 USD, оплата после сдачи.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "The accounting team needs one master .xlsx file made from several workbooks. Sort entries by the Start Date column, which already uses DD/MM/YYYY. Remove entirely blank rows. If rows match in every column, keep one. If any cell differs, keep both rows and use the same fill color on just the cells that differ. Preserve all other data in the output file. Planned budget: $30-250 USD, payable on delivery.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Один .xlsx для отдела учёта. Сортировка Start Date в формате DD/MM/YYYY.",
+        "Только полностью совпадающие записи схлопываются; частичные совпадения сохраняются, различия помечаются одним цветом.",
+        "Плановый диапазон $30-250 USD с оплатой после сдачи."
+      ],
+      "required": [
+        "Указать итоговый формат, получателя, сортировку по Start Date и исходный формат даты DD/MM/YYYY.",
+        "Раздельно отразить пустые строки, точные дубликаты и отличие хотя бы одной ячейки. Сохранить обе отличающиеся строки и пометку только на отличиях одним цветом.",
+        "Не потерять диапазон и плановый статус бюджета. Оплата после сдачи допустима в budget или constraints."
+      ],
+      "prohibited": [
+        "Удаление похожих записей, объединение их полей, заливка целой строки или приведение дат к MM/DD/YYYY. Конкретный цвет, направление сортировки, срок, согласованная цена."
+      ],
+      "allowed": [
+        "Синонимы «рабочая книга» и «файл Excel». Не требуется пересказывать условия в двух полях одновременно."
+      ],
+      "term_status": {
+        "deadline": "не указан",
+        "budget": "плановый диапазон, оплата после сдачи"
+      },
+      "objective": {
+        "missing_fields": [
+          "deadline"
+        ],
+        "value_fragments": {
+          "ru": {
+            "budget": [
+              "$30-250 USD"
+            ]
+          },
+          "en": {
+            "budget": [
+              "$30-250 USD"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-05-audio",
+    "calibration": false,
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "tests/fixtures/brief_decoder_eval/russian_analysis_english_sources.json",
+        "date": "2026-11-23",
+        "date_basis": "git:4fa80b28",
+        "adaptation": "Взяты дословная финальная реплика и разделение языка анализа и цитаты. Добавлены WAV и один естественный голос как составленные требования. Показатели взяты из брифа, а не из содержимого эталонного ответа."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Запишите аудиогид для посетителей выставки. Нужна одна запись в WAV, один естественный голос без фоновой музыки. Закончите запись точной фразой «No fees.» Разбор напишите по-русски.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Record an audio guide for exhibition visitors. Deliver one WAV recording, using one natural voice and no background music. End the recording with the exact words “No fees.” Write this analysis in English.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Один WAV с аудиогидом для посетителей выставки. Один естественный голос, без фоновой музыки.",
+        "Точная финальная фраза — No fees. Язык анализа задан отдельно."
+      ],
+      "required": [
+        "Извлечь цель, аудиторию, один WAV, голос и ограничение на музыку.",
+        "Сохранить точную английскую реплику No fees. и указать, что она произносится в конце записи. Написать авторские строки на явно указанном языке анализа.",
+        "Пометить бюджет и срок как отсутствующие."
+      ],
+      "prohibited": [
+        "Переведённая финальная реплика. Извлечение требования к языку разбора как ограничения на работу. Утверждения о плате за вход, правах, языке всей записи или других форматах."
+      ],
+      "allowed": [
+        "Точная реплика может быть в constraints или в описании deliverables. Тип кавычек вокруг неё свободный."
+      ],
+      "term_status": {
+        "deadline": "не указан",
+        "budget": "не указан"
+      },
+      "objective": {
+        "missing_fields": [
+          "budget",
+          "deadline"
+        ],
+        "value_fragments": {
+          "ru": {},
+          "en": {}
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-06-blog",
+    "calibration": false,
+    "difficulty": "normal",
+    "sources": [
+      {
+        "ref": "tests/fixtures/brief_decoder_eval/deadline_status.json#BD-RU-AGREED",
+        "date": "2026-11-18",
+        "date_basis": "git:06d79037",
+        "adaptation": "Сохранены платформы, количество статей, редиректы и согласованный срок. Правила видимости и фиксированная цена составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Нужно перенести блог с WordPress на Tilda. Перенесите все 40 статей и настройте редиректы со старых адресов. Сохраните у каждой статьи текущий статус видимости. Сдача согласована на 20 декабря. Фиксированная согласованная цена: 65 000 RUB.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Move the blog from WordPress to Tilda. Migrate all 40 articles and set up redirects from the old addresses. Keep each article's current visibility status. Delivery agreed for December 20. Fixed agreed price: 65 000 RUB.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Миграция WordPress → Tilda, 40 статей, редиректы, сохранение видимости.",
+        "Дедлайн согласован на 20 декабря. Согласованная фиксированная цена 65 000 RUB."
+      ],
+      "required": [
+        "Сохранить направление миграции, 40 статей, редиректы именно со старых адресов и текущую видимость каждой статьи.",
+        "В deadline и budget оставить согласованный статус с датой и фиксированный согласованный статус с суммой соответственно."
+      ],
+      "prohibited": [
+        "Обратное направление, новые статьи, общедоступность всех статей, придуманная аудитория. Предварительный срок или приблизительная цена. Конвертация валюты."
+      ],
+      "allowed": [
+        "Статус видимости можно назвать текущими настройками доступа без указания неоговорённых публичных или приватных значений."
+      ],
+      "term_status": {
+        "deadline": "согласованный",
+        "budget": "фиксированный, согласованный"
+      },
+      "objective": {
+        "missing_fields": [
+          "target_audience"
+        ],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "20 декабря"
+            ],
+            "budget": [
+              "65 000 RUB"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "December 20"
+            ],
+            "budget": [
+              "65 000 RUB"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-07-clips",
+    "calibration": false,
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "tests/fixtures/brief_decoder_eval/deadline_status.json#BD-RU-CONDITIONAL",
+        "date": "2026-11-18",
+        "date_basis": "git:06d79037",
+        "adaptation": "Модальность двух связанных дат перенесена из фикстуры. Сфера видеомонтажа, смена редакции, даты и остальные характеристики составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Монтаж нужен редактору музейного аккаунта для короткой серии о новой выставке. Старое письмо с заданием «10 горизонтальных клипов» отменено. По текущему заданию передайте шесть вертикальных клипов по 20 секунд, 1080×1920, и по SRT с чешскими субтитрами к каждому. Исходное видео даёт музей, в ролики не добавляйте логотип. Если исходник поступит к 2026-11-29, сдача — 2026-12-04. Если исходник поступит позже, согласуем новый срок.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "The museum's account editor needs a short series about the new exhibition. The earlier email asking for “10 horizontal clips” has been superseded. The current request is six vertical clips of 20 seconds each, at 1080×1920, with a Czech SRT subtitle file for each. The museum supplies the source video. Do not add a logo to the clips. If the source arrives by 2026-11-29, delivery is due on 2026-12-04. If it arrives later, we will agree on a new date.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Редактор музейного аккаунта, серия о новой выставке.",
+        "Текущие 6 вертикальных клипов по 20 секунд 1080×1920, по чешскому SRT без логотипа. Исходник от музея.",
+        "Условная сдача 2026-12-04 при получении материала к 2026-11-29."
+      ],
+      "required": [
+        "Использовать действующую редакцию объёма, ориентации, длины, разрешения и файлов субтитров, сохранив язык субтитров.",
+        "Перенести аудиторию, материал от музея и запрет логотипа.",
+        "Связать обе даты в deadline и явно указать условность и необходимость согласовать новую дату при опоздании материала."
+      ],
+      "prohibited": [
+        "Старые 10 горизонтальных клипов как требование. Чешский язык анализа. Подмена дедлайна датой получения исходника. Безусловная сдача 2026-12-04 или новая конкретная дата. Цена."
+      ],
+      "allowed": [
+        "Старое письмо допустимо упомянуть только как отменённое. Разрешение допускает запись `1080 × 1920`."
+      ],
+      "term_status": {
+        "deadline": "условный, обе даты и действие при опоздании",
+        "budget": "не указан"
+      },
+      "objective": {
+        "missing_fields": [
+          "budget"
+        ],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "2026-11-29",
+              "2026-12-04"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "2026-11-29",
+              "2026-12-04"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-08-analytics",
+    "calibration": false,
+    "difficulty": "incomplete",
+    "sources": [
+      {
+        "ref": "составленный кейс эксперимента",
+        "date": "2026-11-25",
+        "date_basis": "дата составления",
+        "adaptation": "Бриф без формата результата и коммерческих условий. Слова TBD и «позже» используются как заглушки."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Запрос по аналитике. Хотим понять, на каком шаге теряем новых пользователей. Бюджет TBD, срок обсудим позже.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "We have an analytics request. We want to understand where we lose new users along the way. Budget TBD, timeline to be discussed later.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Цель — определить этап потери новых пользователей. Срок, цена и формат результата не заданы."
+      ],
+      "required": [
+        "Дать цель без придуманного этапа или причины. Пометить пять остальных полей как отсутствующие, включая deliverables."
+      ],
+      "prohibited": [
+        "Дашборд, презентация или аналитический отчёт в составе заказа. Числовые показатели. Срок или бюджет с заглушками. Новые пользователи как аудитория аналитических материалов. Придуманная платформа или источник событий."
+      ],
+      "allowed": [
+        "Синонимичное описание потери новых пользователей, включая воронку как описание процесса. Пустой вывод при соблюдении схемы всё равно пропускает указанную цель."
+      ],
+      "term_status": {
+        "deadline": "не указан",
+        "budget": "не указан"
+      },
+      "objective": {
+        "missing_fields": [
+          "budget",
+          "constraints",
+          "deadline",
+          "deliverables",
+          "target_audience"
+        ],
+        "value_fragments": {
+          "ru": {},
+          "en": {}
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-09-mugs",
+    "calibration": false,
+    "difficulty": "normal",
+    "sources": [
+      {
+        "ref": "tests/fixtures/brief_decoder_eval/deadline_status.json#BD-EN-PLAIN",
+        "date": "2026-11-18",
+        "date_basis": "git:06d79037",
+        "adaptation": "Сохранены пять описаний, примерный объём и срок без статуса. Аудитория, граница бюджета, данные о посудомоечной машине и ограничение на источники составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Напишите пять описаний наших керамических кружек для покупателей, которые выбирают подарки. Желательно около 150 слов на описание. Используйте только предоставленную спецификацию, пригодность для посудомоечной машины не подтверждена, её не обещайте. Срок: 3 марта. Бюджет: не больше 250 USD.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Write five descriptions for our ceramic mugs for shoppers buying gifts. Aim for about 150 words per description. Use only the supplied specification. Dishwasher compatibility is unconfirmed, so do not claim it. Deadline: March 3. Budget: no more than 250 USD.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Пять описаний кружек для покупателей подарков. Целевой объём около 150 слов на описание.",
+        "Только предоставленная спецификация. Пригодность для посудомоечной машины не подтверждена.",
+        "Дата 3 марта без уточнения статуса. Верхняя граница 250 USD."
+      ],
+      "required": [
+        "Сохранить товар, число описаний, аудиторию и приблизительность объёма на одно описание.",
+        "Зафиксировать ограничение на источник и запрет обещать пригодность для посудомоечной машины.",
+        "Оставить дату 3 марта без выдуманного статуса и передать 250 USD как предел."
+      ],
+      "prohibited": [
+        "Ровно 150 слов или 150 слов суммарно. Посудомоечная машина разрешена или категорически запрещена. Назначение 250 USD как согласованной фиксированной суммы. Срок подтверждён, желаем или не подтверждён."
+      ],
+      "allowed": [
+        "Описание заданного объёма в constraints или deliverables. Подходящие переформулировки слов «покупатели подарков»."
+      ],
+      "term_status": {
+        "deadline": "указан без статуса",
+        "budget": "верхний предел"
+      },
+      "objective": {
+        "missing_fields": [],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "3 марта"
+            ],
+            "budget": [
+              "250 USD"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "March 3"
+            ],
+            "budget": [
+              "250 USD"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-10-docs",
+    "calibration": false,
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/documentation/technical-writing-needed",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки Freelancer, project_id=40209482",
+        "adaptation": "По карточке подготовлен пересказ структуры комплекта. Платформенный бюджет не перенесён. Расхождения, контрольный релиз, дата, запрет на публикацию и разделение условий добавлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "source_text": "Для одного веб-продукта нужны понятные материалы для разработчиков и конечных пользователей. Подготовьте инструкцию по установке, руководство пользователя, обзор API, комментарии в коде, краткий журнал изменений и статью для базы знаний (около 800 слов). Статью готовим под Zendesk или Confluence, выбор ещё не сделали. Документы сдайте в Markdown и PDF. Если добавите изображения, отдайте их отдельно в PNG. Для истории правок предпочтителен Git, другой инструмент тоже подойдёт. Мы дадим тестовый доступ и спецификации. Команда поддержки просит, чтобы журнал изменений отмечал расхождения между тестовой версией и спецификацией, а если поведение нельзя проверить, говорил об этом прямо. Не публикуйте материалы в открытом доступе. Обязательная дата передачи комплекта: 2026-12-18. Бюджет согласуем после просмотра материала. При разборе брифа тоже укажите существенные противоречия.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "We need clear materials for developers and end users of one web product. Prepare an installation guide, user manual, API overview, inline code comments, a short changelog and a knowledge-base article of about 800 words. The article is for Zendesk or Confluence and we have not chosen between them. Deliver the documents in Markdown and PDF. If you add images, provide them separately as PNG files. We prefer Git for tracking edits, but another tool is fine. We will provide test access and specifications. The support team needs the changelog to flag discrepancies between the test version and the specification and to say when a behavior cannot be verified. Do not publish the materials publicly. The full package must be handed over by 2026-12-18. We will agree the budget after reviewing the material. When analyzing this brief, flag material discrepancies as well.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Один веб-продукт. Разработчики и конечные пользователи. Шесть типов материалов, статья около 800 слов, Zendesk или Confluence без решения.",
+        "Markdown и PDF, отдельный PNG при наличии изображений, Git предпочтителен, тестовый доступ и спецификации от клиента.",
+        "Журнал изменений отмечает расхождения и непроверяемое. Публичная публикация запрещена. Дедлайн обязателен, сумма не задана.",
+        "Последняя фраза адресована анализу, а не автору документации."
+      ],
+      "required": [
+        "Сохранить аудиторию, состав комплекта, примерный объём статьи, оба возможных CMS, оба формата и условность PNG.",
+        "Сохранить предпочтительность Git, входные материалы от заказчика и запрет публичной публикации.",
+        "Включить правило про расхождения и непроверяемость в журнале. Последнее указание про анализ исключить из требований к работе.",
+        "Привести обязательную дату 2026-12-18, цену отметить как отсутствующую."
+      ],
+      "prohibited": [
+        "Публиковать в Zendesk или Confluence. Обязательный Git либо обязательные изображения. Приписать заказчику фиксированный выбор CMS, сумму, отклонение или результат проверки. Перенести инструкцию к разбору как отдельный результат работы."
+      ],
+      "allowed": [
+        "Группирование однотипных файлов возможно при перечислении шести требуемых составляющих. Упоминание будущего согласования цены допустимо как обстоятельство, без извлечения значения budget."
+      ],
+      "term_status": {
+        "deadline": "обязательный",
+        "budget": "не указан"
+      },
+      "objective": {
+        "missing_fields": [
+          "budget"
+        ],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "2026-12-18"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "2026-12-18"
+            ]
+          }
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,40 @@
+{
+  "rule": "Try gpt-5.6-luna on medium; use gpt-6.2-sol on high if final technical failure or comparison verdict contradicts its returned statuses.",
+  "comparison": "Offline paired replay with observed costs and sum of measured waits when switching.",
+  "switches": [],
+  "summary": {
+    "cheaper": {
+      "good": 59,
+      "n": 90,
+      "cost_usd": "0.09266668",
+      "cost_per_good_usd": "0.001570621694915254237288135593",
+      "latency": {
+        "n": 90,
+        "p50_ms": 5273.0,
+        "p95_ms": 9860
+      }
+    },
+    "stronger": {
+      "good": 88,
+      "n": 90,
+      "cost_usd": "0.8259925",
+      "cost_per_good_usd": "0.009386278409090909090909090909",
+      "latency": {
+        "n": 90,
+        "p50_ms": 8406.5,
+        "p95_ms": 21438
+      }
+    },
+    "conditional": {
+      "good": 59,
+      "n": 90,
+      "cost_usd": "0.09266668",
+      "cost_per_good_usd": "0.001570621694915254237288135593",
+      "latency": {
+        "n": 90,
+        "p50_ms": 5273.0,
+        "p95_ms": 9860
+      }
+    }
+  }
+}

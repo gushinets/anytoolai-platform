@@ -1,0 +1,841 @@
+[
+  {
+    "case_id": "cuw-h01-ebook-accessibility",
+    "calibration": false,
+    "atom_id": "A07",
+    "prompt_ref": "client_update_writer.update_compose_reply.v1",
+    "scenario_case_id": "cuw-h01-ebook-accessibility",
+    "scenario_id": "client_update_writer.update_v1",
+    "scenario_probe": true,
+    "difficulty": "Длинный апдейт с этапами, сроками и коммерческими условиями.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/client_update_writer_eval/commercial_terms.json#V06-ru",
+        "date": "2026-11-06",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Сохранён тип проверки модальности. Ниша, этапы, числа, даты, ограничения и тексты составлены заново."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "warm",
+        "progress_notes": "Статус проверки доступности электронной книги. Из 8 глав полностью проверено 5, в 2 ещё идёт проверка, 1 не начата. В уже проверенных главах найдены таблицы без заголовков. Передайте, пожалуйста, исходники таблиц к главам 7 и 8 к 3 декабря 2026. После получения продолжится проверка. Финальная передача согласована на 10 декабря 2026. Если исходники придут позже 3 декабря, дату передачи нужно пересогласовать. Новая дата пока неизвестна. Договор: 820 EUR. Перевод вне объёма. Это апдейт без запроса оплаты.",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      },
+      "en": {
+        "tone": "warm",
+        "progress_notes": "E-book accessibility review update. Out of 8 chapters, 5 have been fully checked, 2 are being checked, and 1 has not been started. The completed checks found tables without headers. Please send the editable table files for chapters 7 and 8 by December 3, 2026. The review will continue once they arrive. Final delivery is agreed for December 10, 2026. If the table files arrive after December 3, the delivery date must be renegotiated. A new date is not yet known. Contract: EUR 820. Translation is outside scope. This update does not request payment.",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "situation": "Статус проверки доступности электронной книги. Из 8 глав полностью проверено 5, в 2 ещё идёт проверка, 1 не начата. В уже проверенных главах найдены таблицы без заголовков. Передайте, пожалуйста, исходники таблиц к главам 7 и 8 к 3 декабря 2026. После получения продолжится проверка. Финальная передача согласована на 10 декабря 2026. Если исходники придут позже 3 декабря, дату передачи нужно пересогласовать. Новая дата пока неизвестна. Договор: 820 EUR. Перевод вне объёма. Это апдейт без запроса оплаты.",
+        "intent": "Give the client a clear, concrete update on project progress and next steps.",
+        "tone": "warm",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      },
+      "en": {
+        "situation": "E-book accessibility review update. Out of 8 chapters, 5 have been fully checked, 2 are being checked, and 1 has not been started. The completed checks found tables without headers. Please send the editable table files for chapters 7 and 8 by December 3, 2026. The review will continue once they arrive. Final delivery is agreed for December 10, 2026. If the table files arrive after December 3, the delivery date must be renegotiated. A new date is not yet known. Contract: EUR 820. Translation is outside scope. This update does not request payment.",
+        "intent": "Give the client a clear, concrete update on project progress and next steps.",
+        "tone": "warm",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Проверка доступности из 8 глав: 5 готовы, 2 проверяются, 1 не начата.",
+        "Найдены таблицы без заголовков. Нужны редактируемые исходники таблиц для глав 7 и 8.",
+        "Исходники к 3 декабря 2026. Передача согласована на 10 декабря 2026. При опоздании нужна новая договорённость. Договор 820 EUR и перевод вне объёма."
+      ],
+      "required": [
+        "Переданы все три статуса с общим количеством глав и факт о заголовках таблиц.",
+        "Запрошены исходники для обеих глав с указанным сроком. После получения проверка продолжится.",
+        "Статус согласованной передачи и порядок пересогласования сохранены. Указаны договорная сумма и исключение перевода.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Выдуманные заголовки или точное количество дефектов. Другие числа, сроки или валюта. Оплата, счёт или обещание новой даты. Завершённый перевод."
+      ],
+      "allowed": [
+        "Даты можно написать в естественном порядке для локали, и код валюты можно поставить до или после суммы. Просьба передать исходники может стоять в text или call_to_action."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Проверка доступности из 8 глав: 5 готовы, 2 проверяются, 1 не начата.",
+        "Найдены таблицы без заголовков. Нужны редактируемые исходники таблиц для глав 7 и 8.",
+        "Исходники к 3 декабря 2026. Передача согласована на 10 декабря 2026. При опоздании нужна новая договорённость. Договор 820 EUR и перевод вне объёма."
+      ],
+      "required": [
+        "Переданы все три статуса с общим количеством глав и факт о заголовках таблиц.",
+        "Запрошены исходники для обеих глав с указанным сроком. После получения проверка продолжится.",
+        "Статус согласованной передачи и порядок пересогласования сохранены. Указаны договорная сумма и исключение перевода.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Выдуманные заголовки или точное количество дефектов. Другие числа, сроки или валюта. Оплата, счёт или обещание новой даты. Завершённый перевод."
+      ],
+      "allowed": [
+        "Даты можно написать в естественном порядке для локали, и код валюты можно поставить до или после суммы. Просьба передать исходники может стоять в text или call_to_action."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h02-illustration-preview",
+    "calibration": false,
+    "atom_id": "A07",
+    "prompt_ref": "client_update_writer.update_compose_reply.v1",
+    "scenario_case_id": "cuw-h02-illustration-preview",
+    "scenario_id": "client_update_writer.update_v1",
+    "scenario_probe": false,
+    "difficulty": "Короткий апдейт без просьбы к клиенту и календарного срока.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/client_update_writer_eval/final_variants.json#V01-ru",
+        "date": "2026-11-06",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Составлены новые этапы иллюстрации и короткий односторонний апдейт без блокера или запроса."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "neutral",
+        "progress_notes": "Первичная проверка иллюстрации закончена. Коррекция обрезки по краям продолжается. В следующем апдейте будет превью."
+      },
+      "en": {
+        "tone": "neutral",
+        "progress_notes": "The initial illustration review is complete. Work on fixing the edge crops continues. The next update will include a preview."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "situation": "Первичная проверка иллюстрации закончена. Коррекция обрезки по краям продолжается. В следующем апдейте будет превью.",
+        "intent": "Give the client a clear, concrete update on project progress and next steps.",
+        "tone": "neutral"
+      },
+      "en": {
+        "situation": "The initial illustration review is complete. Work on fixing the edge crops continues. The next update will include a preview.",
+        "intent": "Give the client a clear, concrete update on project progress and next steps.",
+        "tone": "neutral"
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Завершена первичная проверка, коррекция обрезки ещё идёт, превью будет в следующем апдейте."
+      ],
+      "required": [
+        "Апдейт сохраняет все три статуса и не содержит call_to_action.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Превью уже отправлено или иллюстрация завершена. Новые даты, просьбы или утверждение об отсутствии блокеров."
+      ],
+      "allowed": [
+        "Допустима компактная формулировка в одном абзаце."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Завершена первичная проверка, коррекция обрезки ещё идёт, превью будет в следующем апдейте."
+      ],
+      "required": [
+        "Апдейт сохраняет все три статуса и не содержит call_to_action.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Превью уже отправлено или иллюстрация завершена. Новые даты, просьбы или утверждение об отсутствии блокеров."
+      ],
+      "allowed": [
+        "Допустима компактная формулировка в одном абзаце."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h03-caption-gate",
+    "calibration": false,
+    "atom_id": "A07",
+    "prompt_ref": "client_update_writer.update_compose_reply.v1",
+    "scenario_case_id": "cuw-h03-caption-gate",
+    "scenario_id": "client_update_writer.update_v1",
+    "scenario_probe": false,
+    "difficulty": "Противоречие по готовности, условие релиза и граница конфиденциальности.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/client_update_writer_eval/privacy_boundary.json#MIX-en",
+        "date": "2026-11-06",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Сценарий, единицы, статусы и внутренние суммы составлены заново по типу проверки приватности."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "firm",
+        "progress_notes": "Апдейт по пакету субтитров. В трекере пакет отмечен готовым, но 2 из 9 проверок синхронизации не прошли. Клиент просил опубликовать пакет сегодня. По согласованному порядку публикация на паузе до прохождения всех проверок. Следом повторная проверка синхронизации, срок ещё неизвестен. Для неё нужен ваш актуальный мастер-файл. В трекере есть наши затраты 145 EUR и маржа 230 EUR. Эти частные сведения клиенту не раскрывать.",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text"
+        }
+      },
+      "en": {
+        "tone": "firm",
+        "progress_notes": "Subtitle pack update. The tracker marks the pack ready, but 2 of 9 timing checks failed. The client asked to publish the pack today. Under the agreed process, publication remains on hold until all checks pass. The next step is a timing recheck, with no ETA yet. It needs your latest master file. The tracker includes our private cost of EUR 145 and margin of EUR 230. Keep these figures private.",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text"
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "situation": "Апдейт по пакету субтитров. В трекере пакет отмечен готовым, но 2 из 9 проверок синхронизации не прошли. Клиент просил опубликовать пакет сегодня. По согласованному порядку публикация на паузе до прохождения всех проверок. Следом повторная проверка синхронизации, срок ещё неизвестен. Для неё нужен ваш актуальный мастер-файл. В трекере есть наши затраты 145 EUR и маржа 230 EUR. Эти частные сведения клиенту не раскрывать.",
+        "intent": "Give the client a clear, concrete update on project progress and next steps.",
+        "tone": "firm",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text"
+        }
+      },
+      "en": {
+        "situation": "Subtitle pack update. The tracker marks the pack ready, but 2 of 9 timing checks failed. The client asked to publish the pack today. Under the agreed process, publication remains on hold until all checks pass. The next step is a timing recheck, with no ETA yet. It needs your latest master file. The tracker includes our private cost of EUR 145 and margin of EUR 230. Keep these figures private.",
+        "intent": "Give the client a clear, concrete update on project progress and next steps.",
+        "tone": "firm",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text"
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Трекер утверждает готовность, но 2 из 9 проверок синхронизации провалены. Публикация запрошена сегодня, по согласованному порядку она на паузе.",
+        "Следующий шаг — повторная проверка, для неё нужен актуальный мастер-файл. Срок неизвестен.",
+        "Затраты и маржа приватны."
+      ],
+      "required": [
+        "Отдельно сохранены оба противоречия: готовность против проверок и запрос на сегодня против условия публикации.",
+        "Запрошен актуальный мастер-файл один раз. Обозначены повторная проверка и неизвестный срок.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Готовность, публикация, обещание срока. Раскрытие затрат, маржи, частной цифры или редакторской инструкции."
+      ],
+      "allowed": [
+        "Можно сказать «пакет пока нельзя публиковать» при сохранении условия прохождения всех проверок."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Трекер утверждает готовность, но 2 из 9 проверок синхронизации провалены. Публикация запрошена сегодня, по согласованному порядку она на паузе.",
+        "Следующий шаг — повторная проверка, для неё нужен актуальный мастер-файл. Срок неизвестен.",
+        "Затраты и маржа приватны."
+      ],
+      "required": [
+        "Отдельно сохранены оба противоречия: готовность против проверок и запрос на сегодня против условия публикации.",
+        "Запрошен актуальный мастер-файл один раз. Обозначены повторная проверка и неизвестный срок.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Готовность, публикация, обещание срока. Раскрытие затрат, маржи, частной цифры или редакторской инструкции."
+      ],
+      "allowed": [
+        "Можно сказать «пакет пока нельзя публиковать» при сохранении условия прохождения всех проверок."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h04-testimonials-rounds",
+    "calibration": false,
+    "atom_id": "A07",
+    "prompt_ref": "client_update_writer.reply_draft_compose_reply.v1",
+    "scenario_case_id": "cuw-h04-testimonials-rounds",
+    "scenario_id": "client_update_writer.reply_draft_v1",
+    "scenario_probe": true,
+    "difficulty": "Обсуждение клиентского объёма с явно принятым изменением.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#reply_draft",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Использован паттерн входа client_message/reply_goal. Переговоры, условия и даты составлены для holdout."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "warm",
+        "client_message": "Можем добавить второй раунд правок в текущую цену? Войдёт ли в него новый блок отзывов для страницы? Ранее согласовали сдачу на 10 декабря 2026.",
+        "reply_goal": "Подтвердить второй раунд в текущей цене. Новый блок отзывов в этот раунд не входит, его можно обсудить и оценить отдельно. Подтвердить согласованную сдачу 10 декабря 2026. Цену отдельной работы пока не обсуждали.",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 750
+        }
+      },
+      "en": {
+        "tone": "warm",
+        "client_message": "Can we include a second revision round in the current price? Will it cover a new testimonials section on the page? We previously agreed on December 10, 2026 for delivery.",
+        "reply_goal": "Confirm a second revision round at the current price. The new testimonials section is excluded from that round and can be discussed and estimated separately. Confirm the agreed delivery on December 10, 2026. The price of the separate work has not been discussed.",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 750
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "situation": "Можем добавить второй раунд правок в текущую цену? Войдёт ли в него новый блок отзывов для страницы? Ранее согласовали сдачу на 10 декабря 2026.",
+        "intent": "Подтвердить второй раунд в текущей цене. Новый блок отзывов в этот раунд не входит, его можно обсудить и оценить отдельно. Подтвердить согласованную сдачу 10 декабря 2026. Цену отдельной работы пока не обсуждали.",
+        "tone": "warm",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 750
+        }
+      },
+      "en": {
+        "situation": "Can we include a second revision round in the current price? Will it cover a new testimonials section on the page? We previously agreed on December 10, 2026 for delivery.",
+        "intent": "Confirm a second revision round at the current price. The new testimonials section is excluded from that round and can be discussed and estimated separately. Confirm the agreed delivery on December 10, 2026. The price of the separate work has not been discussed.",
+        "tone": "warm",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 750
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Второй раунд принят в текущей цене. Блок отзывов исключён из него, возможны отдельное обсуждение и оценка.",
+        "Сдача согласована на 10 декабря 2026. Сумма допработ неизвестна."
+      ],
+      "required": [
+        "Дан прямой ответ на каждый запрос с правильным статусом. Назван именно новый блок отзывов.",
+        "Подтверждена исходная дата без нового требования подтвердить её.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Смешение согласованного раунда и блока отзывов. Выдуманные цена, сроки, объём или условие подтверждения."
+      ],
+      "allowed": [
+        "Можно сказать об отдельной оценке как о возможном шаге. Активная просьба к клиенту не требуется."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Второй раунд принят в текущей цене. Блок отзывов исключён из него, возможны отдельное обсуждение и оценка.",
+        "Сдача согласована на 10 декабря 2026. Сумма допработ неизвестна."
+      ],
+      "required": [
+        "Дан прямой ответ на каждый запрос с правильным статусом. Назван именно новый блок отзывов.",
+        "Подтверждена исходная дата без нового требования подтвердить её.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Смешение согласованного раунда и блока отзывов. Выдуманные цена, сроки, объём или условие подтверждения."
+      ],
+      "allowed": [
+        "Можно сказать об отдельной оценке как о возможном шаге. Активная просьба к клиенту не требуется."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h05-call-time",
+    "calibration": false,
+    "atom_id": "A07",
+    "prompt_ref": "client_update_writer.reply_draft_compose_reply.v1",
+    "scenario_case_id": "cuw-h05-call-time",
+    "scenario_id": "client_update_writer.reply_draft_v1",
+    "scenario_probe": false,
+    "difficulty": "Короткий конкретный ответ с точным часовым поясом.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#reply_draft",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "По контракту ответа составлен короткий вопрос и единственный слот без дополнительных договорённостей."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "neutral",
+        "client_message": "Во сколько вам удобно созвониться?",
+        "reply_goal": "Ответить, что мне подходит 3 декабря 2026 в 15:30 UTC."
+      },
+      "en": {
+        "tone": "neutral",
+        "client_message": "What time works for you for a call?",
+        "reply_goal": "Say that December 3, 2026 at 15:30 UTC works for me."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "situation": "Во сколько вам удобно созвониться?",
+        "intent": "Ответить, что мне подходит 3 декабря 2026 в 15:30 UTC.",
+        "tone": "neutral"
+      },
+      "en": {
+        "situation": "What time works for you for a call?",
+        "intent": "Say that December 3, 2026 at 15:30 UTC works for me.",
+        "tone": "neutral"
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Только один подходящий слот, 3 декабря 2026 в 15:30 UTC."
+      ],
+      "required": [
+        "Сообщить дату и время с UTC как доступность исполнителя, без просьбы согласиться.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Утверждение о назначенной встрече, смена часового пояса, новая длительность, ссылка или телефон."
+      ],
+      "allowed": [
+        "Допустим формат 3:30 p.m. UTC для EN."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Только один подходящий слот, 3 декабря 2026 в 15:30 UTC."
+      ],
+      "required": [
+        "Сообщить дату и время с UTC как доступность исполнителя, без просьбы согласиться.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Утверждение о назначенной встрече, смена часового пояса, новая длительность, ссылка или телефон."
+      ],
+      "allowed": [
+        "Допустим формат 3:30 p.m. UTC для EN."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h06-catalogue-launch",
+    "calibration": false,
+    "atom_id": "A07",
+    "prompt_ref": "client_update_writer.reply_draft_compose_reply.v1",
+    "scenario_case_id": "cuw-h06-catalogue-launch",
+    "scenario_id": "client_update_writer.reply_draft_v1",
+    "scenario_probe": false,
+    "difficulty": "Неполный объём, явный отказ от срока и предложение с двумя условиями.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#reply_draft",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Проверка конкретного ответа по входному сообщению. Ситуация, условия и даты составлены заново."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "firm",
+        "client_message": "Опубликуйте теперь каталог 5 декабря 2026, добавьте новый прайс-лист PDF и новую страницу для опта. Как насчёт этого?",
+        "reply_goal": "Прямо отклонить публикацию 5 декабря. Предложить публикацию 8 декабря 2026 при условии, что к 3 декабря 2026 вы предоставите доступ редактора и утверждённый PDF-прайс. PDF входит в обновление. Страницу для опта можно обсудить и оценить отдельно, в это обновление она не входит. Попросить прислать доступ и PDF.",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      },
+      "en": {
+        "tone": "firm",
+        "client_message": "Please publish the catalogue on December 5, 2026, add the new PDF price list and add a new wholesale page. Can you do that?",
+        "reply_goal": "Explicitly decline publication on December 5. Offer publication on December 8, 2026 if you provide editor access and the approved PDF price list by December 3, 2026. The PDF is included in the update. The wholesale page can be discussed and estimated separately and is excluded from this update. Ask for the access and PDF.",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "situation": "Опубликуйте теперь каталог 5 декабря 2026, добавьте новый прайс-лист PDF и новую страницу для опта. Как насчёт этого?",
+        "intent": "Прямо отклонить публикацию 5 декабря. Предложить публикацию 8 декабря 2026 при условии, что к 3 декабря 2026 вы предоставите доступ редактора и утверждённый PDF-прайс. PDF входит в обновление. Страницу для опта можно обсудить и оценить отдельно, в это обновление она не входит. Попросить прислать доступ и PDF.",
+        "tone": "firm",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      },
+      "en": {
+        "situation": "Please publish the catalogue on December 5, 2026, add the new PDF price list and add a new wholesale page. Can you do that?",
+        "intent": "Explicitly decline publication on December 5. Offer publication on December 8, 2026 if you provide editor access and the approved PDF price list by December 3, 2026. The PDF is included in the update. The wholesale page can be discussed and estimated separately and is excluded from this update. Ask for the access and PDF.",
+        "tone": "firm",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "5 декабря отклонено, 8 декабря предложено с двумя условиями к 3 декабря 2026.",
+        "Включён PDF-прайс. Страница для опта исключена из обновления и обсуждается отдельно."
+      ],
+      "required": [
+        "Приведены точные даты и их статусы: отказ, предложение с условием и срок получения материалов.",
+        "PDF назван частью обновления, а оптовая страница отдельным вопросом. Просьба передать доступ и утверждённый PDF прозвучала один раз.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Публикация без условий или дата как уже согласованная. Включение страницы для опта, выдуманная цена, ссылка или материал."
+      ],
+      "allowed": [
+        "Просьба может быть в text или call_to_action, без повторения."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "5 декабря отклонено, 8 декабря предложено с двумя условиями к 3 декабря 2026.",
+        "Включён PDF-прайс. Страница для опта исключена из обновления и обсуждается отдельно."
+      ],
+      "required": [
+        "Приведены точные даты и их статусы: отказ, предложение с условием и срок получения материалов.",
+        "PDF назван частью обновления, а оптовая страница отдельным вопросом. Просьба передать доступ и утверждённый PDF прозвучала один раз.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Публикация без условий или дата как уже согласованная. Включение страницы для опта, выдуманная цена, ссылка или материал."
+      ],
+      "allowed": [
+        "Просьба может быть в text или call_to_action, без повторения."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h07-audio-deposit-remainder",
+    "calibration": false,
+    "atom_id": "A06",
+    "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+    "scenario_case_id": "cuw-h07-audio-deposit-remainder",
+    "scenario_id": "client_update_writer.prepaid_request_v1",
+    "scenario_probe": true,
+    "difficulty": "Аванс с частичной оплатой, сроком и отдельным платежом.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#prepaid_request",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "От базовой проверки согласованного аванса взят тип сообщения. Предмет, остаток, суммы и даты составлены для опыта."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "neutral",
+        "billing_context": {
+          "notes": "Согласован аванс за очистку звука для аудиогида. Из аванса 900 EUR получено 250 EUR, остаток аванса 650 EUR должен поступить к 9 декабря 2026. Согласовано, что очистка начнётся после поступления остатка. Отдельная оплата 400 EUR за финальную сборку согласована после передачи, к остатку этого аванса она не относится.",
+          "amount": "900 EUR",
+          "due_date": "9 декабря 2026"
+        },
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1000
+        }
+      },
+      "en": {
+        "tone": "neutral",
+        "billing_context": {
+          "notes": "A deposit has been agreed for audio cleanup on the audio guide. EUR 250 of the EUR 900 deposit was received, and the remaining EUR 650 deposit is due by December 9, 2026. Audio cleanup is agreed to start after the remaining deposit arrives. A separate EUR 400 payment for final assembly is agreed for after handover and is unrelated to this remaining deposit.",
+          "amount": "EUR 900",
+          "due_date": "December 9, 2026"
+        },
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1000
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "context": {
+          "notes": "Согласован аванс за очистку звука для аудиогида. Из аванса 900 EUR получено 250 EUR, остаток аванса 650 EUR должен поступить к 9 декабря 2026. Согласовано, что очистка начнётся после поступления остатка. Отдельная оплата 400 EUR за финальную сборку согласована после передачи, к остатку этого аванса она не относится.",
+          "amount": "900 EUR",
+          "due_date": "9 декабря 2026"
+        },
+        "objective": "Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context.",
+        "constraints": {
+          "tone": "neutral",
+          "language": "ru",
+          "length": 1000,
+          "format": "plain_text"
+        }
+      },
+      "en": {
+        "context": {
+          "notes": "A deposit has been agreed for audio cleanup on the audio guide. EUR 250 of the EUR 900 deposit was received, and the remaining EUR 650 deposit is due by December 9, 2026. Audio cleanup is agreed to start after the remaining deposit arrives. A separate EUR 400 payment for final assembly is agreed for after handover and is unrelated to this remaining deposit.",
+          "amount": "EUR 900",
+          "due_date": "December 9, 2026"
+        },
+        "objective": "Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context.",
+        "constraints": {
+          "tone": "neutral",
+          "language": "en",
+          "length": 1000,
+          "format": "plain_text"
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Получено 250 EUR из аванса 900 EUR. Осталось 650 EUR до 9 декабря 2026.",
+        "Очистка звука стартует после остатка. Ещё 400 EUR за финальную сборку платятся отдельно после передачи."
+      ],
+      "required": [
+        "Вежливо и прямо просит перечислить только 650 EUR с указанным сроком.",
+        "Поясняет предмет, полученную сумму и согласованное условие старта. Отдельные 400 EUR сохранены как отдельный платёж после передачи.",
+        "Просит дать знать после отправки платежа.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Требование уплатить 900 или 400 EUR сейчас, произвольная валюта, другой срок, способ платежа, реквизиты, номер счёта, просьба подтвердить получение денег."
+      ],
+      "allowed": [
+        "Порядок суммы и валюты и формат даты можно адаптировать к локали."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Получено 250 EUR из аванса 900 EUR. Осталось 650 EUR до 9 декабря 2026.",
+        "Очистка звука стартует после остатка. Ещё 400 EUR за финальную сборку платятся отдельно после передачи."
+      ],
+      "required": [
+        "Вежливо и прямо просит перечислить только 650 EUR с указанным сроком.",
+        "Поясняет предмет, полученную сумму и согласованное условие старта. Отдельные 400 EUR сохранены как отдельный платёж после передачи.",
+        "Просит дать знать после отправки платежа.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "В итоговом артефакте готовое сообщение находится в text."
+      ],
+      "prohibited": [
+        "Требование уплатить 900 или 400 EUR сейчас, произвольная валюта, другой срок, способ платежа, реквизиты, номер счёта, просьба подтвердить получение денег."
+      ],
+      "allowed": [
+        "Порядок суммы и валюты и формат даты можно адаптировать к локали."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h08-unresolved-share-base",
+    "calibration": false,
+    "atom_id": "A06",
+    "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+    "scenario_case_id": "cuw-h08-unresolved-share-base",
+    "scenario_id": "client_update_writer.prepaid_request_v1",
+    "scenario_probe": false,
+    "difficulty": "Согласованный процент, две обсуждаемые базы и открытая сумма.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#prepaid_request",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Из контракта запроса аванса составлен новый пограничный случай с двумя действующими суммами."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "warm",
+        "billing_context": {
+          "notes": "Аванс за разработку набора иконок согласован как 40% от итоговой цены. Итоговую цену пока обсуждаем. Возможны 1 800 EUR и 2 200 EUR. Дополнительные иллюстрации согласованно вне объёма набора. Дата аванса согласована на 12 декабря 2026.",
+          "amount": "40% от итоговой цены",
+          "due_date": "12 декабря 2026"
+        },
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text"
+        }
+      },
+      "en": {
+        "tone": "warm",
+        "billing_context": {
+          "notes": "The deposit for creating the icon set is agreed at 40% of the final price. The final price is still under discussion, with EUR 1,800 and EUR 2,200 as current options. Additional illustrations are agreed to be outside the scope of the set. The deposit date is agreed for December 12, 2026.",
+          "amount": "40% of the final price",
+          "due_date": "December 12, 2026"
+        },
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text"
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "context": {
+          "notes": "Аванс за разработку набора иконок согласован как 40% от итоговой цены. Итоговую цену пока обсуждаем. Возможны 1 800 EUR и 2 200 EUR. Дополнительные иллюстрации согласованно вне объёма набора. Дата аванса согласована на 12 декабря 2026.",
+          "amount": "40% от итоговой цены",
+          "due_date": "12 декабря 2026"
+        },
+        "objective": "Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context.",
+        "constraints": {
+          "tone": "warm",
+          "language": "ru",
+          "format": "plain_text"
+        }
+      },
+      "en": {
+        "context": {
+          "notes": "The deposit for creating the icon set is agreed at 40% of the final price. The final price is still under discussion, with EUR 1,800 and EUR 2,200 as current options. Additional illustrations are agreed to be outside the scope of the set. The deposit date is agreed for December 12, 2026.",
+          "amount": "40% of the final price",
+          "due_date": "December 12, 2026"
+        },
+        "objective": "Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context.",
+        "constraints": {
+          "tone": "warm",
+          "language": "en",
+          "format": "plain_text"
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Две текущие базы 1 800 EUR и 2 200 EUR обсуждаются. 40% и 12 декабря 2026 согласованы. Иллюстрации вне объёма."
+      ],
+      "required": [
+        "Просит подтвердить только открытый вопрос об итоговой цене или сумме аванса. Называет обе базы спорными вариантами.",
+        "Сохраняет согласованные 40%, дату и границу работ как контекст. Просит ответ по открытому вопросу без запроса платежа.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Выбор базы наугад, запрос любой суммы или условное обещание запроса, повторное согласование процента или даты, просьба сообщить об оплате."
+      ],
+      "allowed": [
+        "Можно попросить подтвердить итоговую цену и тем самым определить аванс, не вычисляя и не запрашивая спорный платёж."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Две текущие базы 1 800 EUR и 2 200 EUR обсуждаются. 40% и 12 декабря 2026 согласованы. Иллюстрации вне объёма."
+      ],
+      "required": [
+        "Просит подтвердить только открытый вопрос об итоговой цене или сумме аванса. Называет обе базы спорными вариантами.",
+        "Сохраняет согласованные 40%, дату и границу работ как контекст. Просит ответ по открытому вопросу без запроса платежа.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "В итоговом артефакте готовое сообщение находится в text."
+      ],
+      "prohibited": [
+        "Выбор базы наугад, запрос любой суммы или условное обещание запроса, повторное согласование процента или даты, просьба сообщить об оплате."
+      ],
+      "allowed": [
+        "Можно попросить подтвердить итоговую цену и тем самым определить аванс, не вычисляя и не запрашивая спорный платёж."
+      ]
+    }
+  },
+  {
+    "case_id": "cuw-h09-settled-advance",
+    "calibration": false,
+    "atom_id": "A06",
+    "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+    "scenario_case_id": "cuw-h09-settled-advance",
+    "scenario_id": "client_update_writer.prepaid_request_v1",
+    "scenario_probe": false,
+    "difficulty": "Короткое подтверждение полного расчёта при устаревших полях.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#prepaid_request",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Из паттерна платёжного сообщения составлен новый кейс, в котором исходная потребность в авансе уже закрыта."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "tone": "warm",
+        "billing_context": {
+          "notes": "Аванс за проверку макетов полностью получен. Остаток по авансу — ноль, споров нет.",
+          "amount": "уточняется",
+          "due_date": "уточняется"
+        }
+      },
+      "en": {
+        "tone": "warm",
+        "billing_context": {
+          "notes": "The deposit for reviewing the mockups has been received in full. There is no remaining deposit balance and nothing is disputed.",
+          "amount": "TBD",
+          "due_date": "TBD"
+        }
+      }
+    },
+    "inputs": {
+      "ru": {
+        "context": {
+          "notes": "Аванс за проверку макетов полностью получен. Остаток по авансу — ноль, споров нет.",
+          "amount": "уточняется",
+          "due_date": "уточняется"
+        },
+        "objective": "Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context.",
+        "constraints": {
+          "tone": "warm"
+        }
+      },
+      "en": {
+        "context": {
+          "notes": "The deposit for reviewing the mockups has been received in full. There is no remaining deposit balance and nothing is disputed.",
+          "amount": "TBD",
+          "due_date": "TBD"
+        },
+        "objective": "Write the final prepayment message the billing notes call for, following the prompt rules, using only the stated context.",
+        "constraints": {
+          "tone": "warm"
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Аванс за проверку макетов внесён полностью, остаток ноль, спорных условий нет."
+      ],
+      "required": [
+        "Короткое подтверждение полного получения или благодарность за перечисленный аванс. Обращение непосредственно к клиенту.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Запрос платежа, срока, подтверждения условий или уведомления об оплате. Выдуманная сумма или новое обещание работы."
+      ],
+      "allowed": [
+        "Достаточно подтвердить, что аванс уже получен полностью."
+      ]
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Аванс за проверку макетов внесён полностью, остаток ноль, спорных условий нет."
+      ],
+      "required": [
+        "Короткое подтверждение полного получения или благодарность за перечисленный аванс. Обращение непосредственно к клиенту.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "В итоговом артефакте готовое сообщение находится в text."
+      ],
+      "prohibited": [
+        "Запрос платежа, срока, подтверждения условий или уведомления об оплате. Выдуманная сумма или новое обещание работы."
+      ],
+      "allowed": [
+        "Достаточно подтвердить, что аванс уже получен полностью."
+      ]
+    }
+  }
+]
