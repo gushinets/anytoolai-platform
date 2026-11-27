@@ -163,6 +163,21 @@ The review tool now uses a single private presentation contract for both modes:
   result for this revision still needs CI verification. No runtime prompt, model or stored
   live output was changed, and no additional paid calls were made.
 
+### Third code review round: termination lifecycle
+
+The offline review CLI returned through its dispatcher before the collector's SIGTERM
+handler was installed. Review now owns its termination handler at its common CLI entry
+point; both direct and dispatched review commands unwind the private directory on catchable
+SIGTERM, exit with status 143, and restore the previous handler. Saved verdicts remain
+intact and an unfinished run remains pending. Forced termination that cannot be intercepted
+(for example SIGKILL or Windows TerminateProcess) cannot guarantee cleanup of a temporary
+file; the private directory and owner-only POSIX file permissions remain the boundary.
+Real child-process SIGTERM tests cover both CLI entry paths after a partial verdict has
+been saved, verify removal of the file and directory, and compare the persisted verdict
+bytes before and after termination. No paid evaluations or product runtime changes are needed.
+All 423 focused evaluation, product, prompt and API tests passed, with config, architecture,
+documentation and whitespace validation also passing.
+
 ## Handoff
 
 The scoped implementation is ready for owner review. All eighteen targeted payment requests

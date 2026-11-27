@@ -4,7 +4,10 @@ import hashlib
 import importlib.util
 import json
 import os
+import signal
+import subprocess
 import sys
+import time
 import zipfile
 from copy import deepcopy
 from pathlib import Path
@@ -669,6 +672,74 @@ def test_collector_dispatches_offline_review_without_docker():
         eval_module.main(["review", "--reviewer", "Putilin", "--directory", "results"])
     offline.assert_called_once_with(["--reviewer", "Putilin", "--directory", "results"])
     collect.assert_not_called()
+
+
+def test_review_main_restores_previous_sigterm_handler():
+    previous = signal.getsignal(signal.SIGTERM)
+
+    def terminate(*_args):
+        handler = signal.getsignal(signal.SIGTERM)
+        assert handler is review_module.interrupt_review
+        handler(signal.SIGTERM, None)
+
+    with (
+        patch.object(review_module, "review", side_effect=terminate),
+        pytest.raises(SystemExit) as stopped,
+    ):
+        review_module.main(["--directory", ".", "--reviewer", "Putilin"])
+    assert stopped.value.code == 128 + signal.SIGTERM
+    assert signal.getsignal(signal.SIGTERM) == previous
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Windows forced process termination is not catchable SIGTERM")
+@pytest.mark.parametrize("entrypoint", [
+    ["client_update_writer_review.py"],
+    ["client_update_writer_eval.py", "review"],
+])
+def test_sigterm_removes_private_review_file_and_preserves_saved_verdict(tmp_path, entrypoint):
+    directory, run = review_directory(tmp_path, questions=["Ready?", "Dates?"])
+    private_root = tmp_path / "private"
+    private_root.mkdir()
+    console = tmp_path / "console.log"
+    script, *subcommand = entrypoint
+    env = {**os.environ, "TMPDIR": str(private_root), "PYTHONIOENCODING": "utf-8",
+           "LITELLM_LOCAL_MODEL_COST_MAP": "True"}
+    command = [sys.executable, "-u", str(ROOT / "scripts/agent" / script), *subcommand,
+               "--directory", str(directory), "--reviewer", "Putilin"]
+    with console.open("w", encoding="utf-8") as log, subprocess.Popen(
+        command, stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", env=env, cwd=ROOT,
+    ) as process:
+        def wait_for_prompt(prompt):
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                text = console.read_text(encoding="utf-8", errors="replace")
+                if prompt in text:
+                    return text
+                if process.poll() is not None:
+                    pytest.fail(f"Review exited before prompt: {text}")
+                time.sleep(0.02)
+            pytest.fail(f"Timed out waiting for {prompt}: {console.read_text(encoding='utf-8', errors='replace')}")
+
+        try:
+            output = wait_for_prompt("Пункт 1/2")
+            [path] = private_root.glob("anytoolai-review-*/case.txt")
+            assert "Internal complete; tests fail." in path.read_text(encoding="utf-8")
+            assert "Internal complete; tests fail." not in output
+            assert process.stdin is not None
+            process.stdin.write("y\n")
+            process.stdin.flush()
+            wait_for_prompt("Пункт 2/2")
+            before = (directory / "verdicts.jsonl").read_bytes()
+            process.terminate()
+            assert process.wait(timeout=10) == 128 + signal.SIGTERM
+            assert not path.parent.exists()
+            assert (directory / "verdicts.jsonl").read_bytes() == before
+            assert report_module.human_status(run, saved_verdict(directory))[0] == "PENDING"
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
 
 
 def experiment_manifests():

@@ -10,7 +10,8 @@ python scripts/agent/client_update_writer_eval.py review \
 Decisions append to verdicts.jsonl, which the existing report command consumes.
 No provider calls. Open the temporary local review file printed for each run before
 answering its numbered criteria. Full input, output, criteria and matching agent observations
-are displayed in that file, not on stdout. The file is removed when the run's review ends.
+are displayed in that file, not on stdout. Cleanup also runs on catchable SIGTERM;
+forced process termination (such as SIGKILL) cannot unwind Python context managers.
 Agent observations are shown separately, never accepted automatically.
 """
 
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import tempfile
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -216,18 +218,26 @@ def _review_answers(run: dict, row: dict, save: Callable[[dict], None]) -> None:
     print(f"Итог: {human_status(run, row)[0]}")
 
 
+def interrupt_review(signum, _frame) -> None:
+    # Unwind the active private review directory while preserving a termination exit status.
+    raise SystemExit(128 + signum)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
     parser.add_argument("--reviewer", required=True)
     parser.add_argument("--series", help="Only review this configuration, e.g. sol-medium")
     args = parser.parse_args(argv)
+    previous_handler = signal.signal(signal.SIGTERM, interrupt_review)
     try:
         review(args.directory, args.reviewer, args.series)
     except (ReviewStopped, EOFError, KeyboardInterrupt):
         print("\nПроверка остановлена. Сохранённые решения останутся при следующем запуске.")
     except (ValueError, OSError) as exc:
         parser.exit(2, f"Ошибка: {exc}\n")
+    finally:
+        signal.signal(signal.SIGTERM, previous_handler)
 
 
 if __name__ == "__main__":
