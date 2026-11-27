@@ -79,6 +79,13 @@ closed if a declared ref has no matching class, since `platform-core` must not i
 
 A failed cross-validation is a PydanticAI validation retry, so the model gets another attempt before the user sees an error.
 
+## A07 `text.compose_reply` output layout
+
+Callers set `output_layout: single_text` to request the complete client message in `text`,
+including any requests. A07 rejects a separate `call_to_action` with a validation retry.
+With the layout omitted, the optional action field is available. The output schema
+continues to accept both layouts so existing results stay readable.
+
 ## A03 `text.score_multidimensional_axes` contract
 
 Strict, closed (`additionalProperties: false`) schemas — `kernel.schemas.score_multidim_input_v1` / `kernel.schemas.score_multidim_output_v1`:

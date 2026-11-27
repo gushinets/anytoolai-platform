@@ -1,0 +1,3048 @@
+{
+  "issue": "ANY-851",
+  "date": "2026-11-25",
+  "reviewer": "Codex agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form backed by an isolated live-provider stack.",
+    "base_source_sha": "d449c1ecd8b4ceedc15e9acbe2f004a1b4e3b362",
+    "profile_fingerprint": "53000fc10be54c19324429e7f94e7836ef73a20097986b521ecfab5e38821ea7",
+    "prompt_sha256": {
+      "reply_draft_compose_reply.v1.md": "23b5ddc8f93c7a30ce5752ed5e9e2f0a3acecd34b0d456ac933bce717066947c",
+      "update_compose_reply.v1.md": "129e91c92b206644b321a583e9f5d0b36e7658d6370e035aeec3480586de9c1e"
+    },
+    "configured_reasoning_effort": "medium"
+  },
+  "runs": [
+    {
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626120751002729_0000000030_8aba6b0e0be048e0a5a68db6ef87ec81",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Для лендинга студии йоги главный экран и расписание готовы, разделы с тренерами и ценами в работе. Всё идёт по плану. Первую версию покажу в пятницу."
+      },
+      "visible_text": "Для лендинга студии йоги главный экран и расписание готовы, разделы с тренерами и ценами в работе. Всё идёт по плану. Первую версию покажу в пятницу.",
+      "copied_text": "Для лендинга студии йоги главный экран и расписание готовы, разделы с тренерами и ценами в работе. Всё идёт по плану. Первую версию покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the project, milestones, remaining sections, schedule and first-person Friday delivery; the paired warm text opens more personally."
+    },
+    {
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626073733103582_0000000009_9702c900810542aab2c5ad5c23f454ad",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Отличная новость: для лендинга студии йоги уже готовы главный экран и расписание. Тренеры и цены сейчас в работе. Всё идёт по плану; первую версию покажу в пятницу."
+      },
+      "visible_text": "Отличная новость: для лендинга студии йоги уже готовы главный экран и расписание. Тренеры и цены сейчас в работе. Всё идёт по плану; первую версию покажу в пятницу.",
+      "copied_text": "Отличная новость: для лендинга студии йоги уже готовы главный экран и расписание. Тренеры и цены сейчас в работе. Всё идёт по плану; первую версию покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Friendly opening ties the progress to the completed screen and schedule. «Покажу» preserves the freelancer's Friday commitment."
+    },
+    {
+      "id": "S2-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626120702009333_0000000027_829648772bc94a1ba0a39d075f7f4395",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвинулся на три дня: фотографии тренеров не поступали от вас в течение недели. Новая дата первой версии — вторник."
+      },
+      "visible_text": "Срок первой версии сдвинулся на три дня: фотографии тренеров не поступали от вас в течение недели. Новая дата первой версии — вторник.",
+      "copied_text": "Срок первой версии сдвинулся на три дня: фотографии тренеров не поступали от вас в течение недели. Новая дата первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm does.",
+          "verdict": "FAIL",
+          "reason": "The update reports only the delay and new date. It never asks the client to send the photos."
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "FAIL",
+          "reason": "The update reports only the delay and new date. It never asks the client to send the photos."
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the client as the source of the missing photos, three-day shift and Tuesday, but provides no request."
+    },
+    {
+      "id": "S2-firm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626120587601719_0000000024_3b1eb5c4fa0f4751aa085612b95a3c2a",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня: вы не присылали фотографии тренеров в течение недели. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня: вы не присылали фотографии тренеров в течение недели. Новый срок первой версии — вторник.",
+      "copied_text": "Срок первой версии сдвигается на три дня: вы не присылали фотографии тренеров в течение недели. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "FAIL",
+          "reason": "The update reports only the delay and new date. It never asks the client to send the photos."
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "FAIL",
+          "reason": "The update reports only the delay and new date. It never asks the client to send the photos."
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the client as the source of the missing photos, three-day shift and Tuesday, but provides no request."
+    },
+    {
+      "id": "S7-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626128836833290_0000000036_ef09ace243ac421eb4c69c10cdca23b1",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок подготовки первой версии сдвигается на три дня, поскольку клиент неделю не присылал фотографии тренеров. Новая дата первой версии — вторник."
+      },
+      "visible_text": "Срок подготовки первой версии сдвигается на три дня, поскольку клиент неделю не присылал фотографии тренеров. Новая дата первой версии — вторник.",
+      "copied_text": "Срок подготовки первой версии сдвигается на три дня, поскольку клиент неделю не присылал фотографии тренеров. Новая дата первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm and S2-firm.",
+          "verdict": "FAIL",
+          "reason": "The update reports only the delay and new date. It never asks the client to send the photos."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "FAIL",
+          "reason": "The update reports only the delay and new date. It never asks the client to send the photos."
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the client as the source of the missing photos, three-day shift and Tuesday, but provides no request."
+    },
+    {
+      "id": "S1-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626134025744553_0000000043_0fabe60baf4d4db1896074478e06d622",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The landing page for the yoga studio: the main screen and schedule are ready, and the trainers and pricing sections are in progress. Everything is on track. I’ll show you the first version on Friday."
+      },
+      "visible_text": "The landing page for the yoga studio: the main screen and schedule are ready, and the trainers and pricing sections are in progress. Everything is on track. I’ll show you the first version on Friday.",
+      "copied_text": "The landing page for the yoga studio: the main screen and schedule are ready, and the trainers and pricing sections are in progress. Everything is on track. I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the yoga studio landing page, completed and ongoing parts, on-track schedule and ‘I’ll show’ on Friday."
+    },
+    {
+      "id": "S1-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626138603811835_0000000049_f0317351e2a2487a80d1c5def515729b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. The trainers and pricing sections are in progress. Everything is on track, and I'll show you the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. The trainers and pricing sections are in progress. Everything is on track, and I'll show you the first version on Friday.",
+      "copied_text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. The trainers and pricing sections are in progress. Everything is on track, and I'll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Adds a milestone-based warm phrase while retaining the same project, progress and first-person Friday delivery."
+    },
+    {
+      "id": "S2-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626142593700508_0000000055_6339493f8f03493f813cf42baa14afb9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is moving back by three days because the trainer photos have not come through from you for a week. The new deadline for the first version is Tuesday. Please send the trainer photos so I can proceed."
+      },
+      "visible_text": "The first version is moving back by three days because the trainer photos have not come through from you for a week. The new deadline for the first version is Tuesday. Please send the trainer photos so I can proceed.",
+      "copied_text": "The first version is moving back by three days because the trainer photos have not come through from you for a week. The new deadline for the first version is Tuesday. Please send the trainer photos so I can proceed.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-en does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Names the client as the source of the missing photos and asks for them once without adding a client deadline. The shift and Tuesday are intact."
+    },
+    {
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626145969229285_0000000061_18661d226d67433f900c65df70df9eb4",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos have not been sent for a week. Please send the trainer photos. The new deadline for the first version is Tuesday."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos have not been sent for a week. Please send the trainer photos. The new deadline for the first version is Tuesday.",
+      "copied_text": "The first version is delayed by three days because the trainer photos have not been sent for a week. Please send the trainer photos. The new deadline for the first version is Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "FAIL",
+          "reason": "‘Have not been sent for a week’ drops the client as the actor of the earlier non-send."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Asks for the photos once and keeps the dates. The passive cause no longer states that the client had not sent them."
+    },
+    {
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626151013896857_0000000068_9e0b4dcfb2da46838f1c53305617db3b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version deadline has moved back by three days to Tuesday because I haven’t received the trainer photos from you for a week. Please send the trainer photos."
+      },
+      "visible_text": "The first version deadline has moved back by three days to Tuesday because I haven’t received the trainer photos from you for a week. Please send the trainer photos.",
+      "copied_text": "The first version deadline has moved back by three days to Tuesday because I haven’t received the trainer photos from you for a week. Please send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "FAIL",
+          "reason": "‘I haven’t received’ supplies a recipient the progress notes do not name."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the shift, cause, Tuesday and one request. The update adds a first-person recipient."
+    },
+    {
+      "id": "S1-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626152478725323_0000000073_09adcc364beb4e7abe384a3d7b301a60",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos; las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos; las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos; las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the project and status and says «Mostraré la primera versión el viernes»."
+    },
+    {
+      "id": "S1-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626156104595599_0000000079_c13621dc5d074fd4aa320e19c668464f",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga ya están listos; es un buen avance. Las secciones de entrenadores y precios siguen en curso. Todo va según lo previsto. Presentaré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga ya están listos; es un buen avance. Las secciones de entrenadores y precios siguen en curso. Todo va según lo previsto. Presentaré la primera versión el viernes.",
+      "copied_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga ya están listos; es un buen avance. Las secciones de entrenadores y precios siguen en curso. Todo va según lo previsto. Presentaré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The freelancer explicitly says in first-person singular that they will show the first version on Friday. A passive without a stated actor fails this criterion.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Uses «un buen avance» in the opening and retains first-person singular in «Presentaré ... el viernes»."
+    },
+    {
+      "id": "S2-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626160345237871_0000000085_8ffd13b41dd5407491380031d901c4e6",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envíame las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envíame las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-es does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "FAIL",
+          "reason": "«Envíame» adds the freelancer as the recipient of the photos."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Spanish warm makes one request with a Tuesday date and a three-day shift. «Envíame» assigns the freelancer as recipient."
+    },
+    {
+      "id": "S2-firm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626073703508612_0000000006_3ad68b942aa94355ad43f649822776ae",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envíame las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envíame las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "FAIL",
+          "reason": "«Envíame» adds the freelancer as the recipient of the photos."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Spanish firm makes one request and retains the delay, date and sender. «Envíame» adds the recipient."
+    },
+    {
+      "id": "S7-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626163696141116_0000000091_9fbd5641b75c4d0a85969a9ec9d929a0",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasará tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envía las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasará tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envía las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasará tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envía las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Retains the client as sender, the delay and Tuesday. «Envía las fotos» requests them once with an unspecified recipient."
+    },
+    {
+      "id": "S2-resolved-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник. Фотографии тренеров уже получены, повторно запрашивать их не нужно.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626166585361770_0000000096_acd9e5cf545b4226ae9329dec8520a59",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Спасибо, фотографии тренеров уже получены. Срок первой версии сдвигается на три дня, поскольку вы не присылали фотографии в течение недели. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Спасибо, фотографии тренеров уже получены. Срок первой версии сдвигается на три дня, поскольку вы не присылали фотографии в течение недели. Новый срок первой версии — вторник.",
+      "copied_text": "Спасибо, фотографии тренеров уже получены. Срок первой версии сдвигается на три дня, поскольку вы не присылали фотографии в течение недели. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Keeps the client's earlier non-send as the cause of the three-day delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States Tuesday as the new date without making it a consequence of the photos arriving.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes no new request for the photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Acknowledges receipt without naming its participants, preserves the original sender and delay, and omits any new request."
+    },
+    {
+      "id": "S2-resolved-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday. The trainer photos have since arrived and are no longer needed from the client.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626172037000892_0000000103_63b1ce13e0bb4ecf9a302f108d99a8e1",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is now due Tuesday, three days later than planned because you hadn’t sent the trainer photos for a week. The photos have since arrived—thank you—and I no longer need them from you."
+      },
+      "visible_text": "The first version is now due Tuesday, three days later than planned because you hadn’t sent the trainer photos for a week. The photos have since arrived—thank you—and I no longer need them from you.",
+      "copied_text": "The first version is now due Tuesday, three days later than planned because you hadn’t sent the trainer photos for a week. The photos have since arrived—thank you—and I no longer need them from you.",
+      "criteria": [
+        {
+          "criterion": "Keeps the client's earlier non-send as the cause of the three-day delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States Tuesday as the new date without making it a consequence of the photos arriving.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes no new request for the photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports arrival without naming its actors, keeps the earlier non-send as the reason for the delay, and makes no new request."
+    },
+    {
+      "id": "S2-resolved-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes. Las fotos de los entrenadores ya se recibieron y no hace falta volver a pedírselas al cliente.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626173401995075_0000000108_e900c964955545498f4f3f3fb9abb7ab",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Las fotos de los entrenadores ya se recibieron, un avance concreto. La primera versión se retrasa tres días porque el cliente tardó una semana en enviarlas. La nueva fecha para la primera versión es el martes."
+      },
+      "visible_text": "Las fotos de los entrenadores ya se recibieron, un avance concreto. La primera versión se retrasa tres días porque el cliente tardó una semana en enviarlas. La nueva fecha para la primera versión es el martes.",
+      "copied_text": "Las fotos de los entrenadores ya se recibieron, un avance concreto. La primera versión se retrasa tres días porque el cliente tardó una semana en enviarlas. La nueva fecha para la primera versión es el martes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the client's earlier non-send as the cause of the three-day delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States Tuesday as the new date without making it a consequence of the photos arriving.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have arrived without naming a sender or recipient for the arrival.",
+          "verdict": "FAIL",
+          "reason": "The client is named only for the earlier non-send. The completed arrival has no stated sender."
+        },
+        {
+          "criterion": "Makes no new request for the photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the dates, delay and absence of any request. «Tardó una semana en enviarlas» implies the client ultimately sent the photos."
+    },
+    {
+      "id": "S2-date-linked-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Из-за отсутствия фотографий тренеров первая версия была перенесена на пятницу. Дизайнер передал фотографии сегодня утром. Благодаря этому первую версию покажу в четверг вместо пятницы.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626178287854796_0000000114_c01efe46853d476985c68e4dd4b6023d",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Хорошая новость: дизайнер передал фотографии тренеров сегодня утром. Благодаря этому первую версию покажу в четверг вместо пятницы. Изначально показ перенесли на пятницу из-за отсутствия фотографий тренеров."
+      },
+      "visible_text": "Хорошая новость: дизайнер передал фотографии тренеров сегодня утром. Благодаря этому первую версию покажу в четверг вместо пятницы. Изначально показ перенесли на пятницу из-за отсутствия фотографий тренеров.",
+      "copied_text": "Хорошая новость: дизайнер передал фотографии тренеров сегодня утром. Благодаря этому первую версию покажу в четверг вместо пятницы. Изначально показ перенесли на пятницу из-за отсутствия фотографий тренеров.",
+      "criteria": [
+        {
+          "criterion": "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who delivered the photos this morning.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes no new request for the photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the earlier Friday delay due to missing photos, the designer's delivery this morning and the freelancer's Thursday commitment caused by the arrival. Makes no new request."
+    },
+    {
+      "id": "S2-date-linked-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The first version moved to Friday because the trainer photos were missing. The designer delivered the photos this morning. Because of that, I'll show the first version on Thursday instead of Friday.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626184321416441_0000000120_86588a0228de4d1ea28a57c7c0c153dd",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Good news: the designer delivered the trainer photos this morning. The first version had moved to Friday because the photos were missing; because they’ve now been delivered, I’ll show you the first version on Thursday instead of Friday."
+      },
+      "visible_text": "Good news: the designer delivered the trainer photos this morning. The first version had moved to Friday because the photos were missing; because they’ve now been delivered, I’ll show you the first version on Thursday instead of Friday.",
+      "copied_text": "Good news: the designer delivered the trainer photos this morning. The first version had moved to Friday because the photos were missing; because they’ve now been delivered, I’ll show you the first version on Thursday instead of Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who delivered the photos this morning.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes no new request for the photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the earlier Friday delay due to missing photos, the designer's delivery this morning and the freelancer's Thursday commitment caused by the arrival. Makes no new request."
+    },
+    {
+      "id": "S2-date-linked-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "La primera versión se aplazó hasta el viernes porque faltaban las fotos de los entrenadores. El diseñador entregó las fotos esta mañana. Gracias a eso, mostraré la primera versión el jueves en vez del viernes.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626191620580155_0000000127_bfee48d12dbc436d841b2846d3ab03f4",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Las fotos de los entrenadores ya llegaron: el diseñador las entregó esta mañana. Gracias a eso, mostraré la primera versión el jueves, en lugar del viernes. La primera versión se había aplazado hasta el viernes porque faltaban esas fotos."
+      },
+      "visible_text": "Las fotos de los entrenadores ya llegaron: el diseñador las entregó esta mañana. Gracias a eso, mostraré la primera versión el jueves, en lugar del viernes. La primera versión se había aplazado hasta el viernes porque faltaban esas fotos.",
+      "copied_text": "Las fotos de los entrenadores ya llegaron: el diseñador las entregó esta mañana. Gracias a eso, mostraré la primera versión el jueves, en lugar del viernes. La primera versión se había aplazado hasta el viernes porque faltaban esas fotos.",
+      "criteria": [
+        {
+          "criterion": "Keeps the earlier move to Friday and attributes it to the missing trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who delivered the photos this morning.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the freelancer's commitment to show the first version on Thursday instead of Friday and states that the arrival made that change possible.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Makes no new request for the photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the earlier Friday delay due to missing photos, the designer's delivery this morning and the freelancer's Thursday commitment caused by the arrival. Makes no new request."
+    },
+    {
+      "id": "S2-designer-neutral-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626196043374507_0000000133_726d1e45db1d42a5aad381c538867190",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Первая версия задерживается на три дня из-за отсутствия фотографий тренеров, принадлежащих клиенту. За отправку фотографий отвечает только дизайнер; он пришлёт их в понедельник. Новый срок для первой версии — вторник."
+      },
+      "visible_text": "Первая версия задерживается на три дня из-за отсутствия фотографий тренеров, принадлежащих клиенту. За отправку фотографий отвечает только дизайнер; он пришлёт их в понедельник. Новый срок для первой версии — вторник.",
+      "copied_text": "Первая версия задерживается на три дня из-за отсутствия фотографий тренеров, принадлежащих клиенту. За отправку фотографий отвечает только дизайнер; он пришлёт их в понедельник. Новый срок для первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-warm-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626200091258440_0000000139_3a39a5a3dbbc44e6a535ca5e7fd7dc97",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Первая версия задерживается на три дня, поскольку фотографий тренеров, принадлежащих вам, пока нет. За отправку фотографий отвечает только дизайнер; он пришлёт их в понедельник. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Первая версия задерживается на три дня, поскольку фотографий тренеров, принадлежащих вам, пока нет. За отправку фотографий отвечает только дизайнер; он пришлёт их в понедельник. Новый срок первой версии — вторник.",
+      "copied_text": "Первая версия задерживается на три дня, поскольку фотографий тренеров, принадлежащих вам, пока нет. За отправку фотографий отвечает только дизайнер; он пришлёт их в понедельник. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-firm-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Фотографии тренеров принадлежат клиенту. Их ещё нет, поэтому первая версия задерживается на три дня. Новый срок — вторник. За отправку фотографий отвечает только дизайнер, он пришлёт их в понедельник.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626204234266076_0000000145_17665a7c777c4308b35cbec957ef4e31",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Фотографии тренеров принадлежат вам, но их пока нет. За отправку отвечает дизайнер; он пришлёт фотографии в понедельник. Поэтому первая версия задерживается на три дня. Новый срок — вторник."
+      },
+      "visible_text": "Фотографии тренеров принадлежат вам, но их пока нет. За отправку отвечает дизайнер; он пришлёт фотографии в понедельник. Поэтому первая версия задерживается на три дня. Новый срок — вторник.",
+      "copied_text": "Фотографии тренеров принадлежат вам, но их пока нет. За отправку отвечает дизайнер; он пришлёт фотографии в понедельник. Поэтому первая версия задерживается на три дня. Новый срок — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "FAIL",
+          "reason": "The causal connector points back to the designer's Monday handoff as well as the earlier missing photos. It does not clearly keep the original cause independent of the planned handoff."
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps Tuesday and the designer's Monday handoff and makes no client request. «Поэтому» follows the sentence about the designer's plan, leaving the cause of the delay ambiguous."
+    },
+    {
+      "id": "S2-designer-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626207387817094_0000000150_780cc96942c2437eab032855c7aa7a05",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos you own are still missing. The designer is responsible for sending the photos and will send them on Monday. The new date for the first version is Tuesday."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos you own are still missing. The designer is responsible for sending the photos and will send them on Monday. The new date for the first version is Tuesday.",
+      "copied_text": "The first version is delayed by three days because the trainer photos you own are still missing. The designer is responsible for sending the photos and will send them on Monday. The new date for the first version is Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626212655796942_0000000156_2de97c6978f14c0ab168722f9f58c929",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos, which you own, are still missing. The new date is Tuesday. The designer alone is responsible for sending the photos and will send them on Monday."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos, which you own, are still missing. The new date is Tuesday. The designer alone is responsible for sending the photos and will send them on Monday.",
+      "copied_text": "The first version is delayed by three days because the trainer photos, which you own, are still missing. The new date is Tuesday. The designer alone is responsible for sending the photos and will send them on Monday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The client owns the trainer photos. The photos are still missing, so the first version is delayed by three days. The new date is Tuesday. Only the designer is responsible for sending the photos and will send them on Monday.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626217004128192_0000000163_463906a9924645779d676e6a26475e26",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The trainer photos are still missing, delaying the first version by three days. You own the photos, but only the designer is responsible for sending them; the designer will send them Monday. The new date for the first version is Tuesday."
+      },
+      "visible_text": "The trainer photos are still missing, delaying the first version by three days. You own the photos, but only the designer is responsible for sending them; the designer will send them Monday. The new date for the first version is Tuesday.",
+      "copied_text": "The trainer photos are still missing, delaying the first version by three days. You own the photos, but only the designer is responsible for sending them; the designer will send them Monday. The new date for the first version is Tuesday.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626219681079092_0000000168_37dac16d88d0426b831dc28dee5d879f",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Las fotos de los entrenadores, que son del cliente, aún faltan. Por este motivo, la primera versión se retrasa tres días y la nueva fecha es el martes. El diseñador está encargado de enviar las fotos y las enviará el lunes."
+      },
+      "visible_text": "Las fotos de los entrenadores, que son del cliente, aún faltan. Por este motivo, la primera versión se retrasa tres días y la nueva fecha es el martes. El diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "copied_text": "Las fotos de los entrenadores, que son del cliente, aún faltan. Por este motivo, la primera versión se retrasa tres días y la nueva fecha es el martes. El diseñador está encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626225086472628_0000000175_160218d1f74f4128816194d9792fe270",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque aún faltan las fotos de los entrenadores, que son del cliente. La nueva fecha para la primera versión es el martes. El diseñador es el único encargado de enviar las fotos y las enviará el lunes."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque aún faltan las fotos de los entrenadores, que son del cliente. La nueva fecha para la primera versión es el martes. El diseñador es el único encargado de enviar las fotos y las enviará el lunes.",
+      "copied_text": "La primera versión se retrasa tres días porque aún faltan las fotos de los entrenadores, que son del cliente. La nueva fecha para la primera versión es el martes. El diseñador es el único encargado de enviar las fotos y las enviará el lunes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-designer-firm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Las fotos de los entrenadores son del cliente. Aún faltan y por eso la primera versión se retrasa tres días. La nueva fecha es el martes. Solo el diseñador está encargado de enviar las fotos y las enviará el lunes.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626227929523321_0000000180_9541f30e14f3426a88e0b9f7b9a32512",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Las fotos de los entrenadores pertenecen al cliente y aún faltan. El diseñador es el único encargado de enviarlas y las enviará el lunes. Debido a la falta de esas fotos, la primera versión se retrasa tres días; la nueva fecha es el martes."
+      },
+      "visible_text": "Las fotos de los entrenadores pertenecen al cliente y aún faltan. El diseñador es el único encargado de enviarlas y las enviará el lunes. Debido a la falta de esas fotos, la primera versión se retrasa tres días; la nueva fecha es el martes.",
+      "copied_text": "Las fotos de los entrenadores pertenecen al cliente y aún faltan. El diseñador es el único encargado de enviarlas y las enviará el lunes. Debido a la falta de esas fotos, la primera versión se retrasa tres días; la nueva fecha es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the missing trainer photos as the cause of a three-day delay and Tuesday as the revised date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the designer as the person who will send the photos on Monday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks for no client action. Owning the photos does not make the client responsible for sending them or following up.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Reports the missing photos and delay to Tuesday, keeps the designer's Monday send, and asks the client for nothing."
+    },
+    {
+      "id": "S2-mixed-ru",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Фотографии тренеров и файл с ценами ещё не получены. Из-за этого срок первой версии сдвигается на три дня, на вторник. Клиент раньше отвечал за отправку фотографий, но теперь их отправит дизайнер в понедельник. Клиенту всё ещё нужно прислать файл с ценами. Биографии тренеров также нужны, их ещё нет и отправитель не назначен. Уже договорились, что клиент пришлёт логотип в понедельник.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626232186627620_0000000187_a2e4d3c935dc426ab3b191b9f428431c",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня — на вторник, поскольку фотографии тренеров и файл с ценами ещё не получены. Раньше за отправку фотографий отвечал клиент, теперь их отправит дизайнер в понедельник. Пожалуйста, пришлите файл с ценами. Биографии тренеров тоже нужны, но их пока нет; отправитель не назначен. Также договорились, что вы пришлёте логотип в понедельник."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня — на вторник, поскольку фотографии тренеров и файл с ценами ещё не получены. Раньше за отправку фотографий отвечал клиент, теперь их отправит дизайнер в понедельник. Пожалуйста, пришлите файл с ценами. Биографии тренеров тоже нужны, но их пока нет; отправитель не назначен. Также договорились, что вы пришлёте логотип в понедельник.",
+      "copied_text": "Срок первой версии сдвигается на три дня — на вторник, поскольку фотографии тренеров и файл с ценами ещё не получены. Раньше за отправку фотографий отвечал клиент, теперь их отправит дизайнер в понедельник. Пожалуйста, пришлите файл с ценами. Биографии тренеров тоже нужны, но их пока нет; отправитель не назначен. Также договорились, что вы пришлёте логотип в понедельник.",
+      "criteria": [
+        {
+          "criterion": "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks the client to provide the pricing sheet once, with no added deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Separates designer photos, the client's pending pricing sheet, unassigned bios and scheduled logo. Asks once for pricing only and keeps the reason and Tuesday."
+    },
+    {
+      "id": "S2-mixed-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "The trainer photos and the pricing sheet are still missing. Because of that, the first version is delayed by three days, to Tuesday. The client was previously responsible for sending the photos, but the designer took over and will send them on Monday. The client still needs to send the pricing sheet. The trainer bios are also needed and still missing. No sender has been assigned for them. The client is already scheduled to send the logo on Monday.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626235582589913_0000000192_5dc90499cff04088b1797ac26083b33e",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The designer has taken over sending the trainer photos and will send them Monday. You’re already scheduled to send the logo Monday. The first version is delayed by three days, to Tuesday, because the trainer photos and pricing sheet are still missing. Please send the pricing sheet. The trainer bios are also still needed and missing; no sender has been assigned for them."
+      },
+      "visible_text": "The designer has taken over sending the trainer photos and will send them Monday. You’re already scheduled to send the logo Monday. The first version is delayed by three days, to Tuesday, because the trainer photos and pricing sheet are still missing. Please send the pricing sheet. The trainer bios are also still needed and missing; no sender has been assigned for them.",
+      "copied_text": "The designer has taken over sending the trainer photos and will send them Monday. You’re already scheduled to send the logo Monday. The first version is delayed by three days, to Tuesday, because the trainer photos and pricing sheet are still missing. Please send the pricing sheet. The trainer bios are also still needed and missing; no sender has been assigned for them.",
+      "criteria": [
+        {
+          "criterion": "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks the client to provide the pricing sheet once, with no added deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the designer's photo plan and client's eventual logo handoff, states the dependency on the unassigned bios, and asks once for the pricing sheet."
+    },
+    {
+      "id": "S2-mixed-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "progress_notes": "Todavía faltan las fotos de los entrenadores y la lista de precios. Por eso la primera versión se retrasa tres días y pasa al martes. Antes el cliente era responsable de enviar las fotos, pero el diseñador asumió esa tarea y las enviará el lunes. El cliente aún tiene que enviar la lista de precios. También hacen falta las biografías de los entrenadores. No se ha asignado a nadie para enviarlas. Ya está acordado que el cliente enviará el logotipo el lunes.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626240897897245_0000000198_84bff74c46ca4b0da43375011e503c30",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días y pasa al martes porque aún faltan las fotos de los entrenadores y la lista de precios. El diseñador asumió el envío de las fotos, que enviará el lunes. El cliente aún debe enviar la lista de precios. También hacen falta las biografías de los entrenadores; todavía no se ha asignado quién las enviará. Ya está acordado que el cliente enviará el logotipo el lunes."
+      },
+      "visible_text": "La primera versión se retrasa tres días y pasa al martes porque aún faltan las fotos de los entrenadores y la lista de precios. El diseñador asumió el envío de las fotos, que enviará el lunes. El cliente aún debe enviar la lista de precios. También hacen falta las biografías de los entrenadores; todavía no se ha asignado quién las enviará. Ya está acordado que el cliente enviará el logotipo el lunes.",
+      "copied_text": "La primera versión se retrasa tres días y pasa al martes porque aún faltan las fotos de los entrenadores y la lista de precios. El diseñador asumió el envío de las fotos, que enviará el lunes. El cliente aún debe enviar la lista de precios. También hacen falta las biografías de los entrenadores; todavía no se ha asignado quién las enviará. Ya está acordado que el cliente enviará el logotipo el lunes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the missing photos and price information as the cause of the three-day delay to Tuesday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the designer's Monday plan as the current photo handoff. Makes no request about the photos to the client, who was only responsible before the reassignment.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Asks the client to provide the pricing sheet once, with no added deadline.",
+          "verdict": "FAIL",
+          "reason": "‘El cliente aún debe enviar la lista de precios’ reports the assignment without actually asking the client to send it."
+        },
+        {
+          "criterion": "Reports the missing trainer bios without assigning a sender or asking the client to act.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports the client's scheduled Monday delivery of the logo without adding a request or reminder.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves all handoffs and dates. The pricing sheet remains a third-person obligation, with no direct request to the recipient."
+    },
+    {
+      "id": "S4-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626247608571693_0000000204_80d326fea71842368b035b97728077f9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что главный экран показался вам скучным и не совпал с вашими ожиданиями. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. Вы пишете, что мы просили яркое оформление, и считаете, что мы так не договаривались."
+      },
+      "visible_text": "Понимаю, что главный экран показался вам скучным и не совпал с вашими ожиданиями. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. Вы пишете, что мы просили яркое оформление, и считаете, что мы так не договаривались.",
+      "copied_text": "Понимаю, что главный экран показался вам скучным и не совпал с вашими ожиданиями. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. Вы пишете, что мы просили яркое оформление, и считаете, что мы так не договаривались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "FAIL",
+          "reason": "In an indirect report from the freelancer’s perspective, «Вы пишете, что мы просили» changes who asked for brightness. The client said they asked for it."
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "FAIL",
+          "reason": "In an indirect report from the freelancer’s perspective, «Вы пишете, что мы просили» changes who asked for brightness. The client said they asked for it."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Personal acknowledgement and the limited two-option offer precede brief context. The attributed request is incorrectly restated as «мы просили». The reported agreement retains its shared parties."
+    },
+    {
+      "id": "S4-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626074247738835_0000000012_a47a208e364a4676b0680c5ef89b0ba1",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "You expected a bright main screen and feel the current one looks dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief. You also say this isn't what we agreed on."
+      },
+      "visible_text": "You expected a bright main screen and feel the current one looks dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief. You also say this isn't what we agreed on.",
+      "copied_text": "You expected a bright main screen and feel the current one looks dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief. You also say this isn't what we agreed on.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Businesslike acknowledgement before the scoped offer. Places the brief and attributed agreement objection after the offer. ‘We agreed on’ keeps both parties."
+    },
+    {
+      "id": "S4-neutral-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626252487079684_0000000211_49b72c9cd3f54d4d90a5e1d237369bda",
+      "semantic_attempts": [
+        1,
+        2
+      ],
+      "output": {
+        "text": "Esperabas algo muy distinto y consideras que la pantalla principal se ve apagada; señalas que pidieron colores vivos y que esto no es lo que acordamos. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Esperabas algo muy distinto y consideras que la pantalla principal se ve apagada; señalas que pidieron colores vivos y que esto no es lo que acordamos. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "copied_text": "Esperabas algo muy distinto y consideras que la pantalla principal se ve apagada; señalas que pidieron colores vivos y que esto no es lo que acordamos. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "FAIL",
+          "reason": "The output addresses the client in the singular, then says «pidieron» without clearly grounding the plural requester in the client's side. The specified requester should remain clear when relayed."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "FAIL",
+          "reason": "The opening restates the prior dispute before the offer, whereas Reply Draft places disputed claims after the offer."
+        }
+      ],
+      "review_note": "Keeps subjective perception, shared «acordamos» and the two-version offer, but puts disputed claims in the opening and leaves the requester ambiguous."
+    },
+    {
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626255857174213_0000000216_e233f7d81e0942ab9f801e84f0efc591",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; indicas que los pidieron y que esto no es lo que acordamos."
+      },
+      "visible_text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; indicas que los pidieron y que esto no es lo que acordamos.",
+      "copied_text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; indicas que los pidieron y que esto no es lo que acordamos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "FAIL",
+          "reason": "The output addresses the client in the singular, then says «pidieron» without clearly grounding the plural requester in the client's side. The specified requester should remain clear when relayed."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Uses a personal acknowledgement and correct offer order. Shared «acordamos» is retained. «Indicas que los pidieron» leaves the original requester ambiguous."
+    },
+    {
+      "id": "S4-neutral-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626262295576818_0000000222_e1d4d88457e940d29a3cd88c4844b095",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы ожидали совсем другого и считаете главный экран скучным; вы также говорите, что просили яркое оформление и что мы так не договаривались. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Вы ожидали совсем другого и считаете главный экран скучным; вы также говорите, что просили яркое оформление и что мы так не договаривались. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Вы ожидали совсем другого и считаете главный экран скучным; вы также говорите, что просили яркое оформление и что мы так не договаривались. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "FAIL",
+          "reason": "The opening restates the prior dispute before the offer, whereas Reply Draft places disputed claims after the offer."
+        }
+      ],
+      "review_note": "Keeps client attribution and shared participants, and offers two options before context. Restates the disputed prior claims in the acknowledgement."
+    },
+    {
+      "id": "S4-firm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626271243126604_0000000228_9b59074e8a4a44d1b43c74a5686382fd",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Вы ожидали яркого главного экрана, считаете его скучным и говорите, что мы так не договаривались. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Вы ожидали яркого главного экрана, считаете его скучным и говорите, что мы так не договаривались. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "copied_text": "Вы ожидали яркого главного экрана, считаете его скучным и говорите, что мы так не договаривались. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "FAIL",
+          "reason": "The opening restates the prior dispute before the offer, whereas Reply Draft places disputed claims after the offer."
+        }
+      ],
+      "review_note": "Direct acknowledgement and the limited offer before brief context. The attributed agreement objection is placed in the opening."
+    },
+    {
+      "id": "S4-neutral-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626277254590523_0000000234_65494ce66f534c76be059a74aefa4417",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "You expected something completely different, feel the main screen looks dull, and say you asked for something bright and that this differs from what we agreed on. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief."
+      },
+      "visible_text": "You expected something completely different, feel the main screen looks dull, and say you asked for something bright and that this differs from what we agreed on. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "copied_text": "You expected something completely different, feel the main screen looks dull, and say you asked for something bright and that this differs from what we agreed on. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "FAIL",
+          "reason": "The opening restates the prior dispute before the offer, whereas Reply Draft places disputed claims after the offer."
+        }
+      ],
+      "review_note": "Attributes dullness and the prior claims and keeps the shared parties and offer scope. The disputed claims appear in the opening."
+    },
+    {
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626281072245886_0000000240_5bcea415186146bbaafab7da58163443",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I can see how disappointing it is that the main screen feels dull to you and differs from what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief. You also say, “We asked for something bright,” and feel that this isn't what we agreed on."
+      },
+      "visible_text": "I can see how disappointing it is that the main screen feels dull to you and differs from what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief. You also say, “We asked for something bright,” and feel that this isn't what we agreed on.",
+      "copied_text": "I can see how disappointing it is that the main screen feels dull to you and differs from what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief. You also say, “We asked for something bright,” and feel that this isn't what we agreed on.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Personal acknowledgement leads directly to the scoped offer. The brief follows. Directly quoting the requester preserves their perspective, and ‘we agreed on’ keeps the shared parties."
+    },
+    {
+      "id": "S4-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6-luna",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626288343169896_0000000247_899e64e5220244c7ace6ba7f29631423",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Esperabas algo muy distinto y consideras que la pantalla principal se ve apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; señalas que pidieron algo con colores vivos y que esto no es lo que acordamos."
+      },
+      "visible_text": "Esperabas algo muy distinto y consideras que la pantalla principal se ve apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; señalas que pidieron algo con colores vivos y que esto no es lo que acordamos.",
+      "copied_text": "Esperabas algo muy distinto y consideras que la pantalla principal se ve apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; señalas que pidieron algo con colores vivos y que esto no es lo que acordamos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "FAIL",
+          "reason": "The output addresses the client in the singular, then says «pidieron» without clearly grounding the plural requester in the client's side. The specified requester should remain clear when relayed."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Directly acknowledges the client and keeps offer, scope and brief order. Shared «acordamos» is retained. The embedded «pidieron» leaves the requester ambiguous."
+    },
+    {
+      "id": "S2-firm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626313644046088_0000000261_92f8e1856a1543818f070c0e382cc53b",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня: вы неделю не присылали фотографии тренеров. Новый срок первой версии — вторник. Пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня: вы неделю не присылали фотографии тренеров. Новый срок первой версии — вторник. Пришлите фотографии тренеров.",
+      "copied_text": "Срок первой версии сдвигается на три дня: вы неделю не присылали фотографии тренеров. Новый срок первой версии — вторник. Пришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S7-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626313284144775_0000000258_867f80a4546d4ed59958736d6ddf79c6",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня: в течение недели вы не присылали фотографии тренеров. Новый срок первой версии — вторник. Пожалуйста, пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня: в течение недели вы не присылали фотографии тренеров. Новый срок первой версии — вторник. Пожалуйста, пришлите фотографии тренеров.",
+      "copied_text": "Срок первой версии сдвигается на три дня: в течение недели вы не присылали фотографии тренеров. Новый срок первой версии — вторник. Пожалуйста, пришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm and S2-firm.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626313690071275_0000000264_df2ecbc695bf4a60a69f05cb94f85857",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. The new deadline is Tuesday. Please send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. The new deadline is Tuesday. Please send the trainer photos.",
+      "copied_text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. The new deadline is Tuesday. Please send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626324515745574_0000000271_217cfb88eaa440c1bfd9b7fc97e8d1a0",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because you have not sent the trainer photos for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because you have not sent the trainer photos for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.",
+      "copied_text": "The first version is delayed by three days because you have not sent the trainer photos for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S2-firm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626329065282711_0000000277_ae1d527fa11845288b4ad7c30ac8ca07",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envía las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envía las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envía las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S7-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626334654862408_0000000283_c7d3e6bce28b42cf833bb7c77d615bf4",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes.\n\nEnvíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes.\n\nEnvíame las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes.\n\nEnvíame las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "FAIL",
+          "reason": "«Envíame» supplies a recipient who was unstated in the source."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the date, cause, sender and one request. Adds an unstated recipient in the request."
+    },
+    {
+      "id": "S4-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626336617455546_0000000289_d9581a1ef5e94cc4a2e75feda2e389d4",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю ваше разочарование: вы ожидали другого и считаете главный экран скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. При этом вы говорите, что просили что-то яркое и что результат отличается от того, о чём мы договаривались."
+      },
+      "visible_text": "Понимаю ваше разочарование: вы ожидали другого и считаете главный экран скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. При этом вы говорите, что просили что-то яркое и что результат отличается от того, о чём мы договаривались.",
+      "copied_text": "Понимаю ваше разочарование: вы ожидали другого и считаете главный экран скучным. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались. При этом вы говорите, что просили что-то яркое и что результат отличается от того, о чём мы договаривались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Warm acknowledgement precedes a two-version offer in the first round. The brief and separately attributed claims follow the offer with faithful speaker roles."
+    },
+    {
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626340893600594_0000000294_9e40e5ba4c49490ba2731347de0e5577",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo tu decepción: esperabas algo muy distinto y la pantalla principal te ha parecido apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; entiendo que me dices que los pidieron y que, para ti, esto no es lo que acordamos."
+      },
+      "visible_text": "Entiendo tu decepción: esperabas algo muy distinto y la pantalla principal te ha parecido apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; entiendo que me dices que los pidieron y que, para ti, esto no es lo que acordamos.",
+      "copied_text": "Entiendo tu decepción: esperabas algo muy distinto y la pantalla principal te ha parecido apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos; entiendo que me dices que los pidieron y que, para ti, esto no es lo que acordamos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "FAIL",
+          "reason": "The output addresses the client in the singular then uses «pidieron» without clearly identifying the client's side as the requester."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the shared agreement and offer order. The requester of bright colors is ambiguous."
+    },
+    {
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-terra",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626347763237769_0000000301_55da6dead39849ea98b9a0ad1c78b58f",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Thank you for sharing that the main screen feels dull to you and that you expected something completely different. I can offer two versions of the main screen within the first round of revisions.\n\nI hear that you recall asking for something bright and feel the result isn’t what we agreed on. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "Thank you for sharing that the main screen feels dull to you and that you expected something completely different. I can offer two versions of the main screen within the first round of revisions.\n\nI hear that you recall asking for something bright and feel the result isn’t what we agreed on. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "Thank you for sharing that the main screen feels dull to you and that you expected something completely different. I can offer two versions of the main screen within the first round of revisions.\n\nI hear that you recall asking for something bright and feel the result isn’t what we agreed on. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Warm acknowledgement precedes a two-version offer in the first round. The brief and separately attributed claims follow the offer with faithful speaker roles."
+    },
+    {
+      "id": "S2-firm",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626371465796137_0000000318_20e7c3a96ef744438091481f6cc138d2",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня — на вторник, поскольку вы неделю не присылали фотографии тренеров. Пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня — на вторник, поскольку вы неделю не присылали фотографии тренеров. Пришлите фотографии тренеров.",
+      "copied_text": "Срок первой версии сдвигается на три дня — на вторник, поскольку вы неделю не присылали фотографии тренеров. Пришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S7-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626371220292067_0000000312_67022f90698c4f33a0f79e92bd2020d9",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня, поскольку в течение недели от вас не поступали фотографии тренеров. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня, поскольку в течение недели от вас не поступали фотографии тренеров. Новый срок первой версии — вторник.",
+      "copied_text": "Срок первой версии сдвигается на три дня, поскольку в течение недели от вас не поступали фотографии тренеров. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm and S2-firm.",
+          "verdict": "FAIL",
+          "reason": "The update gives the delay and date without a request to send the photos."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "FAIL",
+          "reason": "The update gives the delay and date without a request to send the photos."
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "The reason and Tuesday are present. The client receives no request to send the photos."
+    },
+    {
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626371255785575_0000000315_38949bc6d6f04407a2a526afabf1b9cf",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. The new deadline for the first version is Tuesday. Send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. The new deadline for the first version is Tuesday. Send the trainer photos.",
+      "copied_text": "The first version is delayed by three days because you haven’t sent the trainer photos for a week. The new deadline for the first version is Tuesday. Send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626385769666978_0000000324_e1690c9585194476bcf9891c8daaf013",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "The first version is moving back by three days because the trainer photos have been pending from you for a week. The new deadline for the first version is Tuesday. Please send the trainer photos."
+      },
+      "visible_text": "The first version is moving back by three days because the trainer photos have been pending from you for a week. The new deadline for the first version is Tuesday. Please send the trainer photos.",
+      "copied_text": "The first version is moving back by three days because the trainer photos have been pending from you for a week. The new deadline for the first version is Tuesday. Please send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S2-firm-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "firm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626394242878208_0000000330_f6e196e767f446d4bc5101e39e780ee4",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envía las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envía las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Envía las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Preserves the three-day delay and Tuesday, names the client in the cause, and asks once for the photos with no assigned recipient."
+    },
+    {
+      "id": "S7-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "neutral",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626405892122329_0000000336_17d4eaaa15224c0797c4dd458e4ad1f7",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envíame las fotos de los entrenadores.",
+      "copied_text": "La primera versión se retrasa tres días porque llevas una semana sin enviar las fotos de los entrenadores. La nueva fecha para la primera versión es el martes. Por favor, envíame las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps the client as the sender of the outstanding photos and leaves the receiver unstated, as in the source notes.",
+          "verdict": "FAIL",
+          "reason": "«Envíame» supplies a recipient who was unstated in the source."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the date, cause, sender and one request. «Envíame» adds the unstated recipient."
+    },
+    {
+      "id": "S4-warm-ru",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626415511505277_0000000342_cef95ed9d58d4d4d99c61a4a5b5fd181",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Понимаю, что главный экран показался вам скучным и вы ожидали совсем другого результата.\n\nМогу предложить два варианта главного экрана в рамках первого раунда правок, чтобы учесть ваши ожидания. Вы пишете, что просили что-то яркое и что результат не соответствует нашим договорённостям. При этом в брифе яркие цвета не упоминались."
+      },
+      "visible_text": "Понимаю, что главный экран показался вам скучным и вы ожидали совсем другого результата.\n\nМогу предложить два варианта главного экрана в рамках первого раунда правок, чтобы учесть ваши ожидания. Вы пишете, что просили что-то яркое и что результат не соответствует нашим договорённостям. При этом в брифе яркие цвета не упоминались.",
+      "copied_text": "Понимаю, что главный экран показался вам скучным и вы ожидали совсем другого результата.\n\nМогу предложить два варианта главного экрана в рамках первого раунда правок, чтобы учесть ваши ожидания. Вы пишете, что просили что-то яркое и что результат не соответствует нашим договорённостям. При этом в брифе яркие цвета не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Warm acknowledgement precedes a two-version offer in the first round. The brief and separately attributed claims follow the offer with faithful speaker roles."
+    },
+    {
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626423944088800_0000000348_6e77ee845e22446ea64f2185356ee4db",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "Entiendo que esperaban algo muy distinto y que la pantalla principal les resulte apagada. Puedo ofrecerles dos versiones de la pantalla principal dentro de la primera ronda de cambios. Me comentan que pidieron colores vivos y que consideran que el resultado no coincide con lo que acordamos; el brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperaban algo muy distinto y que la pantalla principal les resulte apagada. Puedo ofrecerles dos versiones de la pantalla principal dentro de la primera ronda de cambios. Me comentan que pidieron colores vivos y que consideran que el resultado no coincide con lo que acordamos; el brief no mencionaba colores vivos.",
+      "copied_text": "Entiendo que esperaban algo muy distinto y que la pantalla principal les resulte apagada. Puedo ofrecerles dos versiones de la pantalla principal dentro de la primera ronda de cambios. Me comentan que pidieron colores vivos y que consideran que el resultado no coincide con lo que acordamos; el brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "FAIL",
+          "reason": "The client says «esperaba» in the singular. «Entiendo que esperaban» broadens their stated expectation to the group."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Keeps the offer and brief order, and the plural requester is consistently addressed. It changes the individual client's expectation to a group expectation."
+    },
+    {
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "model": "gpt-6.1-sol",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm",
+        "output_layout": "single_text"
+      },
+      "session_id": "scenario_session_01795626435048638679_0000000354_fcf0814da71d42559403640ca3ba1704",
+      "semantic_attempts": [
+        1
+      ],
+      "output": {
+        "text": "I understand how disappointing it is to expect something completely different and find that the main screen feels dull to you. I can offer two versions of the main screen within the first round of revisions to explore a brighter direction. You’ve said you asked for something bright and that this isn’t what we agreed on. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand how disappointing it is to expect something completely different and find that the main screen feels dull to you. I can offer two versions of the main screen within the first round of revisions to explore a brighter direction. You’ve said you asked for something bright and that this isn’t what we agreed on. Bright colors weren’t mentioned in the brief.",
+      "copied_text": "I understand how disappointing it is to expect something completely different and find that the main screen feels dull to you. I can offer two versions of the main screen within the first round of revisions to explore a brighter direction. You’ve said you asked for something bright and that this isn’t what we agreed on. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's expectation or reaction without making any unsupported description an inherent property of the design, even with softer wording such as subdued.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Shows a distinct register in the paired outputs. Neutral opens with the client's point in plain language, warm opens with personal empathy or specific appreciation, and firm gets straight to the attributed issue. Identical openings or a modal swap alone fail.",
+          "verdict": "NOT_RUN",
+          "reason": "Comparison sample did not include all paired tones. The individual content and request are graded separately."
+        },
+        {
+          "criterion": "The result has a single text field and the visible and copied text match it.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps a request for bright work and the client's view that the result differs from the agreement independent. No claim of a prior agreement on brightness, including as an attributed paraphrase. Any claim mentioned retains its original actor, status and scope.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "If the reply relays the client's version of a shared agreement, it retains both client and freelancer as the parties while keeping the claim attributed.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The opening stays with the client's experience or expectation. Any restated disputed request or agreement follows the offer.",
+          "verdict": "PASS"
+        }
+      ],
+      "review_note": "Warm acknowledgement precedes a two-version offer in the first round. The brief and separately attributed claims follow the offer with faithful speaker roles."
+    }
+  ]
+}

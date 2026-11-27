@@ -1460,7 +1460,8 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   );
 
   // Exhausts Phase["kind"]: a new variant must be handled here.
-  const oldResult = displayedResult?.input && !shallowEqualValues(displayedResult.input, values);
+  const oldResult = displayedResult?.input &&
+    !shallowEqualValues(normalizeValues(displayedResult.input), normalizeValues(values));
   let placeholderMessage: string | null = null;
   let placeholderNode: ReactNode = null;
   let progress: ReactNode = null;

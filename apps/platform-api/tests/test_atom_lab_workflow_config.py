@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from anytoolai_platform_api.atom_lab.catalog import get_atom_catalog_entry
 from anytoolai_platform_core.config.loader import ConfigLoader
 from anytoolai_platform_core.workflows.mappings import resolve_step_input
 
@@ -68,3 +69,17 @@ def test_empty_lab_mapping_preserves_non_smoke_values_and_optional_semantics() -
         )
         == payload
     )
+
+
+def test_atom_lab_a07_default_prompt_distinguishes_output_layouts() -> None:
+    atom = get_atom_catalog_entry(ConfigLoader(CONFIG_ROOT).load(), "A07")
+
+    assert atom is not None
+    assert atom.prompt_ref == "kernel_demo.compose_reply.v1"
+    prompt = " ".join(atom.prompt.split())
+    assert (
+        "When `output_layout` is `single_text`, put the complete request and any supplied "
+        "link for it in `text` and omit `call_to_action`." in prompt
+    )
+    assert "In plain text, write the URL as literal text." in prompt
+    assert "When `output_layout` is omitted, only include `call_to_action`" in prompt

@@ -1,0 +1,2134 @@
+{
+  "issue": "ANY-851",
+  "round": 1,
+  "date": "2026-11-24",
+  "reviewer": "Codex agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form with the revised prompts on an isolated live-provider stack.",
+    "base_source_sha": "0676ea2c04b825db31e268eb815a2834421adf20",
+    "profiles": {
+      "update": {
+        "fingerprint": "35d0f3048e9980c24555a11f0d83d1270b18355fb086a838434d312638d43f48",
+        "prompt_sha256": {
+          "update_compose_reply.v1.md": "aba0e721742e771ecc61d7570423bd406d9ff662c02b2738277ec5c7dc03e98c",
+          "reply_draft_compose_reply.v1.md": "ec6480a7b9495dd24e35594b85ff89d503ced11d6180f682a155144cab0e3a62"
+        }
+      },
+      "reply": {
+        "fingerprint": "9628196d1fc0a9cdd477df67cffe54ac4ca0a504d9b44bb8c6b0d8a1f76c0e59",
+        "prompt_sha256": {
+          "reply_draft_compose_reply.v1.md": "9a32b61e99acb49b4e9786cb7a31a80fb5145ce0b4bc2cbcc3a6a782746a4148",
+          "update_compose_reply.v1.md": "aba0e721742e771ecc61d7570423bd406d9ff662c02b2738277ec5c7dc03e98c"
+        }
+      },
+      "comparison": {
+        "fingerprint": "4e49105d693b4324dffad90e065a37b9e5a4c9b79ba30635a8aec6bcd10148af",
+        "prompt_sha256": {
+          "update_compose_reply.v1.md": "08564bf9730bf1c6fb22b03b6ffcadaeeea0c291453608540a637af92e34a4da",
+          "reply_draft_compose_reply.v1.md": "35e5406c5dff4b9bdde11ff1514d0ca54e0e300930173d21dc2b72c77009a59d"
+        }
+      }
+    },
+    "configured_reasoning_effort": "medium"
+  },
+  "prior_evidence_correction": "The initial English S1 neutral and warm runs both omitted that the landing page was for a yoga studio. Their original passing comparison did not establish source fidelity. The initial Russian S4 pair also lacked a separate tone-distinction criterion.",
+  "runs": [
+    {
+      "id": "S1-neutral",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531518773058784_0000000009_2e53668fda5b43c89ece66d378e0bdc8",
+      "output": {
+        "text": "Лендинг студии йоги: главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану; первую версию покажу в пятницу."
+      },
+      "visible_text": "Лендинг студии йоги: главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану; первую версию покажу в пятницу.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531544743124195_0000000027_7477fa1b7a884af1971bd3f3b2258709",
+      "output": {
+        "text": "The landing page for the yoga studio has its main screen and schedule ready. The trainers and pricing sections are in progress, and everything is on track. I’ll show you the first version on Friday."
+      },
+      "visible_text": "The landing page for the yoga studio has its main screen and schedule ready. The trainers and pricing sections are in progress, and everything is on track. I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-es",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531569711151817_0000000052_8538997141ae4b88b9b6f4a0a2edda07",
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje de un estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531518691495777_0000000006_2af608dddae54e13aa85ae3ae834e7aa",
+      "output": {
+        "text": "Главный экран и расписание лендинга студии йоги уже готовы — хороший этап. Сейчас прорабатываю блоки тренеров и цен; работа идёт по плану. В пятницу покажу первую версию."
+      },
+      "visible_text": "Главный экран и расписание лендинга студии йоги уже готовы — хороший этап. Сейчас прорабатываю блоки тренеров и цен; работа идёт по плану. В пятницу покажу первую версию.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531547776877993_0000000032_b62d1ccf682a4987ab7af27aad96a58d",
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. I’m working on the trainers and pricing sections, and everything is on track. I’ll show you the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready—a great milestone. I’m working on the trainers and pricing sections, and everything is on track. I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-es",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531574314452225_0000000057_feb0cb13673e4219b085099428a28312",
+      "output": {
+        "text": "La página de aterrizaje de un estudio de yoga ya tiene lista la pantalla principal y el horario: ¡un buen avance! Estoy trabajando en las secciones de entrenadores y precios. Todo sigue según lo previsto y mostraré la primera versión el viernes."
+      },
+      "visible_text": "La página de aterrizaje de un estudio de yoga ya tiene lista la pantalla principal y el horario: ¡un buen avance! Estoy trabajando en las secciones de entrenadores y precios. Todo sigue según lo previsto y mostraré la primera versión el viernes.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-firm",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531536979716527_0000000017_c30d2f6dd7d84d8cb7e07b861d05d78b",
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня, потому что фотографии тренеров не поступали от вас неделю. Новая дата первой версии — вторник.",
+        "call_to_action": "Пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня, потому что фотографии тренеров не поступали от вас неделю. Новая дата первой версии — вторник.\n\nПришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-firm-en",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531562307282719_0000000042_5ff9d6006aa7405db80b3ae9f129c176",
+      "output": {
+        "text": "The first-version deadline has moved back by three days because the trainer photos have not arrived for a week. The new deadline for the first version is Tuesday. The trainer photos are still outstanding.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first-version deadline has moved back by three days because the trainer photos have not arrived for a week. The new deadline for the first version is Tuesday. The trainer photos are still outstanding.\n\nPlease send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-firm-es",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531581152876928_0000000067_3f555bae4a0c460aab1e5c1cc01f9c8c",
+      "output": {
+        "text": "La primera versión se retrasa tres días porque las fotos de los entrenadores llevan una semana pendientes. La nueva fecha para la primera versión es el martes.",
+        "call_to_action": "Envía las fotos de los entrenadores para poder avanzar."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque las fotos de los entrenadores llevan una semana pendientes. La nueva fecha para la primera versión es el martes.\n\nEnvía las fotos de los entrenadores para poder avanzar.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-resolved-en",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday. The trainer photos have since arrived and are no longer needed from the client.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531690740993452_0000000142_1144c346755b4a53a67828ee34efba30",
+      "output": {
+        "text": "Good news: the trainer photos have arrived, so they’re no longer outstanding. The first version is now due Tuesday, three days later than planned because the photos hadn’t arrived for a week."
+      },
+      "visible_text": "Good news: the trainer photos have arrived, so they’re no longer outstanding. The first version is now due Tuesday, three days later than planned because the photos hadn’t arrived for a week.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, Tuesday and the earlier source of the delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have since arrived and no longer asks the client to send them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-resolved-es",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes. Las fotos de los entrenadores ya se recibieron y no hace falta volver a pedírselas al cliente.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531698005986578_0000000147_a6288dae80ff408abc1d80911a7cdbc9",
+      "output": {
+        "text": "La primera versión se retrasó tres días porque las fotos de los entrenadores no se enviaron durante una semana. Me alegra que ya hayan llegado. La nueva fecha para la primera versión es el martes."
+      },
+      "visible_text": "La primera versión se retrasó tres días porque las fotos de los entrenadores no se enviaron durante una semana. Me alegra que ya hayan llegado. La nueva fecha para la primera versión es el martes.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, Tuesday and the earlier source of the delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have since arrived and no longer asks the client to send them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-resolved-ru",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник. Фотографии тренеров уже получены, повторно запрашивать их не нужно.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531685151574371_0000000137_c6c5d8ad172944a884d595d54e7c302e",
+      "output": {
+        "text": "Хорошая новость: фотографии тренеров уже получены. Поскольку они не поступали в течение недели, срок первой версии сдвигается на три дня. Новый срок первой версии — вторник."
+      },
+      "visible_text": "Хорошая новость: фотографии тренеров уже получены. Поскольку они не поступали в течение недели, срок первой версии сдвигается на три дня. Новый срок первой версии — вторник.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, Tuesday and the earlier source of the delay.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reports that the photos have since arrived and no longer asks the client to send them.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-warm",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531519746777279_0000000012_5182d3d8ee3d41be9c865ec8d7434e75",
+      "output": {
+        "text": "Срок первой версии сдвинулся на три дня из-за того, что фотографии тренеров не поступали в течение недели. Новый срок первой версии — вторник.\n\nФотографии тренеров пока не получены.",
+        "call_to_action": "Пожалуйста, пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвинулся на три дня из-за того, что фотографии тренеров не поступали в течение недели. Новый срок первой версии — вторник.\n\nФотографии тренеров пока не получены.\n\nПожалуйста, пришлите фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-warm-en",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531556730738313_0000000037_a529f396c9ae49308afdef0e466fb8c6",
+      "output": {
+        "text": "The first version is now due Tuesday, three days later than planned, because the trainer photos have not come through for a week.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version is now due Tuesday, three days later than planned, because the trainer photos have not come through for a week.\n\nPlease send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-en does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S2-warm-es",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531578346511780_0000000062_6dd59edd11414779b17ace7da4ca6283",
+      "output": {
+        "text": "La primera versión tiene como nueva fecha el martes. Se ha retrasado tres días porque aún no he recibido las fotos de los entrenadores, que llevan una semana pendientes.",
+        "call_to_action": "Por favor, envíen las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión tiene como nueva fecha el martes. Se ha retrasado tres días porque aún no he recibido las fotos de los entrenadores, que llevan una semana pendientes.\n\nPor favor, envíen las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-es does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S7-neutral",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531540258636457_0000000022_d9f7fa57382e4e0b9465e12a8092fc90",
+      "output": {
+        "text": "Фотографии тренеров не поступали в течение недели, поэтому срок первой версии сдвигается на три дня. Новый срок первой версии — вторник.\n\nПожалуйста, пришлите фотографии тренеров.",
+        "call_to_action": "Пришлите, пожалуйста, фотографии тренеров."
+      },
+      "visible_text": "Фотографии тренеров не поступали в течение недели, поэтому срок первой версии сдвигается на три дня. Новый срок первой версии — вторник.\n\nПожалуйста, пришлите фотографии тренеров.\n\nПришлите, пожалуйста, фотографии тренеров.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm and S2-firm.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "FAIL",
+          "reason": "The client sees the photo request twice, once in each composed output field."
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S7-neutral-en",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531564278018994_0000000047_ecd40b53ee0d451da99ff3a3abf043e6",
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos have not been received for a week. The new deadline for the first version is Tuesday.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos have not been received for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S7-neutral-es",
+      "profile": "update",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531585785590862_0000000072_f1a297b468714f4badd0ddb3d4e4e24c",
+      "output": {
+        "text": "La primera versión se retrasa tres días y la nueva fecha es el martes. El retraso se debe a que llevo una semana sin recibir las fotos de los entrenadores.",
+        "call_to_action": "Por favor, envíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días y la nueva fecha es el martes. El retraso se debe a que llevo una semana sin recibir las fotos de los entrenadores.\n\nPor favor, envíame las fotos de los entrenadores.",
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The client sees exactly one request for the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-en",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Invoice INV-104 asks for 1,250 USD, but our estimate says 1,250 EUR. Please confirm the currency and that two 30-second versions are included. Can we move delivery from October 15 to October 10?",
+        "reply_goal": "Acknowledge the typo in the invoice: the correct amount is 1,250 EUR and I will send a corrected invoice. Do not say it has already been sent. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026. October 10 is unconfirmed. I need to check my workload first and only promise to say whether the new date is possible. Do not convert EUR to USD.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531825402386109_0000000052_070af07e21e04259b38d549b1bec19ed",
+      "output": {
+        "text": "The currency typo on invoice INV-104 is acknowledged. The correct amount is 1,250 EUR, and I will send a corrected invoice. Exactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026; October 10 is unconfirmed. I need to check my workload first and will let you know whether October 10 is possible."
+      },
+      "visible_text": "The currency typo on invoice INV-104 is acknowledged. The correct amount is 1,250 EUR, and I will send a corrected invoice. Exactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026; October 10 is unconfirmed. I need to check my workload first and will let you know whether October 10 is possible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-es",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "En la factura INV-104 nos pides 1.250 USD, pero el presupuesto indica 1.250 EUR. Confirma la moneda y que se incluyen dos versiones de 30 segundos. ¿Podemos adelantar la entrega del 15 al 10 de octubre?",
+        "reply_goal": "Reconocer el error tipográfico de la factura: el importe correcto es 1.250 EUR y enviaré la factura corregida. No decir que ya se envió. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada es el 15 de octubre de 2026. El 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y solo prometer que informaré si el cambio es posible. No convertir euros a dólares.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531830543956114_0000000057_3542da7baa7e4375b8416af50683dbc9",
+      "output": {
+        "text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura corregida. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad e informaré si es posible adelantar la entrega."
+      },
+      "visible_text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura corregida. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad e informaré si es posible adelantar la entrega.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-ru",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "По счёту INV-104 вы просите 1 250 USD, но у нас в смете 1 250 EUR. Подтвердите валюту и что включены две версии ролика по 30 секунд. Можно перенести сдачу с 15 октября на 10 октября?",
+        "reply_goal": "Признать опечатку в счёте: верно 1 250 EUR, отправлю исправленный счёт, не утверждать что уже отправлен. Включены ровно 2 версии по 30 секунд и один раунд правок. Согласованный срок 15 октября 2026, перенос на 10 октября не подтверждён; сначала нужно проверить загрузку, обещать лишь сообщить о возможности переноса. Не конвертировать EUR в USD.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531819012388606_0000000047_2bff380eb030460c9d202f0cb09e6f0c",
+      "output": {
+        "text": "По счёту INV-104 допущена опечатка. Верная сумма — 1 250 EUR; отправлю исправленный счёт. В стоимость входят ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года; перенос на 10 октября не подтверждён. Сначала проверю загрузку и сообщу, возможен ли перенос."
+      },
+      "visible_text": "По счёту INV-104 допущена опечатка. Верная сумма — 1 250 EUR; отправлю исправленный счёт. В стоимость входят ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года; перенос на 10 октября не подтверждён. Сначала проверю загрузку и сообщу, возможен ли перенос.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-en",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531799295141578_0000000027_bef84d1cffb94b089275e58da5e69b2d",
+      "output": {
+        "text": "The main screen’s subdued look is not what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "The main screen’s subdued look is not what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-es",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531813080537047_0000000042_6a4cc6339e9046c28626e944ef85fa48",
+      "output": {
+        "text": "La pantalla principal no coincide con lo que esperabas y la percibes apagada. Puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos, aunque indicas que los habían pedido."
+      },
+      "visible_text": "La pantalla principal no coincide con lo que esperabas y la percibes apagada. Puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos, aunque indicas que los habían pedido.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-ru",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531763622316298_0000000009_a5ada61059444a92ba1c255afdd6e570",
+      "output": {
+        "text": "Представленный главный экран кажется вам недостаточно ярким. В рамках первого раунда правок могу предложить два варианта главного экрана. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Представленный главный экран кажется вам недостаточно ярким. В рамках первого раунда правок могу предложить два варианта главного экрана. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-neutral-en",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531783441882704_0000000017_a7ec79ee5b974d92a34b10ed55ea3c34",
+      "output": {
+        "text": "You expected a different result and find the main screen dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief."
+      },
+      "visible_text": "You expected a different result and find the main screen dull. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-neutral-es",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531801703278076_0000000032_ccdae7bf037144d5b75a92dab7a689ee",
+      "output": {
+        "text": "Entiendo que esperabas algo distinto y que la pantalla principal te parece apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperabas algo distinto y que la pantalla principal te parece apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-neutral-ru",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531763749211434_0000000012_2726759be4bf482793cfedfc72b8b6db",
+      "output": {
+        "text": "Вы ожидали другого результата и воспринимаете главный экран как скучный. В рамках первого раунда правок могу предложить два варианта главного экрана. Вы пишете, что просили яркое оформление, однако яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Вы ожидали другого результата и воспринимаете главный экран как скучный. В рамках первого раунда правок могу предложить два варианта главного экрана. Вы пишете, что просили яркое оформление, однако яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-en",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531789196229518_0000000022_381e921c85cc49518e4b5cf9e8427362",
+      "output": {
+        "text": "I understand the main screen feels dull and different from what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand the main screen feels dull and different from what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-es",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531809385157343_0000000037_265f2fb3ec774af0a127d8b391ccddcc",
+      "output": {
+        "text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperabas algo muy distinto y que la pantalla principal te parezca apagada. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-ru",
+      "profile": "reply",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm"
+      },
+      "model": "gpt-6-luna",
+      "session_id": "scenario_session_01795531763306270236_0000000006_2f946f5974a1467e8af5c451aa780393",
+      "output": {
+        "text": "Понимаю, что главный экран выглядит для вас скучно и не соответствует ожиданиям. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Понимаю, что главный экран выглядит для вас скучно и не соответствует ожиданиям. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-en",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Invoice INV-104 asks for 1,250 USD, but our estimate says 1,250 EUR. Please confirm the currency and that two 30-second versions are included. Can we move delivery from October 15 to October 10?",
+        "reply_goal": "Acknowledge the typo in the invoice: the correct amount is 1,250 EUR and I will send a corrected invoice. Do not say it has already been sent. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026. October 10 is unconfirmed. I need to check my workload first and only promise to say whether the new date is possible. Do not convert EUR to USD.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531114297328359_0000000182_5ea521bce5f244fe935db4cff99f3e54",
+      "output": {
+        "text": "Invoice INV-104 has a currency typo. The correct amount is 1,250 EUR, and I will send a corrected invoice.\n\nExactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026. October 10 is unconfirmed; I will check my workload and let you know whether delivery on that date is possible."
+      },
+      "visible_text": "Invoice INV-104 has a currency typo. The correct amount is 1,250 EUR, and I will send a corrected invoice.\n\nExactly two 30-second versions and one revision round are included. The agreed delivery deadline remains October 15, 2026. October 10 is unconfirmed; I will check my workload and let you know whether delivery on that date is possible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-es",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "En la factura INV-104 nos pides 1.250 USD, pero el presupuesto indica 1.250 EUR. Confirma la moneda y que se incluyen dos versiones de 30 segundos. ¿Podemos adelantar la entrega del 15 al 10 de octubre?",
+        "reply_goal": "Reconocer el error tipográfico de la factura: el importe correcto es 1.250 EUR y enviaré la factura corregida. No decir que ya se envió. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada es el 15 de octubre de 2026. El 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y solo prometer que informaré si el cambio es posible. No convertir euros a dólares.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531121485272512_0000000187_47b632eea87549f8b76e8682629ec051",
+      "output": {
+        "text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura corregida.\n\nSe incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha de entrega acordada es el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad y les informaré si es posible adelantar la entrega."
+      },
+      "visible_text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura corregida.\n\nSe incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha de entrega acordada es el 15 de octubre de 2026; el 10 de octubre no está confirmado. Primero revisaré mi disponibilidad y les informaré si es posible adelantar la entrega.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-ru",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "По счёту INV-104 вы просите 1 250 USD, но у нас в смете 1 250 EUR. Подтвердите валюту и что включены две версии ролика по 30 секунд. Можно перенести сдачу с 15 октября на 10 октября?",
+        "reply_goal": "Признать опечатку в счёте: верно 1 250 EUR, отправлю исправленный счёт, не утверждать что уже отправлен. Включены ровно 2 версии по 30 секунд и один раунд правок. Согласованный срок 15 октября 2026, перенос на 10 октября не подтверждён; сначала нужно проверить загрузку, обещать лишь сообщить о возможности переноса. Не конвертировать EUR в USD.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531107831715484_0000000177_e09e3db8bcb542e6bfe4b73b2a6cf77c",
+      "output": {
+        "text": "В счёте INV-104 допущена опечатка в валюте. Верная сумма — 1 250 EUR; исправленный счёт отправлю.\n\nВ стоимость входят ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года. Перенос на 10 октября не подтверждён: сначала проверю загрузку и сообщу, возможен ли перенос."
+      },
+      "visible_text": "В счёте INV-104 допущена опечатка в валюте. Верная сумма — 1 250 EUR; исправленный счёт отправлю.\n\nВ стоимость входят ровно две версии ролика по 30 секунд и один раунд правок. Согласованный срок сдачи — 15 октября 2026 года. Перенос на 10 октября не подтверждён: сначала проверю загрузку и сообщу, возможен ли перенос.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "profile": "comparison",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531073416282258_0000000144_baedf34a8da34b88adad0f0cea51bef7",
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "profile": "comparison",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531073185766511_0000000141_16c9fc53a47f4fe1a22c0451163314aa",
+      "output": {
+        "text": "The yoga studio landing page is making good progress: the main screen and schedule are ready. I’m working on the trainers and pricing sections. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "The yoga studio landing page is making good progress: the main screen and schedule are ready. I’m working on the trainers and pricing sections. Everything is on track, and I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-en",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531091810660107_0000000162_f930e66df1164a27a4687e3bde839d19",
+      "output": {
+        "text": "You expected a brighter main screen and say that was agreed. I can offer two versions of the main screen within the first round of revisions. Bright colors were not mentioned in the brief."
+      },
+      "visible_text": "You expected a brighter main screen and say that was agreed. I can offer two versions of the main screen within the first round of revisions. Bright colors were not mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-es",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531104954428418_0000000172_f37ddb633bc84251beab758a8e46f44d",
+      "output": {
+        "text": "Indicas que esperabas algo distinto, que la pantalla principal se ve apagada y que pediste colores vivos, por lo que consideras que no es lo acordado.\n\nPuedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Indicas que esperabas algo distinto, que la pantalla principal se ve apagada y que pediste colores vivos, por lo que consideras que no es lo acordado.\n\nPuedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-ru",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531084311650950_0000000152_5b73a7cf85fe4bf2bd255617ed1b2e6b",
+      "output": {
+        "text": "Вы ожидали более яркий главный экран и говорите, что просили об этом. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Вы ожидали более яркий главный экран и говорите, что просили об этом. Я могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-en",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531085554128077_0000000157_fcba73fed6fd4d5c8262ecd391a6e504",
+      "output": {
+        "text": "I appreciate your feedback, and I understand that you expected a brighter main screen and feel the current design doesn't match what you agreed on.\n\nI can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief."
+      },
+      "visible_text": "I appreciate your feedback, and I understand that you expected a brighter main screen and feel the current design doesn't match what you agreed on.\n\nI can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-es",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531098587274876_0000000167_114e24bde2d749399a076d082cba5b27",
+      "output": {
+        "text": "Entiendo la decepción que te ha causado ver la pantalla principal apagada, sobre todo porque me comentas que pedisteis colores vivos y esperabais algo distinto de lo acordado.\n\nPuedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo la decepción que te ha causado ver la pantalla principal apagada, sobre todo porque me comentas que pedisteis colores vivos y esperabais algo distinto de lo acordado.\n\nPuedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-ru",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-terra",
+      "session_id": "scenario_session_01795531073890164132_0000000147_a02da476edeb4054a7207f637039a107",
+      "output": {
+        "text": "Спасибо, что поделились впечатлением. Понимаю, что главный экран показался вам скучным и не соответствует тому, как вы представляли нашу договорённость.\n\nПредложу два варианта главного экрана в рамках первого раунда правок. При этом яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Спасибо, что поделились впечатлением. Понимаю, что главный экран показался вам скучным и не соответствует тому, как вы представляли нашу договорённость.\n\nПредложу два варианта главного экрана в рамках первого раунда правок. При этом яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-en",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Invoice INV-104 asks for 1,250 USD, but our estimate says 1,250 EUR. Please confirm the currency and that two 30-second versions are included. Can we move delivery from October 15 to October 10?",
+        "reply_goal": "Acknowledge the typo in the invoice: the correct amount is 1,250 EUR and I will send a corrected invoice. Do not say it has already been sent. Exactly two 30-second versions and one revision round are included. The agreed deadline is October 15, 2026. October 10 is unconfirmed. I need to check my workload first and only promise to say whether the new date is possible. Do not convert EUR to USD.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531199397948979_0000000237_f17ae1b63c9641b185b9f2f71b739414",
+      "output": {
+        "text": "Invoice INV-104 has a currency typo: it lists 1,250 USD instead of 1,250 EUR.\n\nThe correct amount is 1,250 EUR. I will send a corrected invoice. Exactly two 30-second versions and one revision round are included.\n\nThe agreed deadline remains October 15, 2026. October 10 is unconfirmed. I will check my workload and let you know whether delivery on October 10 is possible."
+      },
+      "visible_text": "Invoice INV-104 has a currency typo: it lists 1,250 USD instead of 1,250 EUR.\n\nThe correct amount is 1,250 EUR. I will send a corrected invoice. Exactly two 30-second versions and one revision round are included.\n\nThe agreed deadline remains October 15, 2026. October 10 is unconfirmed. I will check my workload and let you know whether delivery on October 10 is possible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-es",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "En la factura INV-104 nos pides 1.250 USD, pero el presupuesto indica 1.250 EUR. Confirma la moneda y que se incluyen dos versiones de 30 segundos. ¿Podemos adelantar la entrega del 15 al 10 de octubre?",
+        "reply_goal": "Reconocer el error tipográfico de la factura: el importe correcto es 1.250 EUR y enviaré la factura corregida. No decir que ya se envió. Se incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada es el 15 de octubre de 2026. El 10 de octubre no está confirmado. Primero debo revisar mi disponibilidad y solo prometer que informaré si el cambio es posible. No convertir euros a dólares.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531205554563088_0000000242_a45867e0f3e44a3e9536369ebd2defc3",
+      "output": {
+        "text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura corregida.\n\nSe incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026. El adelanto al 10 de octubre no está confirmado: primero debo revisar mi disponibilidad e informaré si el cambio es posible."
+      },
+      "visible_text": "La factura INV-104 contiene un error tipográfico en la moneda. El importe correcto es 1.250 EUR y enviaré la factura corregida.\n\nSe incluyen exactamente dos versiones de 30 segundos y una ronda de revisiones. La fecha acordada sigue siendo el 15 de octubre de 2026. El adelanto al 10 de octubre no está confirmado: primero debo revisar mi disponibilidad e informaré si el cambio es posible.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "R05-firm-ru",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "По счёту INV-104 вы просите 1 250 USD, но у нас в смете 1 250 EUR. Подтвердите валюту и что включены две версии ролика по 30 секунд. Можно перенести сдачу с 15 октября на 10 октября?",
+        "reply_goal": "Признать опечатку в счёте: верно 1 250 EUR, отправлю исправленный счёт, не утверждать что уже отправлен. Включены ровно 2 версии по 30 секунд и один раунд правок. Согласованный срок 15 октября 2026, перенос на 10 октября не подтверждён; сначала нужно проверить загрузку, обещать лишь сообщить о возможности переноса. Не конвертировать EUR в USD.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531193215739572_0000000232_5b07ea1eba90454bbd3582163b6984ca",
+      "output": {
+        "text": "В счёте INV-104 допущена опечатка в валюте. Верная сумма — 1 250 EUR. Отправлю исправленный счёт. Включены ровно 2 версии ролика по 30 секунд и один раунд правок.\n\nСогласованный срок сдачи — 15 октября 2026 года, он остаётся в силе. Перенос на 10 октября не подтверждён: сначала нужно проверить загрузку. Сообщу, возможен ли перенос."
+      },
+      "visible_text": "В счёте INV-104 допущена опечатка в валюте. Верная сумма — 1 250 EUR. Отправлю исправленный счёт. Включены ровно 2 версии ролика по 30 секунд и один раунд правок.\n\nСогласованный срок сдачи — 15 октября 2026 года, он остаётся в силе. Перенос на 10 октября не подтверждён: сначала нужно проверить загрузку. Сообщу, возможен ли перенос.",
+      "criteria": [
+        {
+          "criterion": "Admits the author's invoice typo and identifies INV-104.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Confirms 1,250 EUR and promises to send a corrected invoice. No claim it was sent and no disclosure of the author's directions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps exactly two 30-second versions and one revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Keeps October 15, 2026 and leaves October 10 unconfirmed. Only promises to check availability and report back.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-neutral-en",
+      "profile": "comparison",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531153267933433_0000000196_6269ebda72db47fe86c39eae965ccb10",
+      "output": {
+        "text": "The main screen and schedule for the yoga studio landing page are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for the yoga studio landing page are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S1-warm-en",
+      "profile": "comparison",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531153352722144_0000000199_b270daf59deb495fb681d3ed42023279",
+      "output": {
+        "text": "The main screen and schedule for your yoga studio landing page are ready—a good milestone. I’m working on the trainers and pricing sections. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "The main screen and schedule for your yoga studio landing page are ready—a good milestone. I’m working on the trainers and pricing sections. Everything is on track, and I’ll show you the first version on Friday.",
+      "criteria": [
+        {
+          "criterion": "Keeps the input facts: the project is a yoga studio landing page, the main screen and schedule are ready, the trainer and pricing sections are in progress, the project is on track, and the first version will be shown on Friday.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Preserves the same source facts, deadlines and commitments as the paired tone.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-en",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531180763309658_0000000217_0e4437bab29a4bafa13510ea593b4f2c",
+      "output": {
+        "text": "The main screen looks dull to you, and you say it doesn’t match what we agreed on. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "The main screen looks dull to you, and you say it doesn’t match what we agreed on. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-es",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531189912831915_0000000227_eb7de95a94d9431b9e0a8a4443f95676",
+      "output": {
+        "text": "La pantalla principal les resulta apagada y distinta de lo que esperaban. Señalan que habían pedido colores vivos y que el resultado no coincide con lo acordado.\n\nPuedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.\n\nEl brief no mencionaba colores vivos."
+      },
+      "visible_text": "La pantalla principal les resulta apagada y distinta de lo que esperaban. Señalan que habían pedido colores vivos y que el resultado no coincide con lo acordado.\n\nPuedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.\n\nEl brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-firm-ru",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531165736773347_0000000207_f1f4d8e0cf844728b17ec7b77c6cb837",
+      "output": {
+        "text": "Вы считаете главный экран скучным и не соответствующим договорённостям, поскольку, по вашим словам, просили яркое оформление.\n\nПредложу два варианта главного экрана в рамках первого раунда правок. При этом яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Вы считаете главный экран скучным и не соответствующим договорённостям, поскольку, по вашим словам, просили яркое оформление.\n\nПредложу два варианта главного экрана в рамках первого раунда правок. При этом яркие цвета в брифе не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-en",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531169053359395_0000000212_3bd351354dc64c6bb212010cc8ae3928",
+      "output": {
+        "text": "I’m sorry the main screen feels dull to you and isn’t what you expected. I can offer two versions of the main screen within the first round of revisions to explore a brighter direction. Bright colors weren’t mentioned in the brief, though I understand you recall asking for them."
+      },
+      "visible_text": "I’m sorry the main screen feels dull to you and isn’t what you expected. I can offer two versions of the main screen within the first round of revisions to explore a brighter direction. Bright colors weren’t mentioned in the brief, though I understand you recall asking for them.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "FAIL",
+          "reason": "Introduces an apology that the reply goal did not authorize."
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-es",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531186594507001_0000000222_2ba21ff7d47a490fb93ca4d846164f47",
+      "output": {
+        "text": "Entiendo tu decepción al ver una pantalla principal que te resulta apagada y distinta de lo que esperabas. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios para explorar colores más vivos. Aunque comentas que los habían pedido, el brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo tu decepción al ver una pantalla principal que te resulta apagada y distinta de lo que esperabas. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios para explorar colores más vivos. Aunque comentas que los habían pedido, el brief no mencionaba colores vivos.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "id": "S4-warm-ru",
+      "profile": "comparison",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm"
+      },
+      "model": "gpt-6.1-sol",
+      "session_id": "scenario_session_01795531154518364993_0000000202_7b894101bcff4bed88cf6afb3057ea1e",
+      "output": {
+        "text": "Понимаю ваше разочарование: главный экран кажется вам скучным, а вы ожидали яркого решения и считаете, что результат не соответствует договорённостям.\n\nМогу предложить два варианта главного экрана в рамках первого раунда правок, чтобы приблизить дизайн к вашим ожиданиям. Вы пишете, что просили что-то яркое, однако в брифе яркие цвета не упоминались."
+      },
+      "visible_text": "Понимаю ваше разочарование: главный экран кажется вам скучным, а вы ожидали яркого решения и считаете, что результат не соответствует договорённостям.\n\nМогу предложить два варианта главного экрана в рамках первого раунда правок, чтобы приблизить дизайн к вашим ожиданиям. Вы пишете, что просили что-то яркое, однако в брифе яркие цвета не упоминались.",
+      "criteria": [
+        {
+          "criterion": "Acknowledges how the client viewed the design or what they expected. Explicitly attributes any disputed claim to the client.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first round of revisions.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places brief context after the offer. Preserves that bright colors were absent from the brief.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no fault, concession, apology, deadline, stronger promise or unsupported speaker identity.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Uses the requested tone throughout. Warm uses a specific first-person acknowledgement and collaborative phrasing. Firm gives a concise factual acknowledgement and direct offer. Neutral states the concern and decision plainly. Compare the paired openings and delivery against this distinction.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Replies in the language of the source.",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1603 @@
+{
+  "issue": "ANY-851",
+  "date": "2026-11-23",
+  "reviewer": "Codex agent semantic review. Owner acceptance pending.",
+  "environment": {
+    "surface": "Local Client Update Writer web form connected to an isolated live-provider stack",
+    "base_source_sha": "4fa80b289b520d3c24f48b02ba461ab1b53c5264",
+    "prompts_sha256": {
+      "reply_draft_compose_reply.v1.md": "ffc3343e9cd66e3238fd9c058e6e659674edf3b3b4dd529a1ffe4d25166b82ae",
+      "update_compose_reply.v1.md": "4b6d73f4f2c02f83fffe48e4dcc2c35627413e59f2c0bd24d167218dc6fb5cc9"
+    },
+    "profile_fingerprint": "eb4207f458bf715c99392c536fafad001299ead0221c635495f5485ea4763f94",
+    "russian_input_source": "ANY-851 production QA attachment dated 2026-11-11 and S2/S7 screenshots"
+  },
+  "runs": [
+    {
+      "series": "luna-verified",
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:52:56.651Z",
+      "session_id": "scenario_session_01795456376986851548_0000000009_9fa9e91c9e0643cc8240fbedbedcd221",
+      "output": {
+        "text": "Для лендинга студии йоги готовы главный экран и расписание. Сейчас в работе блоки с тренерами и ценами. Проект идёт по плану; первую версию покажу в пятницу."
+      },
+      "visible_text": "Для лендинга студии йоги готовы главный экран и расписание. Сейчас в работе блоки с тренерами и ценами. Проект идёт по плану; первую версию покажу в пятницу.",
+      "ui_latency_ms": 10993.87,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-warm.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:52:57.148Z",
+      "session_id": "scenario_session_01795456377392126989_0000000012_8486e135d4ea4607bb7ee3a9c076ee7e",
+      "output": {
+        "text": "Главный экран и расписание лендинга студии йоги готовы — это хороший этап. Сейчас в работе блоки с тренерами и ценами. Работа идёт по плану; первую версию покажу в пятницу."
+      },
+      "visible_text": "Главный экран и расписание лендинга студии йоги готовы — это хороший этап. Сейчас в работе блоки с тренерами и ценами. Работа идёт по плану; первую версию покажу в пятницу.",
+      "ui_latency_ms": 12902.93,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-neutral.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S2-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:52:55.902Z",
+      "session_id": "scenario_session_01795456376218995397_0000000006_0cf5cc89b15e4bd9bd23e1dcb260413b",
+      "output": {
+        "text": "Срок подготовки первой версии сдвигается на три дня: фотографии тренеров не поступали в течение недели. Новая дата первой версии — вторник.",
+        "call_to_action": "Пришлите, пожалуйста, фотографии тренеров, чтобы работа могла продолжиться."
+      },
+      "visible_text": "Срок подготовки первой версии сдвигается на три дня: фотографии тренеров не поступали в течение недели. Новая дата первой версии — вторник.\n\nПришлите, пожалуйста, фотографии тренеров, чтобы работа могла продолжиться.",
+      "ui_latency_ms": 6915.32,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S2-firm",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:53:09.486Z",
+      "session_id": "scenario_session_01795456389776997033_0000000017_b027cfd71ac543d08ec693e03674585b",
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня: фотографии тренеров не поступали в течение недели. Новый срок первой версии — вторник.",
+        "call_to_action": "Пришлите фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня: фотографии тренеров не поступали в течение недели. Новый срок первой версии — вторник.\n\nПришлите фотографии тренеров.",
+      "ui_latency_ms": 6895.73,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S7-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Срок первой версии сдвигается на три дня: клиент неделю не присылал фотографии тренеров. Новый срок первой версии: вторник.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:53:15.863Z",
+      "session_id": "scenario_session_01795456396023136519_0000000022_d2e60d43db5c4bd5b5e0b92c579a0870",
+      "output": {
+        "text": "Срок первой версии сдвигается на три дня: фотографии тренеров не поступали в течение недели. Новый срок — вторник.\n\nДля подготовки первой версии нужны фотографии тренеров.",
+        "call_to_action": "Пришлите, пожалуйста, фотографии тренеров."
+      },
+      "visible_text": "Срок первой версии сдвигается на три дня: фотографии тренеров не поступали в течение недели. Новый срок — вторник.\n\nДля подготовки первой версии нужны фотографии тренеров.\n\nПришлите, пожалуйста, фотографии тренеров.",
+      "ui_latency_ms": 6578.84,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm and S2-firm.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S1-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:53:17.488Z",
+      "session_id": "scenario_session_01795456397671950311_0000000027_1761e891afe34c228be641d04b5ae3b7",
+      "output": {
+        "text": "The landing page’s main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday."
+      },
+      "visible_text": "The landing page’s main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track, and I’ll show you the first version on Friday.",
+      "ui_latency_ms": 6775.85,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-warm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S1-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "Project: landing page for a yoga studio. The main screen and schedule are ready. The trainers and pricing sections are in progress. Everything is on track; I'll show the first version on Friday.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:53:22.409Z",
+      "session_id": "scenario_session_01795456402609434310_0000000032_9e14deb9794542baab2dbadf83dc9737",
+      "output": {
+        "text": "The landing page’s main screen and schedule are ready—a solid milestone. I’m working on the trainers and pricing sections now, and everything is on track. I’ll show you the first version on Friday."
+      },
+      "visible_text": "The landing page’s main screen and schedule are ready—a solid milestone. I’m working on the trainers and pricing sections now, and everything is on track. I’ll show you the first version on Friday.",
+      "ui_latency_ms": 6870.88,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-neutral-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-en in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S2-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:53:29.730Z",
+      "session_id": "scenario_session_01795456409861557187_0000000037_92c5482f26f04578ab39ae828d70271f",
+      "output": {
+        "text": "The first-version deadline has shifted by three days because the trainer photos have been outstanding for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first-version deadline has shifted by three days because the trainer photos have been outstanding for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 6806.59,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-en does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "FAIL",
+          "reason": "The rendered update asks for the photos twice because both output fields contain the request."
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:53:31.504Z",
+      "session_id": "scenario_session_01795456411632187068_0000000042_c778dead624542378163afdf73d2cf1e",
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos have been outstanding for a week. The new deadline for the first version is Tuesday.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos have been outstanding for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 10684.64,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:53:35.144Z",
+      "session_id": "scenario_session_01795456415266007360_0000000047_899b318ee4f8435dacb0bf41eb2d25e7",
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos have not been sent for a week. The new deadline for the first version is Tuesday.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos have not been sent for a week. The new deadline for the first version is Tuesday.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 10564.51,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S1-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:53:40.583Z",
+      "session_id": "scenario_session_01795456420788839386_0000000052_afba66c828ee497381d387bf48574a58",
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto. Mostraré la primera versión el viernes.",
+      "ui_latency_ms": 8835.15,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-warm-es.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S1-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "Proyecto: página de aterrizaje de un estudio de yoga. La pantalla principal y el horario están listos. Las secciones de entrenadores y precios están en curso. Todo va según lo previsto; mostraré la primera versión el viernes.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:53:46.502Z",
+      "session_id": "scenario_session_01795456426692291323_0000000057_a552d723a071413c8feb48498476f64e",
+      "output": {
+        "text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: es un buen avance. Estoy trabajando en las secciones de entrenadores y precios. Todo va según lo previsto y mostraré la primera versión el viernes."
+      },
+      "visible_text": "La pantalla principal y el horario de la página de aterrizaje del estudio de yoga ya están listos: es un buen avance. Estoy trabajando en las secciones de entrenadores y precios. Todo va según lo previsto y mostraré la primera versión el viernes.",
+      "ui_latency_ms": 6655.71,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-neutral-es.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral-es in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S2-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:53:52.282Z",
+      "session_id": "scenario_session_01795456432528548273_0000000062_ad48d74c21034002b470b6f78aaec0e3",
+      "output": {
+        "text": "La primera versión se retrasa tres días porque las fotos de los entrenadores siguen pendientes desde hace una semana. La nueva fecha para la primera versión es el martes.",
+        "call_to_action": "¿Podrías enviarme las fotos de los entrenadores?"
+      },
+      "visible_text": "La primera versión se retrasa tres días porque las fotos de los entrenadores siguen pendientes desde hace una semana. La nueva fecha para la primera versión es el martes.\n\n¿Podrías enviarme las fotos de los entrenadores?",
+      "ui_latency_ms": 6930.58,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-es does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S2-firm-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:53:57.469Z",
+      "session_id": "scenario_session_01795456437609555990_0000000067_d10efa4d05384fa4bd40fdc5d60905d3",
+      "output": {
+        "text": "La primera versión se retrasa tres días porque las fotos de los entrenadores llevan una semana pendientes. La nueva fecha para la primera versión es el martes.\n\n",
+        "call_to_action": "Envíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasa tres días porque las fotos de los entrenadores llevan una semana pendientes. La nueva fecha para la primera versión es el martes.\n\n\n\nEnvíame las fotos de los entrenadores.",
+      "ui_latency_ms": 5069.35,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S7-neutral-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:54:00.875Z",
+      "session_id": "scenario_session_01795456441086745436_0000000072_41e628953e814378af58c258226a7eec",
+      "output": {
+        "text": "La primera versión se retrasará tres días; la nueva fecha es el martes. El retraso se debe a que las fotos de los entrenadores siguen pendientes desde hace una semana.",
+        "call_to_action": "Por favor, envíen las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión se retrasará tres días; la nueva fecha es el martes. El retraso se debe a que las fotos de los entrenadores siguen pendientes desde hace una semana.\n\nPor favor, envíen las fotos de los entrenadores.",
+      "ui_latency_ms": 4723.59,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-es and S2-firm-es.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S4-firm",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:54:06.896Z",
+      "session_id": "scenario_session_01795456447290176659_0000000077_f133c6dda1d44e5891b43fce13ecc803",
+      "output": {
+        "text": "Понимаю, что вы ожидали яркий главный экран и считаете текущий скучным. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Понимаю, что вы ожидали яркий главный экран и считаете текущий скучным. Предлагаю два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "ui_latency_ms": 7010.88,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S4-firm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:54:11.171Z",
+      "session_id": "scenario_session_01795456451335770738_0000000082_9f1613c417ce47dfb673933cbe356a23",
+      "output": {
+        "text": "I understand you expected a brighter main screen. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand you expected a brighter main screen. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "ui_latency_ms": 4563.55,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S4-firm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:54:13.614Z",
+      "session_id": "scenario_session_01795456453793111180_0000000087_38feb431ca704f8baaee96992ebb7941",
+      "output": {
+        "text": "Entiendo que esperabas algo distinto y que la pantalla principal te parece apagada. Puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperabas algo distinto y que la pantalla principal te parece apagada. Puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "ui_latency_ms": 6685.31,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S4-warm",
+      "mode": "reply_draft",
+      "form_language": "ru",
+      "input": {
+        "client_message": "Честно, я ожидала совсем другого. Главный экран выглядит скучно, мы же просили что-то яркое. Мы так не договаривались.",
+        "reply_goal": "Яркие цвета в брифе не упоминались, но я готов предложить два варианта главного экрана в рамках первого раунда правок.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:54:22.338Z",
+      "session_id": "scenario_session_01795456462766174613_0000000094_4eb2067e32df439c80f12f0e7a8fc6f6",
+      "output": {
+        "text": "Понимаю, что вы ожидали яркий главный экран и считаете текущий вариант скучным. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались."
+      },
+      "visible_text": "Понимаю, что вы ожидали яркий главный экран и считаете текущий вариант скучным. Могу предложить два варианта главного экрана в рамках первого раунда правок. Яркие цвета в брифе не упоминались.",
+      "ui_latency_ms": 8949.96,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:54:23.678Z",
+      "session_id": "scenario_session_01795456463876855585_0000000097_562d1797deae4b3bb82b584fa0e36969",
+      "output": {
+        "text": "I understand you expected something completely different, find the main screen dull, and asked for something bright. I can offer two versions of the main screen within the first revision round. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand you expected something completely different, find the main screen dull, and asked for something bright. I can offer two versions of the main screen within the first revision round. Bright colors weren’t mentioned in the brief.",
+      "ui_latency_ms": 10866.51,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "FAIL",
+          "reason": "The wording 'you ... asked for something bright' states the client's disputed account as a fact instead of attributing it to the client."
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "luna-verified",
+      "id": "S4-warm-es",
+      "mode": "reply_draft",
+      "form_language": "es",
+      "input": {
+        "client_message": "Sinceramente, esperaba algo muy distinto. La pantalla principal se ve apagada. Pedimos algo con colores vivos. Esto no es lo que acordamos.",
+        "reply_goal": "El brief no mencionaba colores vivos, pero puedo ofrecer dos versiones de la pantalla principal dentro de la primera ronda de cambios.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:54:27.679Z",
+      "session_id": "scenario_session_01795456468004094525_0000000102_866900c735d144c39caf671630e740e2",
+      "output": {
+        "text": "Entiendo que esperabas algo muy distinto, que la pantalla principal te parece apagada y que esperabas colores vivos. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos."
+      },
+      "visible_text": "Entiendo que esperabas algo muy distinto, que la pantalla principal te parece apagada y que esperabas colores vivos. Puedo ofrecerte dos versiones de la pantalla principal dentro de la primera ronda de cambios. El brief no mencionaba colores vivos.",
+      "ui_latency_ms": 10951.52,
+      "model": "gpt-6-luna",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:54:55.856Z",
+      "session_id": "scenario_session_01795456496025531020_0000000117_5ffb76076ab34b09bcebe6ebac54a2db",
+      "output": {
+        "text": "По лендингу студии йоги готовы главный экран и расписание. Разделы с тренерами и ценами в работе. Всё идёт по плану, первую версию покажу в пятницу."
+      },
+      "visible_text": "По лендингу студии йоги готовы главный экран и расписание. Разделы с тренерами и ценами в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+      "ui_latency_ms": 12929.25,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-warm.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:54:55.430Z",
+      "session_id": "scenario_session_01795456495591113072_0000000111_7f7a931fbb624f89a800ea36e7c4414d",
+      "output": {
+        "text": "В лендинге студии йоги уже готовы главный экран и расписание — это хороший этап в работе. Сейчас работаю над разделами с тренерами и ценами. Всё идёт по плану, первую версию покажу в пятницу."
+      },
+      "visible_text": "В лендинге студии йоги уже готовы главный экран и расписание — это хороший этап в работе. Сейчас работаю над разделами с тренерами и ценами. Всё идёт по плану, первую версию покажу в пятницу.",
+      "ui_latency_ms": 6543.17,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-neutral.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S2-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:56:26.204Z",
+      "session_id": "scenario_session_01795456586473165427_0000000159_c567f4e0c6564a1fac22377922d33a0c",
+      "output": {
+        "text": "The first version is now due Tuesday, three days later than planned. I’m still waiting for the trainer photos, which have been outstanding for a week. Thanks for your help with this.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version is now due Tuesday, three days later than planned. I’m still waiting for the trainer photos, which have been outstanding for a week. Thanks for your help with this.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 6862.83,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "FAIL",
+          "reason": "Explains that the photos are still outstanding, but leaves the causal link to the three-day delay implicit."
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-en does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:54:55.823Z",
+      "session_id": "scenario_session_01795456495998896051_0000000114_3a331f3ebe5e447cbe68c3b93b0d6e31",
+      "output": {
+        "text": "The first version is delayed by three days because the trainer photos have not been received for a week. The new deadline is Tuesday.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version is delayed by three days because the trainer photos have not been received for a week. The new deadline is Tuesday.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 11241.33,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:55:09.761Z",
+      "session_id": "scenario_session_01795456510004899134_0000000122_fad6f137004b4a1eaaf27360d3b6b755",
+      "output": {
+        "text": "The first version’s deadline has moved back by three days to Tuesday because the trainer photos have not been received for a week.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The first version’s deadline has moved back by three days to Tuesday because the trainer photos have not been received for a week.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 4857.12,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S2-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:55:14.003Z",
+      "session_id": "scenario_session_01795456514139988403_0000000127_5a1ed41396544fd89969738b7e65061b",
+      "output": {
+        "text": "La primera versión tiene nueva fecha: el martes. Se retrasa tres días porque las fotos de los entrenadores llevan una semana pendientes de envío.",
+        "call_to_action": "Por favor, envíame las fotos de los entrenadores."
+      },
+      "visible_text": "La primera versión tiene nueva fecha: el martes. Se retrasa tres días porque las fotos de los entrenadores llevan una semana pendientes de envío.\n\nPor favor, envíame las fotos de los entrenadores.",
+      "ui_latency_ms": 6624.88,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-es does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "terra-sample",
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:56:26.853Z",
+      "session_id": "scenario_session_01795456587231500990_0000000162_fcfd38861e7947cd855b3554f024a6e0",
+      "output": {
+        "text": "I understand your concern that the main screen looks dull and isn't what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief."
+      },
+      "visible_text": "I understand your concern that the main screen looks dull and isn't what you expected. I can offer two versions of the main screen within the first round of revisions. Bright colors weren't mentioned in the brief.",
+      "ui_latency_ms": 8928.03,
+      "model": "gpt-6.1-terra",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S1-neutral",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:55:34.325Z",
+      "session_id": "scenario_session_01795456534528181635_0000000139_351e43a3b4b0446d9b7cfe07c8b54db2",
+      "output": {
+        "text": "По лендингу студии йоги готовы главный экран и расписание. Разделы «Тренеры» и «Цены» в работе. Всё идёт по плану, первую версию покажу в пятницу."
+      },
+      "visible_text": "По лендингу студии йоги готовы главный экран и расписание. Разделы «Тренеры» и «Цены» в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+      "ui_latency_ms": 8716.16,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-warm.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Even businesslike wording: no praise, no emotional words.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No added results, promises or deadlines.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S1-warm",
+      "mode": "update",
+      "form_language": "ru",
+      "input": {
+        "progress_notes": "Проект: лендинг студии йоги. Главный экран и расписание готовы, тренеры и цены в работе. Всё идёт по плану, первую версию покажу в пятницу.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:55:34.426Z",
+      "session_id": "scenario_session_01795456535020913564_0000000142_6c5d3028338d439b8e45aa07b91e6766",
+      "output": {
+        "text": "В лендинге студии йоги уже готовы главный экран и расписание — два раздела на месте. Сейчас работаю над разделами с тренерами и ценами. Всё идёт по плану, первую версию покажу в пятницу."
+      },
+      "visible_text": "В лендинге студии йоги уже готовы главный экран и расписание — два раздела на месте. Сейчас работаю над разделами с тренерами и ценами. Всё идёт по плану, первую версию покажу в пятницу.",
+      "ui_latency_ms": 11573.78,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Same facts and the Friday date as S1-neutral.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Reads naturally warm and friendly; visibly different from S1-neutral in delivery, not only word order.",
+          "verdict": "FAIL",
+          "reason": "Uses the first person and adds 'два раздела на месте'; the delivery still reads close to neutral."
+        },
+        {
+          "criterion": "No praise, enthusiasm or promise the input does not support.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No gendered first-person past tense.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S2-warm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:56:48.546Z",
+      "session_id": "scenario_session_01795456608704217670_0000000169_4d457e7728574713b652a192ee1e4109",
+      "output": {
+        "text": "The first-version deadline is moving back by three days to Tuesday because the trainer photos haven’t come through for a week. I’m still waiting on those photos to move forward.",
+        "call_to_action": "Please send over the trainer photos."
+      },
+      "visible_text": "The first-version deadline is moving back by three days to Tuesday because the trainer photos haven’t come through for a week. I’m still waiting on those photos to move forward.\n\nPlease send over the trainer photos.",
+      "ui_latency_ms": 8816.91,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-en does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S2-firm-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "firm"
+      },
+      "selected_tone": "firm",
+      "submitted_at": "2026-11-23T17:55:34.251Z",
+      "session_id": "scenario_session_01795456534451086851_0000000136_b011ae2abdef4411a2898c46c67690cc",
+      "output": {
+        "text": "The first version is moving back by three days to Tuesday because the trainer photos have not been provided for a week.",
+        "call_to_action": "Send the trainer photos."
+      },
+      "visible_text": "The first version is moving back by three days to Tuesday because the trainer photos have not been provided for a week.\n\nSend the trainer photos.",
+      "ui_latency_ms": 6911.67,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Direct wording without courtesy padding; no invented apology or deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S7-neutral-en",
+      "mode": "update",
+      "form_language": "en",
+      "input": {
+        "progress_notes": "The first version is moving back by three days because the client hasn't sent the trainer photos for a week. New deadline for the first version: Tuesday.",
+        "tone": "neutral"
+      },
+      "selected_tone": "neutral",
+      "submitted_at": "2026-11-23T17:55:47.583Z",
+      "session_id": "scenario_session_01795456547878169835_0000000147_089f2d87336644d08684c9bdc5953a71",
+      "output": {
+        "text": "The deadline for the first version has moved back by three days to Tuesday. The trainer photos have been outstanding for a week, and their absence is delaying progress.",
+        "call_to_action": "Please send the trainer photos."
+      },
+      "visible_text": "The deadline for the first version has moved back by three days to Tuesday. The trainer photos have been outstanding for a week, and their absence is delaying progress.\n\nPlease send the trainer photos.",
+      "ui_latency_ms": 4819.09,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, the missing trainer photos as the reason, and Tuesday as the new first-version date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, as in S2-warm-en and S2-firm-en.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "States the reason in an even, businesslike tone without adding blame, an apology or a deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S2-warm-es",
+      "mode": "update",
+      "form_language": "es",
+      "input": {
+        "progress_notes": "La primera versión se retrasa tres días porque el cliente lleva una semana sin enviar las fotos de los entrenadores. Nueva fecha para la primera versión: el martes.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:55:50.220Z",
+      "session_id": "scenario_session_01795456550533909347_0000000152_392ca893c6754d7d874bfc16ff064d99",
+      "output": {
+        "text": "La nueva fecha para la primera versión es el martes, con un retraso de tres días. Sigo a la espera de las fotos de los entrenadores, pendientes de envío desde hace una semana; su falta es la causa del retraso.",
+        "call_to_action": "Por favor, envíame las fotos de los entrenadores para poder avanzar. Gracias por tu ayuda."
+      },
+      "visible_text": "La nueva fecha para la primera versión es el martes, con un retraso de tres días. Sigo a la espera de las fotos de los entrenadores, pendientes de envío desde hace una semana; su falta es la causa del retraso.\n\nPor favor, envíame las fotos de los entrenadores para poder avanzar. Gracias por tu ayuda.",
+      "ui_latency_ms": 4692.04,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Preserves the three-day shift, its reason and the Tuesday date.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Requests the trainer photos, exactly as S2-firm-es does.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "No invented apology, concession or response deadline.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    },
+    {
+      "series": "sol-sample",
+      "id": "S4-warm-en",
+      "mode": "reply_draft",
+      "form_language": "en",
+      "input": {
+        "client_message": "Honestly, I expected something completely different. The main screen looks dull. We asked for something bright. This isn't what we agreed on.",
+        "reply_goal": "Bright colors weren't mentioned in the brief, but I can offer two versions of the main screen within the first round of revisions.",
+        "tone": "warm"
+      },
+      "selected_tone": "warm",
+      "submitted_at": "2026-11-23T17:56:48.982Z",
+      "session_id": "scenario_session_01795456609290729968_0000000172_472df9b85b6f43e3ba59c1405cbb7141",
+      "output": {
+        "text": "I understand the main screen feels dull to you and you expected something bright. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief."
+      },
+      "visible_text": "I understand the main screen feels dull to you and you expected something bright. I can offer two versions of the main screen within the first round of revisions. Bright colors weren’t mentioned in the brief.",
+      "ui_latency_ms": 10923.44,
+      "model": "gpt-6.1-sol",
+      "configured_reasoning_effort": "medium",
+      "ledger_reasoning_effort": null,
+      "criteria": [
+        {
+          "criterion": "Acknowledges the client's concern without conceding a disputed fact.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Immediately offers two versions of the main screen within the first revision round.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Places any brief or scope explanation after the next step.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "Adds no concession, stronger promise, deadline or unsupported speaker gender.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The output is in the language of the submitted source.",
+          "verdict": "PASS"
+        },
+        {
+          "criterion": "The request to the client, if required, appears once.",
+          "verdict": "PASS"
+        }
+      ]
+    }
+  ]
+}
