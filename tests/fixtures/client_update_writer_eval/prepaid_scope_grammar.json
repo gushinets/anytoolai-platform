@@ -1,0 +1,277 @@
+{
+  "cases": [
+    {
+      "id": "CU-P-RU-06",
+      "language": "ru",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Для трекера питания согласован отдельный исследовательский этап: интервью, карта основного сценария и два варианта структуры. До его начала нужен указанный аванс. Полный прототип, медицинские советы и сканирование продуктов в этот этап не входят.",
+        "amount": "8 000 рублей",
+        "due_date": "до первой встречи"
+      },
+      "criteria": [
+        "Opening substantive scope line is either a grammatically complete, self-contained statement or a coherent independent scope label followed by its list. An unattached “For …” or equivalent followed by a dash and list fails. Correct prepositional openings with a governing clause are allowed.",
+        "Separate agreed research stage for the nutrition tracker; interviews, a map of the main scenario and TWO structure options are included.",
+        "Explicit request to pay 8,000 Russian rubles before the first meeting, with advance required before the stage starts; do not tighten timing, add urgency or invent a payment method.",
+        "Full prototype, medical advice and product scanning are excluded; no scope expansion, completion claim or added exclusion.",
+        "Firm, professional, copy-ready message in the target language, direct client address and request to notify the freelancer once payment is sent; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-EN-06",
+      "language": "en",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "A separate research stage has been agreed for the nutrition tracker: interviews, a map of the main scenario, and two structure options. The stated advance is required before the stage starts. The full prototype, medical advice, and food product scanning are not included in this stage.",
+        "amount": "8,000 Russian rubles",
+        "due_date": "before the first meeting"
+      },
+      "criteria": [
+        "Opening substantive scope line is either a grammatically complete, self-contained statement or a coherent independent scope label followed by its list. An unattached “For …” or equivalent followed by a dash and list fails. Correct prepositional openings with a governing clause are allowed.",
+        "Separate agreed research stage for the nutrition tracker; interviews, a map of the main scenario and TWO structure options are included.",
+        "Explicit request to pay 8,000 Russian rubles before the first meeting, with advance required before the stage starts; do not tighten timing, add urgency or invent a payment method.",
+        "Full prototype, medical advice and product scanning are excluded; no scope expansion, completion claim or added exclusion.",
+        "Firm, professional, copy-ready message in the target language, direct client address and request to notify the freelancer once payment is sent; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-ES-06",
+      "language": "es",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Se ha acordado una fase de investigación independiente para el registro de alimentación: entrevistas, un mapa del escenario principal y dos opciones de estructura. Se requiere el anticipo indicado antes de iniciar la fase. El prototipo completo, los consejos médicos y el escaneo de productos alimenticios quedan fuera de esta fase.",
+        "amount": "8.000 rublos rusos",
+        "due_date": "antes de la primera reunión"
+      },
+      "criteria": [
+        "Opening substantive scope line is either a grammatically complete, self-contained statement or a coherent independent scope label followed by its list. An unattached “For …” or equivalent followed by a dash and list fails. Correct prepositional openings with a governing clause are allowed.",
+        "Separate agreed research stage for the nutrition tracker; interviews, a map of the main scenario and TWO structure options are included.",
+        "Explicit request to pay 8,000 Russian rubles before the first meeting, with advance required before the stage starts; do not tighten timing, add urgency or invent a payment method.",
+        "Full prototype, medical advice and product scanning are excluded; no scope expansion, completion claim or added exclusion.",
+        "Firm, professional, copy-ready message in the target language, direct client address and request to notify the freelancer once payment is sent; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-RU-07",
+      "language": "ru",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Для согласованного отдельного исследовательского этапа трекера питания аванс покрывает интервью, карту основного сценария и два варианта структуры. До его начала нужен указанный аванс. Полный прототип, медицинские советы и сканирование продуктов в этот этап не входят.",
+        "amount": "8 000 рублей",
+        "due_date": "до первой встречи"
+      },
+      "criteria": [
+        "Opening substantive scope line is either a grammatically complete, self-contained statement or a coherent independent scope label followed by its list. An unattached “For …” or equivalent followed by a dash and list fails. Correct prepositional openings with a governing clause are allowed.",
+        "Separate agreed research stage for the nutrition tracker; interviews, a map of the main scenario and TWO structure options are included.",
+        "Explicit request to pay 8,000 Russian rubles before the first meeting, with advance required before the stage starts; do not tighten timing, add urgency or invent a payment method.",
+        "Full prototype, medical advice and product scanning are excluded; no scope expansion, completion claim or added exclusion.",
+        "Firm, professional, copy-ready message in the target language, direct client address and request to notify the freelancer once payment is sent; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-EN-07",
+      "language": "en",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "For the agreed separate research stage of the nutrition tracker, the advance covers interviews, a map of the main scenario, and two structure options. The stated advance is required before the stage starts. The full prototype, medical advice, and food product scanning are not included in this stage.",
+        "amount": "8,000 Russian rubles",
+        "due_date": "before the first meeting"
+      },
+      "criteria": [
+        "Opening substantive scope line is either a grammatically complete, self-contained statement or a coherent independent scope label followed by its list. An unattached “For …” or equivalent followed by a dash and list fails. Correct prepositional openings with a governing clause are allowed.",
+        "Separate agreed research stage for the nutrition tracker; interviews, a map of the main scenario and TWO structure options are included.",
+        "Explicit request to pay 8,000 Russian rubles before the first meeting, with advance required before the stage starts; do not tighten timing, add urgency or invent a payment method.",
+        "Full prototype, medical advice and product scanning are excluded; no scope expansion, completion claim or added exclusion.",
+        "Firm, professional, copy-ready message in the target language, direct client address and request to notify the freelancer once payment is sent; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-ES-07",
+      "language": "es",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Para la fase de investigación independiente acordada del registro de alimentación, el anticipo cubre las entrevistas, un mapa del escenario principal y dos opciones de estructura. Se requiere el anticipo indicado antes de iniciar la fase. El prototipo completo, los consejos médicos y el escaneo de productos alimenticios quedan fuera de esta fase.",
+        "amount": "8.000 rublos rusos",
+        "due_date": "antes de la primera reunión"
+      },
+      "criteria": [
+        "Opening substantive scope line is either a grammatically complete, self-contained statement or a coherent independent scope label followed by its list. An unattached “For …” or equivalent followed by a dash and list fails. Correct prepositional openings with a governing clause are allowed.",
+        "Separate agreed research stage for the nutrition tracker; interviews, a map of the main scenario and TWO structure options are included.",
+        "Explicit request to pay 8,000 Russian rubles before the first meeting, with advance required before the stage starts; do not tighten timing, add urgency or invent a payment method.",
+        "Full prototype, medical advice and product scanning are excluded; no scope expansion, completion claim or added exclusion.",
+        "Firm, professional, copy-ready message in the target language, direct client address and request to notify the freelancer once payment is sent; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-RU-A",
+      "language": "ru",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Для трекера питания согласован отдельный исследовательский этап: интервью, карта основного сценария и два варианта структуры. Аванс в размере 8 000 рублей уже получен полностью. Полный прототип, медицинские советы и сканирование продуктов в этот этап не входят.",
+        "amount": "8 000 рублей"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Acknowledge that the advance was received; do not present an outstanding debt. If the amount is mentioned, it must be 8,000 Russian rubles.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-EN-A",
+      "language": "en",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "A separate research stage has been agreed for the nutrition tracker: interviews, a map of the main scenario, and two structure options. The advance of 8,000 Russian rubles has already been received in full. The full prototype, medical advice, and food product scanning are not included in this stage.",
+        "amount": "8,000 Russian rubles"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Acknowledge that the advance was received; do not present an outstanding debt. If the amount is mentioned, it must be 8,000 Russian rubles.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-ES-A",
+      "language": "es",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Se ha acordado una fase de investigación independiente para el registro de alimentación: entrevistas, un mapa del escenario principal y dos opciones de estructura. Ya se ha recibido íntegramente el anticipo de 8.000 rublos rusos. El prototipo completo, los consejos médicos y el escaneo de productos alimenticios quedan fuera de esta fase.",
+        "amount": "8.000 rublos rusos"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Acknowledge that the advance was received; do not present an outstanding debt. If the amount is mentioned, it must be 8,000 Russian rubles.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-RU-B",
+      "language": "ru",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Для трекера питания согласован отдельный исследовательский этап: интервью, карта основного сценария и два варианта структуры. В заметках текущая сумма аванса составляет 9 000 рублей. Полный прототип, медицинские советы и сканирование продуктов в этот этап не входят.",
+        "amount": "8 000 рублей"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Ask to confirm both concrete advance candidates: 8,000 and 9,000 Russian rubles; do not endorse either as owed.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-EN-B",
+      "language": "en",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "A separate research stage has been agreed for the nutrition tracker: interviews, a map of the main scenario, and two structure options. The current advance amount in the notes is 9,000 Russian rubles. The full prototype, medical advice, and food product scanning are not included in this stage.",
+        "amount": "8,000 Russian rubles"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Ask to confirm both concrete advance candidates: 8,000 and 9,000 Russian rubles; do not endorse either as owed.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-ES-B",
+      "language": "es",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Se ha acordado una fase de investigación independiente para el registro de alimentación: entrevistas, un mapa del escenario principal y dos opciones de estructura. El importe actual del anticipo en las notas es de 9.000 rublos rusos. El prototipo completo, los consejos médicos y el escaneo de productos alimenticios quedan fuera de esta fase.",
+        "amount": "8.000 rublos rusos"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Ask to confirm both concrete advance candidates: 8,000 and 9,000 Russian rubles; do not endorse either as owed.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-RU-C",
+      "language": "ru",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Для трекера питания согласован отдельный исследовательский этап: интервью, карта основного сценария и два варианта структуры. Аванс 8 000 рублей согласован, но до запроса оплаты нужно дождаться рассмотрения клиентом. Полный прототип, медицинские советы и сканирование продуктов в этот этап не входят.",
+        "amount": "8 000 рублей"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Acknowledge waiting for the client’s review; if mentioned, the agreed advance is 8,000 Russian rubles.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-EN-C",
+      "language": "en",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "A separate research stage has been agreed for the nutrition tracker: interviews, a map of the main scenario, and two structure options. The advance of 8,000 Russian rubles is agreed, but wait for the client’s review before requesting payment. The full prototype, medical advice, and food product scanning are not included in this stage.",
+        "amount": "8,000 Russian rubles"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Acknowledge waiting for the client’s review; if mentioned, the agreed advance is 8,000 Russian rubles.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    },
+    {
+      "id": "CU-P-ES-C",
+      "language": "es",
+      "mode": "prepaid_request",
+      "tone": "firm",
+      "billing_context": {
+        "notes": "Se ha acordado una fase de investigación independiente para el registro de alimentación: entrevistas, un mapa del escenario principal y dos opciones de estructura. Se ha acordado un anticipo de 8.000 rublos rusos, pero hay que esperar a la revisión del cliente antes de solicitar el pago. El prototipo completo, los consejos médicos y el escaneo de productos alimenticios quedan fuera de esta fase.",
+        "amount": "8.000 rublos rusos"
+      },
+      "criteria": [
+        "Write natural, grammatically complete text in the target language, with any included scope statement or label coherent.",
+        "Acknowledge waiting for the client’s review; if mentioned, the agreed advance is 8,000 Russian rubles.",
+        "No payment demand or request to report payment; do not invent a deadline or payment method.",
+        "Any scope details included must be faithful to the stated deliverables and exclusions, with no expansion or completion claim; do not require scope exposition in this message kind.",
+        "Firm, professional, copy-ready message addressed directly to the client; no placeholders, author instructions or invented terms."
+      ]
+    }
+  ],
+  "models": [
+    "openai/gpt-6-luna",
+    "openai/gpt-6.1-terra",
+    "openai/gpt-6.1-sol"
+  ],
+  "reasoning": [
+    "medium"
+  ],
+  "repeats": 3,
+  "minimum_usable": 3,
+  "max_median_ui_ms": 60000,
+  "max_critical_errors": 0
+}
