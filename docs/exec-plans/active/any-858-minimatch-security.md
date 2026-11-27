@@ -5,16 +5,16 @@
 - State: active
 - Owner: Codex
 - Created: 2026-11-27
-- Last updated: 2026-11-27
-- Review date: 2026-11-27
-- Next action: Read the post-commit verification receipts and handoff; authorize a PR separately when ready.
-- Blocker: Local Windows baseline ACL failure is pre-existing; full verification history and definitive post-commit results are linked below. No blocker remains to resolving the dependency graph.
+- Last updated: 2026-11-28
+- Review date: 2026-11-28
+- Next action: After PR #297 merges and main is rescanned, verify that Dependabot #181 closes; if it remains open, compare its affected dependency path with the merged lockfile and investigate before completing this plan.
+- Blocker: The post-merge Dependabot check awaits merge and the main-branch rescan. Pre-merge checks passed in the hosted CI runs linked below; local host failures remain recorded as historical diagnostics.
 - Baseline: freshly fetched origin/main `26128baa3ae87ad9213906af18697feafff28470`.
 - Branch: `codex/any-858-minimatch`.
 
 ## Goal and boundaries
 
-Remove all known applicable minimatch CVE/GHSA version matches from the complete resolved lint graph, with the smallest supported change. Keep the lint stack, scanning policy, allowBuilds and unrelated dependencies. No PR, merge, deployment, Linear mutation or alert closure is authorized. Personal timing remains only in the original checkout's ignored workpaper.md.
+Remove all known applicable minimatch CVE/GHSA version matches from the complete resolved lint graph, with the smallest supported change. Keep the lint stack, scanning policy, allowBuilds and unrelated dependencies. PR creation and review corrections were subsequently authorized; [PR #297](https://github.com/gushinets/anytoolai-platform/pull/297) is open. Merge, deployment, Linear mutation and manual alert closure remain unauthorized. Personal timing remains only in the original checkout's ignored workpaper.md.
 
 Read AGENTS.md, its ten start documents, docs/agent/coding-conventions.md, .github/workflows/{backend,frontend,trivy}.yml and completed/trivy-dependabot-adoption-2026-11-03.md. Root manifests and this plan have no governing nested AGENTS.md; extensions/AGENTS.md was also read; no extension source is changed. No API, DB, configuration-runtime, event or product contract changes.
 
@@ -80,6 +80,24 @@ Changed files: package.json (two devDependency floors), pnpm-lock.yaml (generate
 
 ## Validation record and final-SHA protocol
 
+### Published PR evidence and remaining acceptance step
+
+The following hosted evidence is available from a fresh checkout without the original worktree's ignored receipts. Checked on 2026-11-28 for PR head `02ecfeede82d5d68e1c280ab5a2da34a37c32a40` (which incorporates main `cf8ae98082abce67b5425154d88726aa806583ff`); CI checked out PR merge revision `dcf93c89ac9bbe03e2250f51b3d7a23a3e6bf11d`. These results apply to that revision, not automatically to subsequent documentation commits.
+
+| Required check | Published result |
+|---|---|
+| full-check | [Passed, including frozen install and canonical full-check](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/job/140775341871) |
+| postgresql-quota-concurrency | [Passed](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/job/140775200393) |
+| atoms-proof | [Passed](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/job/140775200311) |
+| baseline (windows-latest) | [Passed](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/job/140775200448) |
+| compose-smoke-prod | [Passed](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/job/140775200120) |
+
+[Frontend CI](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586494) and [documentation CI](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586444) also passed. The [Trivy job](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/job/140775200424) passed and published the [all-severity filesystem SARIF artifact](https://github.com/gushinets/anytoolai-platform/actions/runs/46079586504/artifacts/15237205019), with development dependencies included. Artifact name: `trivy-filesystem-sarif`; archive digest: `sha256:3524153b5f75ce0f65a82b53006f64cd503668948357b0ae0fb72d7a59334b26`; hosted retention ends 2026-12-27. The [independent review record](https://github.com/gushinets/anytoolai-platform/pull/297#issuecomment-7230243047) confirms inspection of the SARIF: no CVE-2026-118764, three unrelated Next.js Medium findings and one Dockerfile Low finding. GHSA-only range analysis remains documented above; passing the High/Critical gate alone is not its evidence.
+
+The only unfinished acceptance step is [Dependabot #181](https://github.com/gushinets/anytoolai-platform/security/dependabot/181) closing after merge and the main-branch rescan. Keep this plan active until that state is observed. If the hosted artifact has expired, use the recorded run/revision/digest and review summary as provenance and obtain a fresh scan of the merged lockfile; do not rely on unavailable local receipts or manually close the alert as a substitute.
+
+### Historical local verification and receipts
+
 Evidence directory in the isolated worktree: `.agent/any-858/` (ignored; tool output, not a personal diary). Experimental one-sided/8.74 locks are preserved outside this checkout at `D:/Devpy/anytoolai-platform/.agent/any-858-candidates/`, so a whole-checkout Trivy scan examines the shipped workspace graph without scanner exclusions. No filtering, severity exclusion, ignore rule or scanning-policy change is used.
 
 The final commit SHA and lockfile SHA-256 are recorded after commit in `final-verification.json` in the evidence directory and in the handoff. A commit cannot include its own SHA; no amendment is made after the final-SHA checks. Every verification command records its starting/ending SHA and lock hash in that receipt. Precommit checks below are preliminary and do not replace final-SHA verification.
@@ -119,12 +137,12 @@ pnpm why -r minimatch --json
 | Acceptance criterion | Status |
 |---|---|
 | Every affected dev chain resolves a fixed version; no >=7 <11.0.1 in root lock | Implemented: all lint consumers 11.0.9; independent 5.1.9 retained. Final receipt rechecks lock/tree. |
-| Frozen install and complete lint work | Proven before commit; final-SHA rerun required by this assignment and recorded in receipt. |
-| Fresh Trivy lacks CVE-2026-118764 | Proven for the selected root lock before commit; final whole-checkout scan and full lint-subgraph assertions recorded in receipt. GHSA-only records checked separately above. |
-| Frontend and relevant repository checks work | Final receipt contains each actual result; no missing check counts as pass. |
-| Dependabot #181 closes after merge to main | Pending authorized PR/merge and GitHub rescan; cannot be proven locally. No PR or alert mutation authorized. |
+| Frozen install and complete lint work | Met in the published full-check and frontend CI runs linked above, for the recorded PR merge revision. |
+| Fresh Trivy lacks CVE-2026-118764 | Met in the published Trivy SARIF linked above and independently reviewed. GHSA-only records checked separately above. |
+| Frontend and relevant repository checks work | All five required checks and frontend/docs CI passed for the recorded PR merge revision; subsequent commits require their own CI results. |
+| Dependabot #181 closes after merge to main | Pending merge of PR #297 and the main-branch rescan; verify the alert state before completing this plan. No manual alert closure authorized. |
 
-Local Windows limitations and the exact Linux environment corrections are recorded above; definitive receipts determine each final local outcome. Required GitHub statuses still need to run on a future authorized PR, with alert closure checked after merge. Unrelated Next.js Medium findings remain visible. Recheck advisories when integrating because security data can change.
+Local Windows limitations and the exact Linux environment corrections are retained above as historical diagnostics. Published PR checks now provide the shared pre-merge evidence; alert closure remains a post-merge check. Unrelated Next.js Medium findings remain visible. Recheck advisories when integrating because security data can change.
 
 ## Complete path proof
 
