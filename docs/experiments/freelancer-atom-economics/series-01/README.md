@@ -90,7 +90,7 @@ holdout касалась подмены пожелания обязательс�
 
 ## Таблицы замеров
 
-- [Пилот на 540 входах](report-pilot-540.csv) и [отложенная выборка финалистов](report-finalists-holdout.csv).
+- [540 запусков на 60 входах](report-pilot-540.csv) и [отложенная выборка финалистов](report-finalists-holdout.csv).
 - [Парное сравнение reasoning у финалистов](report-finalists-effort.csv) и [точечные проверки сложных кейсов](report-finalists-targeted.csv).
 - [Результаты полных сценариев](report-scenarios.csv).
 - [Сигнал переключения модели](fallback-analysis.json), [сверка расходов](ledger-reconciliation.json) и [снимок контрольных сумм holdout](holdout-freeze.json).
