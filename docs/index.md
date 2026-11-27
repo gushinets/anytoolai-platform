@@ -104,6 +104,7 @@ This directory is the system of record for agents. Keep it current. If a decisio
 
 ## Experiments
 
+- [Freelancer Suite model selection before the pilot](experiments/freelancer-model-selection-2026-11-26.md) — Luna and Sol by product step, paired RU/EN results, cost per ready answer, and when to retest.
 - [Kernel Demo prompt selection results](experiments/kernel-demo-prompt-results-2026-10-13.md) — adopted variants, multilingual comparison results, and limits of the evidence.
 
 ## Generated docs
