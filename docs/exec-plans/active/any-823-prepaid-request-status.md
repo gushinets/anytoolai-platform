@@ -55,3 +55,10 @@ Only the product-owned `client_update_writer.prepaid_request_compose_persuasive_
 ## Acceptance status
 
 **Live acceptance passed (18/18); local contract and product tests passed.** The original provider-failed series remains independently preserved. The three documented pre-existing environment-dependent runner failures remain in full-check, while separate frontend-check and the complete Freelancer Suite passed. No unrelated fixes or production configuration changes were made. The owner explicitly authorized pushing the scoped commit and instructed that the Linear ticket remain open without a comment or status update.
+
+
+## Review round 1 — regression contract completeness
+
+The product test pins the agreed-term and explicit-status instructions but not the ambiguous-start prohibition. Confirm the omission by temporarily removing only that sentence and running the test; add the normalized sentence assertion and repeat the mutation check, restoring the prompt bytes in both cases. Run the product module and documentation checks. Production prompt and live evidence remain unchanged.
+
+Verified: removing exactly the ambiguous-start sentence left the original test green (1 passed). With the added assertion, the same mutation failed at that assertion (1 failed). Restoring the original prompt produced 77/77 passing product tests. The deployed-tested prompt SHA-256 remains `83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110`, so the retained 18/18 live acceptance evidence still applies to production behavior. No additional provider calls required.

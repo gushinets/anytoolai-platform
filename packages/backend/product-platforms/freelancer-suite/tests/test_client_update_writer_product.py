@@ -578,6 +578,10 @@ def test_prepaid_request_prompt_preserves_work_and_payment_status_independently(
 
     assert "State a prepayment-before-start condition as an agreed term." in prompt
     assert (
+        "Ambiguous start wording does not establish that work is already underway or that "
+        "payment should already have been made." in prompt
+    )
+    assert (
         "Preserve an explicitly stated work start or overdue payment independently; "
         "evidence of one does not establish the other." in prompt
     )
