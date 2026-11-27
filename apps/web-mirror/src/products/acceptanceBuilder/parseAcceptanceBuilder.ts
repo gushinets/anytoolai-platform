@@ -44,7 +44,11 @@ export type AcceptanceBuilderResult = {
   analysisLanguage: string;
   missingFields: ListField[];
   // Deterministic presentation only; never an independent output.document.
-  document: { sections: { title: string; content: string }[]; summary: string };
+  document: {
+    sections: { title: string; content: string }[];
+    summary: string;
+    check?: { findings: string[]; evidence: string[]; rationale?: string };
+  };
   // Present only for `check_v1`.
   comparison?: Comparison;
   insufficientBrief?: true;

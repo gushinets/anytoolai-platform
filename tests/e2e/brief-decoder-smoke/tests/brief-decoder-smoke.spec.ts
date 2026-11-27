@@ -149,7 +149,7 @@ test.describe("Brief Decoder web product", () => {
     await page.goto(PRODUCT_URL);
     await expect(page.locator("h1")).toHaveText("Brief Decoder");
     await submitBrief(page);
-    const copyButton = page.getByRole("button", { name: "Copy" });
+    const copyButton = page.getByRole("button", { name: "Copy", exact: true });
     await expect(copyButton).toBeVisible({ timeout: 60_000 });
 
     const expected = composedOutput("");
@@ -170,7 +170,7 @@ test.describe("Brief Decoder web product", () => {
     await expect.poll(() => countEvents("web.result_viewed", sessionId), { timeout: 10_000 }).toBe(1);
 
     await copyButton.click();
-    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toBe(composeCopyText(expected));
     expect(copied).not.toContain(expected.document.summary);
@@ -189,7 +189,7 @@ test.describe("Brief Decoder web product", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(PRODUCT_URL);
     await submitBrief(page);
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
     await expect(page.locator("#brief-decoder-brief-text")).toHaveValue(BRIEF);
     await expectWorkspaceLayout(page, "side-by-side");
@@ -200,7 +200,7 @@ test.describe("Brief Decoder web product", () => {
     await page.getByRole("button", { name: "Decode brief again" }).click();
     // The progress line sits next to the "previous details" notice, both announced as status.
     await expect(page.getByRole("status").filter({ hasText: "Decoding your brief" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
     await expect(page.getByRole("status")).toHaveCount(0, { timeout: 60_000 });
     await expect(page.getByRole("button", { name: "New task" })).toBeVisible();
 
@@ -230,7 +230,7 @@ test.describe("Brief Decoder web product", () => {
     await page.goto(PRODUCT_URL);
     const field = page.getByRole("textbox", { name: "Client brief" });
     const submit = page.getByRole("button", { name: "Decode brief", exact: true });
-    const copy = page.getByRole("button", { name: "Copy" });
+    const copy = page.getByRole("button", { name: "Copy", exact: true });
     const handoff = page.getByRole("button", { name: "Create acceptance criteria" });
     await field.fill(junk);
     await submit.click();
@@ -240,6 +240,7 @@ test.describe("Brief Decoder web product", () => {
     await expect(field).toBeFocused();
     await expect(field).toHaveValue(junk);
     await expect(copy).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy questions", exact: true })).toHaveCount(0);
     await expect(handoff).toHaveCount(0);
     expect(clientEvents).not.toContain("web.result_viewed");
 
@@ -256,17 +257,41 @@ test.describe("Brief Decoder web product", () => {
     expect(starts).toHaveLength(2);
   });
 
-  test("weak input: the vague-brief fixtures render a full result with four questions and one result_viewed", async ({
+  test("weak input: four questions copied as plain text with one copy activation and one result_viewed", async ({
     page,
   }) => {
     const run = trackRun(page, START_ROUTE_PATTERN);
-    await overrideResult(page, composedOutput(".weak_input"));
+    const output = composedOutput(".weak_input");
+    const copyRequests: { url: string; body: unknown }[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST" && COPY_NEXT_ACTION_PATTERN.test(request.url())) {
+        copyRequests.push({ url: request.url(), body: request.postDataJSON() });
+      }
+    });
+    await overrideResult(page, output);
     await page.goto(PRODUCT_URL);
     await submitBrief(page);
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("heading", { name: "4 clarifying questions" })).toBeVisible();
     await expect(page.locator("ol > li")).toHaveCount(4);
-    await expect.poll(() => countEvents("web.result_viewed", run.sessionId()), { timeout: 10_000 }).toBe(1);
+    const section = page.getByRole("region", { name: "4 clarifying questions" });
+    const copy = section.getByRole("button", { name: "Copy questions", exact: true });
+    const sessionId = run.sessionId();
+    expect(sessionId).toBeTruthy();
+    await expect.poll(() => countEvents("web.result_viewed", sessionId), { timeout: 10_000 }).toBe(1);
+    await copy.focus();
+    await copy.press("Enter");
+    await expect(section.getByRole("button", { name: "Questions copied", exact: true })).toBeVisible();
+    const clipboardTypes = await page.evaluate(async () => (await navigator.clipboard.read()).flatMap((item) => item.types));
+    expect(clipboardTypes).toEqual(["text/plain"]);
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied.replace(/\r\n/g, "\n")).toBe(output.questions.map(({ question }) => question).join("\n"));
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
+    await expect.poll(() => copyRequests.length, { timeout: 5_000 }).toBe(1);
+    expect(new URL(copyRequests[0]!.url).pathname.endsWith(`/scenario-sessions/${sessionId}/next-actions/copy_result`)).toBe(true);
+    expect(copyRequests[0]!.body).toEqual({ checkpoint_id: "result_ready" });
+    await expect.poll(() => countEvents("client.next_action_clicked", sessionId), { timeout: 5_000 }).toBe(1);
+    expect(await countEvents("web.result_viewed", sessionId)).toBe(1);
   });
 
   test("zero questions: both empty states, no readiness claim, no result_viewed, structured result still copyable", async ({
@@ -278,16 +303,17 @@ test.describe("Brief Decoder web product", () => {
     await overrideResult(page, output);
     await page.goto(PRODUCT_URL);
     await submitBrief(page);
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("No issues found.")).toBeVisible();
     await expect(page.getByText("No clarifying questions were generated.")).toBeVisible();
     await expect(page.locator("ol > li")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy questions", exact: true })).toHaveCount(0);
 
     // The backend records completion; the browser must not report a "viewed" activation.
     await expect.poll(() => countEvents("scenario.completed", run.sessionId()), { timeout: 10_000 }).toBe(1);
 
-    await page.getByRole("button", { name: "Copy" }).click();
-    await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+    await page.getByRole("button", { name: "Copy", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toBe(composeCopyText(output));
     expect(copied).toContain("No clarifying questions were generated.");
@@ -328,7 +354,7 @@ test.describe("Brief Decoder web product", () => {
       timeout: 60_000,
     });
     await expect(page.locator("#brief-decoder-brief-text")).toHaveValue(BRIEF);
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
     await expect(page.getByRole("status")).toHaveCount(0);
   });
 
@@ -339,12 +365,12 @@ test.describe("Brief Decoder web product", () => {
     await page.goto(PRODUCT_URL);
     for (let run = 1; run <= GUEST_QUOTA_LIMIT; run += 1) {
       await submitBrief(page);
-      await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
       await page.getByRole("button", { name: "New task" }).click();
       await expect(page.locator("#brief-decoder-brief-text")).toHaveValue("");
     }
     await submitBrief(page);
     await expect(page.getByText(/used all your/)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "Copy" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
   });
 });

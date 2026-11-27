@@ -1,0 +1,1723 @@
+[
+  {
+    "case_id": "bd-h01-labels-a01",
+    "scenario_case_id": "bd-h01-labels",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/packaging-design/PET-Bottle-Label-Design",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты задача оформления этикетки, редактируемый исходник, PDF и размеры упаковки как вход. Банки, число размеров, стороны, фраза, расхождение, лимит и сроки составлены для эксперимента. Все фиксированные промежуточные результаты составлены для эксперимента."
+      }
+    ],
+    "atom_id": "A01",
+    "step_id": "extract",
+    "prompt_ref": "brief_decoder.extract_brief.v1",
+    "inputs": {
+      "ru": {
+        "source_text": "Нужны обновлённые этикетки для трёх размеров банок с джемом, чтобы команда типографии могла напечатать серию. Сдайте один редактируемый исходник с отдельной монтажной областью на каждый размер и PDF для печати на каждый размер. Мы передадим актуальный логотип и тексты; контуры и размеры ещё не утверждены, сейчас есть только черновые. На каждой этикетке оставьте точную фразу «Keep chilled.» Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов. Сам тираж в работу не входит. Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил. Бюджет — не более 380 USD.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "We need updated labels for three sizes of jam jar so the print team can produce the run. Deliver one editable source file with a separate artboard per size and a print PDF for each size. We will provide the current logo and copy; the dielines and dimensions are still draft and have not been approved. Keep the exact words “Keep chilled.” on each label. The printer requires a single black ink, while marketing requires full-color CMYK for those same files. Printing the run is out of scope. The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet. The budget is no more than 380 USD.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Нужны обновлённые этикетки для трёх размеров банок с джемом, чтобы команда типографии могла напечатать серию. Сдайте один редактируемый исходник с отдельной монтажной областью на каждый размер и PDF для печати на каждый размер. Мы передадим актуальный логотип и тексты; контуры и размеры ещё не утверждены, сейчас есть только черновые. На каждой этикетке оставьте точную фразу «Keep chilled.» Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов. Сам тираж в работу не входит. Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил. Бюджет — не более 380 USD."
+      },
+      "en": {
+        "brief_text": "We need updated labels for three sizes of jam jar so the print team can produce the run. Deliver one editable source file with a separate artboard per size and a print PDF for each size. We will provide the current logo and copy; the dielines and dimensions are still draft and have not been approved. Keep the exact words “Keep chilled.” on each label. The printer requires a single black ink, while marketing requires full-color CMYK for those same files. Printing the run is out of scope. The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet. The budget is no more than 380 USD."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Три размера банок, одна монтажная область на размер в одном исходнике и три PDF для типографии.",
+        "Контуры и размеры не утверждены. Типография и маркетинг требуют разные цветовые режимы для одних файлов.",
+        "Точная фраза Keep chilled., тираж исключён; 2026-12-11 — желаемая неподтверждённая дата, 380 USD — верхний предел."
+      ],
+      "required": [
+        "Вернуть штатный конечный результат brief_decoder.decode_v1, исходный бриф дословно и четыре раздела документа в порядке шаблона.",
+        "Вывод пригоден для чтения и передачи: 3 размера, один исходник с отдельной областью на размер и PDF на каждый, точная фраза Keep chilled., ограничения и отсутствие печати тиража.",
+        "Указать желаемый неподтверждённый срок 2026-12-11 и верхний предел 380 USD. Назвать неутверждённые контуры и противоречие между типографией и маркетингом. Показать, что работу начинать рано.",
+        "В результате есть вопросы, соответствующие фактическим проблемам и индексам, включая подтверждение размеров и выбор режима цвета. Документ сохраняет дословные строки реально пройденных шагов в исходном порядке. Авторский текст на языке брифа."
+      ],
+      "prohibited": [
+        "Придуманные условия, выбранный цвет, подтверждённая дата, другая цена или включение тиража. Потеря предупреждений о контуре или цвете. Перевод фразы Keep chilled. или сокращение фактических списков в документе."
+      ],
+      "allowed": [
+        "Порядок находок и их формулировки определяются фактически выполненными шагами. Вопрос о желаемой дате полезен, если A04 выделил отдельный риск срока."
+      ]
+    },
+    "rubric": {
+      "facts": [
+        "Три размера банок, одна монтажная область на размер в одном исходнике и три PDF для типографии.",
+        "Контуры и размеры не утверждены. Типография и маркетинг требуют разные цветовые режимы для одних файлов.",
+        "Точная фраза Keep chilled., тираж исключён; 2026-12-11 — желаемая неподтверждённая дата, 380 USD — верхний предел."
+      ],
+      "required": [
+        "Отдельно перечислить исходник и PDF с привязкой к трём размерам и указать типографию.",
+        "Сохранить точную фразу Keep chilled., границы печати, черновые контуры и обе стороны противоречащих требований к цвету.",
+        "Сохранить желаемый неподтверждённый срок и верхний предел бюджета."
+      ],
+      "prohibited": [
+        "Согласованный срок, фиксированная цена 380 USD, печать тиража в составе проекта, утверждённые размеры или выбранный цветовой режим. Перевод фразы Keep chilled."
+      ],
+      "allowed": [
+        "Формулировки существенных фактов произвольны, если не меняют смысл. Сроки, суммы и дословные цитаты передавать как они сформулированы в брифе."
+      ],
+      "objective": {
+        "missing_fields": [],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "2026-12-11"
+            ],
+            "budget": [
+              "380 USD"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "2026-12-11"
+            ],
+            "budget": [
+              "380 USD"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-h01-labels-a04",
+    "scenario_case_id": "bd-h01-labels",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/packaging-design/PET-Bottle-Label-Design",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты задача оформления этикетки, редактируемый исходник, PDF и размеры упаковки как вход. Банки, число размеров, стороны, фраза, расхождение, лимит и сроки составлены для эксперимента. Все фиксированные промежуточные результаты составлены для эксперимента."
+      }
+    ],
+    "atom_id": "A04",
+    "step_id": "detect_issues",
+    "prompt_ref": "brief_decoder.detect_issues.v1",
+    "inputs": {
+      "ru": {
+        "source_text": "Нужны обновлённые этикетки для трёх размеров банок с джемом, чтобы команда типографии могла напечатать серию. Сдайте один редактируемый исходник с отдельной монтажной областью на каждый размер и PDF для печати на каждый размер. Мы передадим актуальный логотип и тексты; контуры и размеры ещё не утверждены, сейчас есть только черновые. На каждой этикетке оставьте точную фразу «Keep chilled.» Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов. Сам тираж в работу не входит. Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил. Бюджет — не более 380 USD.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      },
+      "en": {
+        "source_text": "We need updated labels for three sizes of jam jar so the print team can produce the run. Deliver one editable source file with a separate artboard per size and a print PDF for each size. We will provide the current logo and copy; the dielines and dimensions are still draft and have not been approved. Keep the exact words “Keep chilled.” on each label. The printer requires a single black ink, while marketing requires full-color CMYK for those same files. Printing the run is out of scope. The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet. The budget is no more than 380 USD.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Три размера банок, одна монтажная область на размер в одном исходнике и три PDF для типографии.",
+        "Контуры и размеры не утверждены. Типография и маркетинг требуют разные цветовые режимы для одних файлов.",
+        "Точная фраза Keep chilled., тираж исключён; 2026-12-11 — желаемая неподтверждённая дата, 380 USD — верхний предел."
+      ],
+      "required": [
+        "Назвать неутверждённые размеры/контуры и несовместимые требования к цвету для одних файлов. Оба вопроса существенно мешают подготовке финальных файлов; для цветового расхождения нужен `contradiction`.",
+        "Привести короткую опору на фактические формулировки для цветового расхождения. Не выдумывать недостающих условий."
+      ],
+      "prohibited": [
+        "Назвать неуказанными сам бюджет, аудиторию или дату. Превратить неподтверждённую дату в нарушение уже согласованного срока. Добавить обязательство по печати тиража."
+      ],
+      "allowed": [
+        "Отметить неподтверждённый срок как отдельный риск (полезно, не обязательно для зачёта A04). Недостающие утверждённые контуры допустимы как missing_information или ambiguity, если смысл не меняется."
+      ],
+      "objective": {
+        "required_issue_categories": [
+          "contradiction"
+        ]
+      }
+    }
+  },
+  {
+    "case_id": "bd-h01-labels-a05",
+    "scenario_case_id": "bd-h01-labels",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/packaging-design/PET-Bottle-Label-Design",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты задача оформления этикетки, редактируемый исходник, PDF и размеры упаковки как вход. Банки, число размеров, стороны, фраза, расхождение, лимит и сроки составлены для эксперимента. Все фиксированные промежуточные результаты составлены для эксперимента."
+      }
+    ],
+    "atom_id": "A05",
+    "step_id": "generate_questions",
+    "prompt_ref": "brief_decoder.generate_questions.v1",
+    "inputs": {
+      "ru": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "Контуры и размеры для трёх вариантов ещё не утверждены.",
+            "evidence": "контуры и размеры ещё не утверждены, сейчас есть только черновые"
+          },
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "Для одних и тех же файлов типография требует один чёрный цвет, а маркетинг — цветной CMYK.",
+            "evidence": "Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов."
+          },
+          {
+            "category": "timeline_risk",
+            "severity": "medium",
+            "description": "Исполнитель ещё не подтвердил желаемую дату 2026-12-11.",
+            "evidence": "Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Нужны обновлённые этикетки для трёх размеров банок с джемом, чтобы команда типографии могла напечатать серию. Сдайте один редактируемый исходник с отдельной монтажной областью на каждый размер и PDF для печати на каждый размер. Мы передадим актуальный логотип и тексты; контуры и размеры ещё не утверждены, сейчас есть только черновые. На каждой этикетке оставьте точную фразу «Keep chilled.» Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов. Сам тираж в работу не входит. Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил. Бюджет — не более 380 USD.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      },
+      "en": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "The dielines and dimensions for the three versions are still unapproved.",
+            "evidence": "the dielines and dimensions are still draft and have not been approved"
+          },
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "The printer requires a single black ink and marketing requires full-color CMYK for the same files.",
+            "evidence": "The printer requires a single black ink, while marketing requires full-color CMYK for those same files."
+          },
+          {
+            "category": "timeline_risk",
+            "severity": "medium",
+            "description": "The freelancer has not confirmed the preferred delivery date of 2026-12-11.",
+            "evidence": "The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "We need updated labels for three sizes of jam jar so the print team can produce the run. Deliver one editable source file with a separate artboard per size and a print PDF for each size. We will provide the current logo and copy; the dielines and dimensions are still draft and have not been approved. Keep the exact words “Keep chilled.” on each label. The printer requires a single black ink, while marketing requires full-color CMYK for those same files. Printing the run is out of scope. The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet. The budget is no more than 380 USD.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Три размера банок, одна монтажная область на размер в одном исходнике и три PDF для типографии.",
+        "Контуры и размеры не утверждены. Типография и маркетинг требуют разные цветовые режимы для одних файлов.",
+        "Точная фраза Keep chilled., тираж исключён; 2026-12-11 — желаемая неподтверждённая дата, 380 USD — верхний предел."
+      ],
+      "required": [
+        "Первый блок вопросов должен получить утверждённые размеры/контуры всех банок и решение, какой цветовой вариант считать действующим. Связать вопросы с индексами 0 и 1.",
+        "Один вопрос связан с индексом 2 и помогает выяснить обязательную или реалистичную дату без подмены желаемой даты подтверждённой. Вопросы отсортированы по приоритету и индексу."
+      ],
+      "prohibited": [
+        "Спрашивать уже заданный предел бюджета, поручать клиенту печать тиража или требовать подтвердить готовый выбор цвета."
+      ],
+      "allowed": [
+        "Смысл вопроса и причины может быть сформулирован свободно. Одно обращение может уточнять два взаимосвязанных параметра одной находки."
+      ],
+      "objective": {
+        "required_source_issue_indices": [
+          0,
+          1,
+          2
+        ],
+        "max_questions": 5
+      }
+    }
+  },
+  {
+    "case_id": "bd-h01-labels-a10",
+    "scenario_case_id": "bd-h01-labels",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/packaging-design/PET-Bottle-Label-Design",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты задача оформления этикетки, редактируемый исходник, PDF и размеры упаковки как вход. Банки, число размеров, стороны, фраза, расхождение, лимит и сроки составлены для эксперимента. Все фиксированные промежуточные результаты составлены для эксперимента."
+      }
+    ],
+    "atom_id": "A10",
+    "step_id": "generate_document",
+    "prompt_ref": "brief_decoder.generate_summary.v1",
+    "inputs": {
+      "ru": {
+        "template_ref": "brief_decoder.summary_v1",
+        "data": {
+          "source_brief": "Нужны обновлённые этикетки для трёх размеров банок с джемом, чтобы команда типографии могла напечатать серию. Сдайте один редактируемый исходник с отдельной монтажной областью на каждый размер и PDF для печати на каждый размер. Мы передадим актуальный логотип и тексты; контуры и размеры ещё не утверждены, сейчас есть только черновые. На каждой этикетке оставьте точную фразу «Keep chilled.» Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов. Сам тираж в работу не входит. Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил. Бюджет — не более 380 USD.",
+          "brief": {
+            "values": {
+              "project_goal": "Обновить этикетки банок с джемом для печати.",
+              "target_audience": "Команда типографии.",
+              "deliverables": [
+                "Один редактируемый исходник\n  по одной монтажной области на каждый из трёх размеров",
+                "PDF для печати на каждый из трёх размеров"
+              ],
+              "deadline": "Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил",
+              "budget": "Бюджет — не более 380 USD",
+              "constraints": [
+                "Заказчик передаст актуальный логотип и тексты.",
+                "Контуры и размеры пока черновые, не утверждены.",
+                "На каждой этикетке должна быть точная фраза «Keep chilled.»",
+                "Типография требует один чёрный цвет; отдел маркетинга требует цветной CMYK для тех же файлов.",
+                "Печать тиража не входит в объём."
+              ]
+            },
+            "missing_fields": []
+          },
+          "issues": [
+            {
+              "category": "missing_information",
+              "severity": "high",
+              "description": "Контуры и размеры для трёх вариантов ещё не утверждены.",
+              "evidence": "контуры и размеры ещё не утверждены, сейчас есть только черновые"
+            },
+            {
+              "category": "contradiction",
+              "severity": "high",
+              "description": "Для одних и тех же файлов типография требует один чёрный цвет, а маркетинг — цветной CMYK.",
+              "evidence": "Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов."
+            },
+            {
+              "category": "timeline_risk",
+              "severity": "medium",
+              "description": "Исполнитель ещё не подтвердил желаемую дату 2026-12-11.",
+              "evidence": "Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил."
+            }
+          ],
+          "questions": [
+            {
+              "question": "Когда будут утверждены контуры и размеры для всех трёх банок?",
+              "rationale": "По этим размерам нужно подготовить файлы для печати.",
+              "priority": "high",
+              "category": "missing_information",
+              "source_issue_index": 0
+            },
+            {
+              "question": "Какой вариант цвета согласовали для сдаваемых файлов: один чёрный или цветную печать?",
+              "rationale": "От выбора зависит подготовка файлов для типографии.",
+              "priority": "high",
+              "category": "contradiction",
+              "source_issue_index": 1
+            },
+            {
+              "question": "К какой дате вам обязательно нужны файлы, если желаемую дату 2026-12-11 подтвердить не получится?",
+              "rationale": "Ответ поможет согласовать реальный срок сдачи.",
+              "priority": "medium",
+              "category": "timeline_risk",
+              "source_issue_index": 2
+            }
+          ]
+        }
+      },
+      "en": {
+        "template_ref": "brief_decoder.summary_v1",
+        "data": {
+          "source_brief": "We need updated labels for three sizes of jam jar so the print team can produce the run. Deliver one editable source file with a separate artboard per size and a print PDF for each size. We will provide the current logo and copy; the dielines and dimensions are still draft and have not been approved. Keep the exact words “Keep chilled.” on each label. The printer requires a single black ink, while marketing requires full-color CMYK for those same files. Printing the run is out of scope. The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet. The budget is no more than 380 USD.",
+          "brief": {
+            "values": {
+              "project_goal": "Update the jam jar labels for printing.",
+              "target_audience": "The print team.",
+              "deliverables": [
+                "One editable source file\n  with one artboard for each of the three sizes",
+                "A print PDF for each of the three sizes"
+              ],
+              "deadline": "The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet",
+              "budget": "The budget is no more than 380 USD",
+              "constraints": [
+                "The client will provide the current logo and copy.",
+                "The dielines and dimensions are draft and have not been approved.",
+                "Each label must carry the exact words “Keep chilled.”",
+                "The printer requires a single black ink; marketing requires full-color CMYK for the same files.",
+                "Printing the run is out of scope."
+              ]
+            },
+            "missing_fields": []
+          },
+          "issues": [
+            {
+              "category": "missing_information",
+              "severity": "high",
+              "description": "The dielines and dimensions for the three versions are still unapproved.",
+              "evidence": "the dielines and dimensions are still draft and have not been approved"
+            },
+            {
+              "category": "contradiction",
+              "severity": "high",
+              "description": "The printer requires a single black ink and marketing requires full-color CMYK for the same files.",
+              "evidence": "The printer requires a single black ink, while marketing requires full-color CMYK for those same files."
+            },
+            {
+              "category": "timeline_risk",
+              "severity": "medium",
+              "description": "The freelancer has not confirmed the preferred delivery date of 2026-12-11.",
+              "evidence": "The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet."
+            }
+          ],
+          "questions": [
+            {
+              "question": "When will you have approved outlines and dimensions for all three jar sizes?",
+              "rationale": "We need those dimensions to prepare the print files.",
+              "priority": "high",
+              "category": "missing_information",
+              "source_issue_index": 0
+            },
+            {
+              "question": "Should the delivered files use black ink only or full color?",
+              "rationale": "The answer determines how we prepare the files for the printer.",
+              "priority": "high",
+              "category": "contradiction",
+              "source_issue_index": 1
+            },
+            {
+              "question": "When do you absolutely need the files if we cannot confirm the preferred date of 2026-12-11?",
+              "rationale": "This will help us agree on a workable delivery date.",
+              "priority": "medium",
+              "category": "timeline_risk",
+              "source_issue_index": 2
+            }
+          ]
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Три размера банок, одна монтажная область на размер в одном исходнике и три PDF для типографии.",
+        "Контуры и размеры не утверждены. Типография и маркетинг требуют разные цветовые режимы для одних файлов.",
+        "Точная фраза Keep chilled., тираж исключён; 2026-12-11 — желаемая неподтверждённая дата, 380 USD — верхний предел.",
+        "Для данного атома единственный источник фактов — data.brief, data.issues и data.questions; язык выбирается по data.source_brief."
+      ],
+      "required": [
+        "Ровно четыре раздела шаблона в заданном порядке с точными английскими заголовками. У key-details и next-steps metadata.kind равен list.",
+        "Дословно отразить цель и аудиторию, если она задана в структурированном входе. Сохранить список результатов и ограничений, сроки и суммы с их статусом без изменения списка, строк и порядка.",
+        "Дословно скопировать описания проблем и вопросы в порядке входа, без рационализаций вопросов; отсутствующие сведения из brief.missing_fields назвать обычными словами.",
+        "Первая самостоятельная фраза summary сообщает о неготовности. Кратко указать, какие блокеры снять прежде всего, и не добавлять новых фактов. Авторский текст на языке брифа."
+      ],
+      "prohibited": [
+        "Добавлять факты из исходного текста помимо структурированных данных. Превращать предпочтительный или условный срок либо предел бюджета в согласованный.",
+        "Повторно формулировать или переводить дословные строки, терять переносы, менять порядок списка, терять авторство действия, релевантные риски или вопросы. Выводить служебные имена пропусков в авторском тексте."
+      ],
+      "allowed": [
+        "Формулировки авторских связок и краткого вердикта произвольны при выполнении остальных правил. Фиксированные заголовки, термины и процитированные строки сохраняют исходный язык."
+      ],
+      "objective": {
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview"
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "metadata_kind": "list"
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks"
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "metadata_kind": "list"
+          }
+        ],
+        "ordered_section_fragments": {
+          "ru": {
+            "overview": [
+              "Обновить этикетки банок с джемом для печати.",
+              "Команда типографии."
+            ],
+            "key-details": [
+              "- Один редактируемый исходник\n  по одной монтажной области на каждый из трёх размеров",
+              "- PDF для печати на каждый из трёх размеров",
+              "Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил",
+              "Бюджет — не более 380 USD",
+              "- Заказчик передаст актуальный логотип и тексты.",
+              "- Контуры и размеры пока черновые, не утверждены.",
+              "- На каждой этикетке должна быть точная фраза «Keep chilled.»",
+              "- Типография требует один чёрный цвет; отдел маркетинга требует цветной CMYK для тех же файлов.",
+              "- Печать тиража не входит в объём."
+            ],
+            "gaps": [
+              "- Контуры и размеры для трёх вариантов ещё не утверждены.",
+              "- Для одних и тех же файлов типография требует один чёрный цвет, а маркетинг — цветной CMYK.",
+              "- Исполнитель ещё не подтвердил желаемую дату 2026-12-11."
+            ],
+            "next-steps": [
+              "- Когда будут утверждены контуры и размеры для всех трёх банок?",
+              "- Какой вариант цвета согласовали для сдаваемых файлов: один чёрный или цветную печать?",
+              "- К какой дате вам обязательно нужны файлы, если желаемую дату 2026-12-11 подтвердить не получится?"
+            ]
+          },
+          "en": {
+            "overview": [
+              "Update the jam jar labels for printing.",
+              "The print team."
+            ],
+            "key-details": [
+              "- One editable source file\n  with one artboard for each of the three sizes",
+              "- A print PDF for each of the three sizes",
+              "The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet",
+              "The budget is no more than 380 USD",
+              "- The client will provide the current logo and copy.",
+              "- The dielines and dimensions are draft and have not been approved.",
+              "- Each label must carry the exact words “Keep chilled.”",
+              "- The printer requires a single black ink; marketing requires full-color CMYK for the same files.",
+              "- Printing the run is out of scope."
+            ],
+            "gaps": [
+              "- The dielines and dimensions for the three versions are still unapproved.",
+              "- The printer requires a single black ink and marketing requires full-color CMYK for the same files.",
+              "- The freelancer has not confirmed the preferred delivery date of 2026-12-11."
+            ],
+            "next-steps": [
+              "- When will you have approved outlines and dimensions for all three jar sizes?",
+              "- Should the delivered files use black ink only or full color?",
+              "- When do you absolutely need the files if we cannot confirm the preferred date of 2026-12-11?"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-h02-slides-a01",
+    "scenario_case_id": "bd-h02-slides",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "incomplete",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/administrative-support/document-presentation-creation",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Сюжет подготовки презентации по данным, редактируемые графики и Google Slides адаптированы из открытого заказа. Пилот, число слайдов, запрет публикации и отсутствующие материалы, аудитория и условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A01",
+    "step_id": "extract",
+    "prompt_ref": "brief_decoder.extract_brief.v1",
+    "inputs": {
+      "ru": {
+        "source_text": "Соберите редактируемую презентацию на английском языке из 12 слайдов в Google Slides, чтобы показать итоги нашего пилотного проекта. Включите таблицу ключевых показателей и графики, которые можно самостоятельно обновлять после сдачи. Исходные таблицы ещё не передали; кому именно будем показывать презентацию, пока обсуждаем. Не добавляйте вымышленные цифры и не открывайте публичный доступ.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "Create an editable 12-slide presentation in English in Google Slides to show the results of our pilot. Include a table of key metrics and charts we can update ourselves after delivery. We have not sent the source spreadsheets yet and are still discussing who will see the presentation. Do not add invented figures or make the deck publicly accessible.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Соберите редактируемую презентацию на английском языке из 12 слайдов в Google Slides, чтобы показать итоги нашего пилотного проекта. Включите таблицу ключевых показателей и графики, которые можно самостоятельно обновлять после сдачи. Исходные таблицы ещё не передали; кому именно будем показывать презентацию, пока обсуждаем. Не добавляйте вымышленные цифры и не открывайте публичный доступ."
+      },
+      "en": {
+        "brief_text": "Create an editable 12-slide presentation in English in Google Slides to show the results of our pilot. Include a table of key metrics and charts we can update ourselves after delivery. We have not sent the source spreadsheets yet and are still discussing who will see the presentation. Do not add invented figures or make the deck publicly accessible."
+      }
+    },
+    "rubric": {
+      "facts": [
+        "12 редактируемых слайдов на английском в Google Slides, таблица результатов пилота и обновляемые заказчиком графики.",
+        "Исходные таблицы ещё отсутствуют, аудитория не определена. Срок и бюджет не указаны. Цифры не выдумывать, публичный доступ не открывать."
+      ],
+      "required": [
+        "Сохранить Google Slides, 12 слайдов, английский язык результата, таблицу, обновляемые графики и запреты.",
+        "Передать цель про результаты пилота, не придумать показатели или аудиторию. Срок, бюджет и целевую аудиторию отметить отсутствующими."
+      ],
+      "prohibited": [
+        "Публичная публикация, сданные исходники, готовые результаты, конкретная цена, срок или заданная аудитория."
+      ],
+      "allowed": [
+        "Формулировки существенных фактов произвольны, если не меняют смысл. Сроки, суммы и дословные цитаты передавать как они сформулированы в брифе."
+      ],
+      "objective": {
+        "missing_fields": [
+          "deadline",
+          "budget",
+          "target_audience"
+        ],
+        "value_fragments": {
+          "ru": {},
+          "en": {}
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-h02-slides-a04",
+    "scenario_case_id": "bd-h02-slides",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "incomplete",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/administrative-support/document-presentation-creation",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Сюжет подготовки презентации по данным, редактируемые графики и Google Slides адаптированы из открытого заказа. Пилот, число слайдов, запрет публикации и отсутствующие материалы, аудитория и условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A04",
+    "step_id": "detect_issues",
+    "prompt_ref": "brief_decoder.detect_issues.v1",
+    "inputs": {
+      "ru": {
+        "source_text": "Соберите редактируемую презентацию на английском языке из 12 слайдов в Google Slides, чтобы показать итоги нашего пилотного проекта. Включите таблицу ключевых показателей и графики, которые можно самостоятельно обновлять после сдачи. Исходные таблицы ещё не передали; кому именно будем показывать презентацию, пока обсуждаем. Не добавляйте вымышленные цифры и не открывайте публичный доступ.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      },
+      "en": {
+        "source_text": "Create an editable 12-slide presentation in English in Google Slides to show the results of our pilot. Include a table of key metrics and charts we can update ourselves after delivery. We have not sent the source spreadsheets yet and are still discussing who will see the presentation. Do not add invented figures or make the deck publicly accessible.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "12 редактируемых слайдов на английском в Google Slides, таблица результатов пилота и обновляемые заказчиком графики.",
+        "Исходные таблицы ещё отсутствуют, аудитория не определена. Срок и бюджет не указаны. Цифры не выдумывать, публичный доступ не открывать."
+      ],
+      "required": [
+        "Различить недоступные исходные таблицы и неопределённую аудиторию. Приоритетнее отсутствие таблиц, без них нельзя заполнить графики.",
+        "Назвать отсутствующие дату и бюджет. Различить отсутствие информации и противоречие. Для отсутствующих даты и бюджета не выдумывать цитаты."
+      ],
+      "prohibited": [
+        "Назвать неопределёнными формат, объём, язык презентации или требование доступности. Приписать брифу только PowerPoint, число показателей или указание на публичный доступ."
+      ],
+      "allowed": [
+        "Объединённое описание отсутствующих коммерческих условий допустимо при сохранении обоих пробелов и их явном названии. Возможна иная тяжесть даты или бюджета, если таблицы остаются основным блокером."
+      ],
+      "objective": {
+        "required_issue_categories": [
+          "missing_information"
+        ]
+      }
+    }
+  },
+  {
+    "case_id": "bd-h02-slides-a05",
+    "scenario_case_id": "bd-h02-slides",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "incomplete",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/administrative-support/document-presentation-creation",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Сюжет подготовки презентации по данным, редактируемые графики и Google Slides адаптированы из открытого заказа. Пилот, число слайдов, запрет публикации и отсутствующие материалы, аудитория и условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A05",
+    "step_id": "generate_questions",
+    "prompt_ref": "brief_decoder.generate_questions.v1",
+    "inputs": {
+      "ru": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "Исходные таблицы не переданы, поэтому подлинные значения для графиков пока недоступны.",
+            "evidence": "Исходные таблицы ещё не передали"
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Клиент ещё не определил, кому будет показывать презентацию.",
+            "evidence": "кому именно будем показывать презентацию, пока обсуждаем"
+          },
+          {
+            "category": "timeline_risk",
+            "severity": "medium",
+            "description": "Не указана дата, к которой нужна готовая презентация."
+          },
+          {
+            "category": "budget_risk",
+            "severity": "medium",
+            "description": "Клиент не указал бюджет на подготовку презентации."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Соберите редактируемую презентацию на английском языке из 12 слайдов в Google Slides, чтобы показать итоги нашего пилотного проекта. Включите таблицу ключевых показателей и графики, которые можно самостоятельно обновлять после сдачи. Исходные таблицы ещё не передали; кому именно будем показывать презентацию, пока обсуждаем. Не добавляйте вымышленные цифры и не открывайте публичный доступ.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      },
+      "en": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "The source spreadsheets have not been supplied, so the actual chart values are unavailable.",
+            "evidence": "We have not sent the source spreadsheets yet"
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "The client has not identified the audience for the deck.",
+            "evidence": "are still discussing who will see the presentation"
+          },
+          {
+            "category": "timeline_risk",
+            "severity": "medium",
+            "description": "The client does not give a date for the finished presentation."
+          },
+          {
+            "category": "budget_risk",
+            "severity": "medium",
+            "description": "The client does not specify a budget for the presentation."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Create an editable 12-slide presentation in English in Google Slides to show the results of our pilot. Include a table of key metrics and charts we can update ourselves after delivery. We have not sent the source spreadsheets yet and are still discussing who will see the presentation. Do not add invented figures or make the deck publicly accessible.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      }
+    },
+    "rubric": {
+      "facts": [
+        "12 редактируемых слайдов на английском в Google Slides, таблица результатов пилота и обновляемые заказчиком графики.",
+        "Исходные таблицы ещё отсутствуют, аудитория не определена. Срок и бюджет не указаны. Цифры не выдумывать, публичный доступ не открывать."
+      ],
+      "required": [
+        "Запросить исходные таблицы или срок их передачи первым, задав индекс 0. Выяснить аудиторию, срок сдачи и бюджет, ссылаясь на соответствующие индексы.",
+        "К каждому вопросу дать краткую рабочую причину. Язык вопросов и причин следует языку брифа, даже если презентация должна быть на английском."
+      ],
+      "prohibited": [
+        "Запрашивать число слайдов или язык презентации, выдавать тестовые значения за фактические, предлагать открыть публичный доступ."
+      ],
+      "allowed": [
+        "Смысл вопроса и причины может быть сформулирован свободно. Одно обращение может уточнять два взаимосвязанных параметра одной находки."
+      ],
+      "objective": {
+        "required_source_issue_indices": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "max_questions": 5
+      }
+    }
+  },
+  {
+    "case_id": "bd-h02-slides-a10",
+    "scenario_case_id": "bd-h02-slides",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "incomplete",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/administrative-support/document-presentation-creation",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Сюжет подготовки презентации по данным, редактируемые графики и Google Slides адаптированы из открытого заказа. Пилот, число слайдов, запрет публикации и отсутствующие материалы, аудитория и условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A10",
+    "step_id": "generate_document",
+    "prompt_ref": "brief_decoder.generate_summary.v1",
+    "inputs": {
+      "ru": {
+        "template_ref": "brief_decoder.summary_v1",
+        "data": {
+          "source_brief": "Соберите редактируемую презентацию на английском языке из 12 слайдов в Google Slides, чтобы показать итоги нашего пилотного проекта. Включите таблицу ключевых показателей и графики, которые можно самостоятельно обновлять после сдачи. Исходные таблицы ещё не передали; кому именно будем показывать презентацию, пока обсуждаем. Не добавляйте вымышленные цифры и не открывайте публичный доступ.",
+          "brief": {
+            "values": {
+              "project_goal": "Показать итоги пилотного проекта.",
+              "deliverables": [
+                "Редактируемая презентация из 12 слайдов в Google Slides",
+                "Таблица ключевых показателей",
+                "Графики, которые заказчик может обновлять после сдачи"
+              ],
+              "constraints": [
+                "Язык презентации — английский.",
+                "Не добавлять вымышленные цифры.",
+                "Не открывать публичный доступ.",
+                "Исходные таблицы ещё не передали."
+              ]
+            },
+            "missing_fields": [
+              "deadline",
+              "budget",
+              "target_audience"
+            ]
+          },
+          "issues": [
+            {
+              "category": "missing_information",
+              "severity": "high",
+              "description": "Исходные таблицы не переданы, поэтому подлинные значения для графиков пока недоступны.",
+              "evidence": "Исходные таблицы ещё не передали"
+            },
+            {
+              "category": "missing_information",
+              "severity": "medium",
+              "description": "Клиент ещё не определил, кому будет показывать презентацию.",
+              "evidence": "кому именно будем показывать презентацию, пока обсуждаем"
+            },
+            {
+              "category": "timeline_risk",
+              "severity": "medium",
+              "description": "Не указана дата, к которой нужна готовая презентация."
+            },
+            {
+              "category": "budget_risk",
+              "severity": "medium",
+              "description": "Клиент не указал бюджет на подготовку презентации."
+            }
+          ],
+          "questions": [
+            {
+              "question": "Когда вы сможете передать исходные таблицы с результатами пилота?",
+              "rationale": "Эти данные нужны, чтобы заполнить таблицу и графики фактическими значениями.",
+              "priority": "high",
+              "category": "missing_information",
+              "source_issue_index": 0
+            },
+            {
+              "question": "Кому вы планируете показать презентацию?",
+              "rationale": "От аудитории зависит, какие результаты и пояснения стоит выделить.",
+              "priority": "medium",
+              "category": "missing_information",
+              "source_issue_index": 1
+            },
+            {
+              "question": "К какой дате вам нужна готовая презентация?",
+              "rationale": "Это позволит согласовать срок на подготовку и проверку.",
+              "priority": "medium",
+              "category": "timeline_risk",
+              "source_issue_index": 2
+            },
+            {
+              "question": "На какой бюджет вы рассчитываете для подготовки презентации?",
+              "rationale": "Так можно заранее согласовать объём и стоимость.",
+              "priority": "medium",
+              "category": "budget_risk",
+              "source_issue_index": 3
+            }
+          ]
+        }
+      },
+      "en": {
+        "template_ref": "brief_decoder.summary_v1",
+        "data": {
+          "source_brief": "Create an editable 12-slide presentation in English in Google Slides to show the results of our pilot. Include a table of key metrics and charts we can update ourselves after delivery. We have not sent the source spreadsheets yet and are still discussing who will see the presentation. Do not add invented figures or make the deck publicly accessible.",
+          "brief": {
+            "values": {
+              "project_goal": "Show the results of the pilot project.",
+              "deliverables": [
+                "An editable 12-slide presentation in Google Slides",
+                "A table of key metrics",
+                "Charts the client can update after delivery"
+              ],
+              "constraints": [
+                "The presentation must be in English.",
+                "Do not add invented figures.",
+                "Do not make the deck publicly accessible.",
+                "The source spreadsheets have not been sent yet."
+              ]
+            },
+            "missing_fields": [
+              "deadline",
+              "budget",
+              "target_audience"
+            ]
+          },
+          "issues": [
+            {
+              "category": "missing_information",
+              "severity": "high",
+              "description": "The source spreadsheets have not been supplied, so the actual chart values are unavailable.",
+              "evidence": "We have not sent the source spreadsheets yet"
+            },
+            {
+              "category": "missing_information",
+              "severity": "medium",
+              "description": "The client has not identified the audience for the deck.",
+              "evidence": "are still discussing who will see the presentation"
+            },
+            {
+              "category": "timeline_risk",
+              "severity": "medium",
+              "description": "The client does not give a date for the finished presentation."
+            },
+            {
+              "category": "budget_risk",
+              "severity": "medium",
+              "description": "The client does not specify a budget for the presentation."
+            }
+          ],
+          "questions": [
+            {
+              "question": "When can you share the spreadsheets with the pilot results?",
+              "rationale": "We need the source data to populate the table and charts with actual figures.",
+              "priority": "high",
+              "category": "missing_information",
+              "source_issue_index": 0
+            },
+            {
+              "question": "Who do you plan to show the presentation to?",
+              "rationale": "The audience determines which results and explanations we should emphasize.",
+              "priority": "medium",
+              "category": "missing_information",
+              "source_issue_index": 1
+            },
+            {
+              "question": "When do you need the finished presentation?",
+              "rationale": "This gives us a date for preparing and checking the deck.",
+              "priority": "medium",
+              "category": "timeline_risk",
+              "source_issue_index": 2
+            },
+            {
+              "question": "What budget do you have in mind for preparing the presentation?",
+              "rationale": "That lets us agree on the scope and cost up front.",
+              "priority": "medium",
+              "category": "budget_risk",
+              "source_issue_index": 3
+            }
+          ]
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "12 редактируемых слайдов на английском в Google Slides, таблица результатов пилота и обновляемые заказчиком графики.",
+        "Исходные таблицы ещё отсутствуют, аудитория не определена. Срок и бюджет не указаны. Цифры не выдумывать, публичный доступ не открывать.",
+        "Для данного атома единственный источник фактов — data.brief, data.issues и data.questions; язык выбирается по data.source_brief."
+      ],
+      "required": [
+        "Ровно четыре раздела шаблона в заданном порядке с точными английскими заголовками. У key-details и next-steps metadata.kind равен list.",
+        "Дословно отразить цель и аудиторию, если она задана в структурированном входе. Сохранить список результатов и ограничений, сроки и суммы с их статусом без изменения списка, строк и порядка.",
+        "Дословно скопировать описания проблем и вопросы в порядке входа, без рационализаций вопросов; отсутствующие сведения из brief.missing_fields назвать обычными словами.",
+        "Первая самостоятельная фраза summary сообщает о неготовности. Кратко указать, какие блокеры снять прежде всего, и не добавлять новых фактов. Авторский текст на языке брифа."
+      ],
+      "prohibited": [
+        "Добавлять факты из исходного текста помимо структурированных данных. Превращать предпочтительный или условный срок либо предел бюджета в согласованный.",
+        "Повторно формулировать или переводить дословные строки, терять переносы, менять порядок списка, терять авторство действия, релевантные риски или вопросы. Выводить служебные имена пропусков в авторском тексте."
+      ],
+      "allowed": [
+        "Формулировки авторских связок и краткого вердикта произвольны при выполнении остальных правил. Фиксированные заголовки, термины и процитированные строки сохраняют исходный язык."
+      ],
+      "objective": {
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview"
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "metadata_kind": "list"
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks"
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "metadata_kind": "list"
+          }
+        ],
+        "ordered_section_fragments": {
+          "ru": {
+            "overview": [
+              "Показать итоги пилотного проекта."
+            ],
+            "key-details": [
+              "- Редактируемая презентация из 12 слайдов в Google Slides",
+              "- Таблица ключевых показателей",
+              "- Графики, которые заказчик может обновлять после сдачи",
+              "- Язык презентации — английский.",
+              "- Не добавлять вымышленные цифры.",
+              "- Не открывать публичный доступ.",
+              "- Исходные таблицы ещё не передали."
+            ],
+            "gaps": [
+              "- Исходные таблицы не переданы, поэтому подлинные значения для графиков пока недоступны.",
+              "- Клиент ещё не определил, кому будет показывать презентацию.",
+              "- Не указана дата, к которой нужна готовая презентация.",
+              "- Клиент не указал бюджет на подготовку презентации."
+            ],
+            "next-steps": [
+              "- Когда вы сможете передать исходные таблицы с результатами пилота?",
+              "- Кому вы планируете показать презентацию?",
+              "- К какой дате вам нужна готовая презентация?",
+              "- На какой бюджет вы рассчитываете для подготовки презентации?"
+            ]
+          },
+          "en": {
+            "overview": [
+              "Show the results of the pilot project."
+            ],
+            "key-details": [
+              "- An editable 12-slide presentation in Google Slides",
+              "- A table of key metrics",
+              "- Charts the client can update after delivery",
+              "- The presentation must be in English.",
+              "- Do not add invented figures.",
+              "- Do not make the deck publicly accessible.",
+              "- The source spreadsheets have not been sent yet."
+            ],
+            "gaps": [
+              "- The source spreadsheets have not been supplied, so the actual chart values are unavailable.",
+              "- The client has not identified the audience for the deck.",
+              "- The client does not give a date for the finished presentation.",
+              "- The client does not specify a budget for the presentation."
+            ],
+            "next-steps": [
+              "- When can you share the spreadsheets with the pilot results?",
+              "- Who do you plan to show the presentation to?",
+              "- When do you need the finished presentation?",
+              "- What budget do you have in mind for preparing the presentation?"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-h03-stock-a01",
+    "scenario_case_id": "bd-h03-stock",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/google-sheets/inventory-data-entry-assistant-40189557",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты ввод остатков и вопрос неполных идентификаторов. Airtable, пилот, стороны, правила, ограничения, поддержка и коммерческие условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A01",
+    "step_id": "extract",
+    "prompt_ref": "brief_decoder.extract_brief.v1",
+    "inputs": {
+      "ru": {
+        "source_text": "Заведующей мастерской нужен пилот в Airtable, чтобы видеть остатки запчастей на одном складе. Сдайте настроенную базу, импорт начальных остатков, автоматическое уведомление о низком остатке и лист запуска. Сведения о поставщиках нельзя выгружать за пределы Airtable. Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код. Если остатки в двух исходных файлах расходятся, главный источник пока не определён. Есть строки без артикула производителя, правила для них нет. Для уведомления не выбраны ни порог, ни получатель. После сдачи нужна «помощь по мере надобности», объём и период не заданы. Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили. Предварительная сдача — 2027-01-19, если доступ будет выдан заранее. Предварительный бюджет — 500–700 EUR; расширение не согласовано.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      },
+      "en": {
+        "source_text": "The workshop manager needs an Airtable pilot to see spare-parts stock at one warehouse. Deliver a configured base, an initial stock import, an automatic low-stock notification and a launch checklist. Supplier information must not leave Airtable. The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code. We have not picked an authoritative file when the two source files disagree about stock levels. Some rows lack a manufacturer part number and no rule covers them. Neither the low-stock threshold nor the notification recipient is set. We need “help as needed” after delivery, with no duration or scope stated. The import can begin only once access is provided, and we have not been told when that will be. Tentative delivery is 2027-01-19 if access is provided in advance. Tentative budget is 500–700 EUR; no expansion has been agreed.",
+        "fields": [
+          {"name": "project_goal", "type": "nonblank_string", "description": "What the project is meant to achieve.", "required": false},
+          {"name": "deliverables", "type": "nonempty_text_list", "description": "Concrete deliverables the client expects.", "required": false},
+          {"name": "deadline", "type": "nonblank_string", "description": "Deadline or timeline as the brief states it, including its stated status (for example preferred, tentative, conditional or agreed).", "required": false},
+          {"name": "budget", "type": "nonblank_string", "description": "Budget or price expectation as the brief states it, including its stated status (for example approximate, preferred or agreed).", "required": false},
+          {"name": "target_audience", "type": "nonblank_string", "description": "Who the result is for.", "required": false},
+          {"name": "constraints", "type": "nonempty_text_list", "description": "Stated constraints, requirements or preferences.", "required": false}
+        ],
+        "strict": false
+      }
+    },
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Заведующей мастерской нужен пилот в Airtable, чтобы видеть остатки запчастей на одном складе. Сдайте настроенную базу, импорт начальных остатков, автоматическое уведомление о низком остатке и лист запуска. Сведения о поставщиках нельзя выгружать за пределы Airtable. Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код. Если остатки в двух исходных файлах расходятся, главный источник пока не определён. Есть строки без артикула производителя, правила для них нет. Для уведомления не выбраны ни порог, ни получатель. После сдачи нужна «помощь по мере надобности», объём и период не заданы. Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили. Предварительная сдача — 2027-01-19, если доступ будет выдан заранее. Предварительный бюджет — 500–700 EUR; расширение не согласовано."
+      },
+      "en": {
+        "brief_text": "The workshop manager needs an Airtable pilot to see spare-parts stock at one warehouse. Deliver a configured base, an initial stock import, an automatic low-stock notification and a launch checklist. Supplier information must not leave Airtable. The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code. We have not picked an authoritative file when the two source files disagree about stock levels. Some rows lack a manufacturer part number and no rule covers them. Neither the low-stock threshold nor the notification recipient is set. We need “help as needed” after delivery, with no duration or scope stated. The import can begin only once access is provided, and we have not been told when that will be. Tentative delivery is 2027-01-19 if access is provided in advance. Tentative budget is 500–700 EUR; no expansion has been agreed."
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Пилот Airtable на одном складе для заведующей. База, импорт, уведомление и лист запуска; данные поставщиков только в Airtable.",
+        "Стороны требуют два разных исключительных ключа. Не решены источник остатков, строки без артикула, порог и получатель, сроки доступа и границы поддержки.",
+        "2027-01-19 — предварительная дата при наличии доступа заранее. 500–700 EUR — предварительный диапазон без согласованного расширения."
+      ],
+      "required": [
+        "Передать цель, аудиторию, границу одного склада, четыре результата и открытый объём поддержки.",
+        "Указать запрет передачи сведений о поставщиках за пределы Airtable, сохранить оба несовместимых требования к ключам и зависимость импорта от доступа.",
+        "Сохранить предварительные статусы даты и диапазона бюджета, включая условие доступа и отсутствие согласованного расширения."
+      ],
+      "prohibited": [
+        "Выбрать ключ, источник, правила обработки пустых идентификаторов или параметры уведомления. Указать фиксированную цену или гарантированную сдачу. Расширить объём на другой склад."
+      ],
+      "allowed": [
+        "Формулировки существенных фактов произвольны, если не меняют смысл. Сроки, суммы и дословные цитаты передавать как они сформулированы в брифе."
+      ],
+      "objective": {
+        "missing_fields": [],
+        "value_fragments": {
+          "ru": {
+            "deadline": [
+              "2027-01-19"
+            ],
+            "budget": [
+              "500–700 EUR"
+            ]
+          },
+          "en": {
+            "deadline": [
+              "2027-01-19"
+            ],
+            "budget": [
+              "500–700 EUR"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "bd-h03-stock-a04",
+    "scenario_case_id": "bd-h03-stock",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/google-sheets/inventory-data-entry-assistant-40189557",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты ввод остатков и вопрос неполных идентификаторов. Airtable, пилот, стороны, правила, ограничения, поддержка и коммерческие условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A04",
+    "step_id": "detect_issues",
+    "prompt_ref": "brief_decoder.detect_issues.v1",
+    "inputs": {
+      "ru": {
+        "source_text": "Заведующей мастерской нужен пилот в Airtable, чтобы видеть остатки запчастей на одном складе. Сдайте настроенную базу, импорт начальных остатков, автоматическое уведомление о низком остатке и лист запуска. Сведения о поставщиках нельзя выгружать за пределы Airtable. Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код. Если остатки в двух исходных файлах расходятся, главный источник пока не определён. Есть строки без артикула производителя, правила для них нет. Для уведомления не выбраны ни порог, ни получатель. После сдачи нужна «помощь по мере надобности», объём и период не заданы. Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили. Предварительная сдача — 2027-01-19, если доступ будет выдан заранее. Предварительный бюджет — 500–700 EUR; расширение не согласовано.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      },
+      "en": {
+        "source_text": "The workshop manager needs an Airtable pilot to see spare-parts stock at one warehouse. Deliver a configured base, an initial stock import, an automatic low-stock notification and a launch checklist. Supplier information must not leave Airtable. The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code. We have not picked an authoritative file when the two source files disagree about stock levels. Some rows lack a manufacturer part number and no rule covers them. Neither the low-stock threshold nor the notification recipient is set. We need “help as needed” after delivery, with no duration or scope stated. The import can begin only once access is provided, and we have not been told when that will be. Tentative delivery is 2027-01-19 if access is provided in advance. Tentative budget is 500–700 EUR; no expansion has been agreed.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Пилот Airtable на одном складе для заведующей. База, импорт, уведомление и лист запуска; данные поставщиков только в Airtable.",
+        "Стороны требуют два разных исключительных ключа. Не решены источник остатков, строки без артикула, порог и получатель, сроки доступа и границы поддержки.",
+        "2027-01-19 — предварительная дата при наличии доступа заранее. 500–700 EUR — предварительный диапазон без согласованного расширения."
+      ],
+      "required": [
+        "Найти конфликт двух обязательных ключей сопоставления с `contradiction`. Различить отсутствие приоритетного файла и отсутствие правила для строк без артикула.",
+        "Назвать недостающие порог и получателя уведомлений, неопределённые сроки доступа, от которых зависит импорт, и открытый объём или срок поддержки.",
+        "Сопроводить наблюдаемые формулировки короткой опорой на текст. Не подменять неопределённость решением."
+      ],
+      "prohibited": [
+        "Назвать неподтверждённый диапазон отсутствующим, считать доступ уже открытым, выбирать ключ, файл, порог или получателя."
+      ],
+      "allowed": [
+        "Дополнительно назвать предварительный бюджет риском, если описать именно неподтверждённый статус. Объединение близких находок допустимо, если явным остаётся каждый из шести фактов."
+      ],
+      "objective": {
+        "required_issue_categories": [
+          "contradiction"
+        ]
+      }
+    }
+  },
+  {
+    "case_id": "bd-h03-stock-a05",
+    "scenario_case_id": "bd-h03-stock",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/google-sheets/inventory-data-entry-assistant-40189557",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты ввод остатков и вопрос неполных идентификаторов. Airtable, пилот, стороны, правила, ограничения, поддержка и коммерческие условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A05",
+    "step_id": "generate_questions",
+    "prompt_ref": "brief_decoder.generate_questions.v1",
+    "inputs": {
+      "ru": {
+        "issues": [
+          {
+            "category": "ambiguity",
+            "severity": "medium",
+            "description": "Уведомление о низком остатке пока не имеет порога и получателя.",
+            "evidence": "Для уведомления не выбраны ни порог, ни получатель."
+          },
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "Нет главного источника остатка на случай расхождения двух файлов.",
+            "evidence": "Если остатки в двух исходных файлах расходятся, главный источник пока не определён."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "low",
+            "description": "Поддержка после сдачи не ограничена периодом или объёмом.",
+            "evidence": "«помощь по мере надобности», объём и период не заданы"
+          },
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "Две стороны требуют несовместимые исключительные правила сопоставления по артикулу или внутреннему коду.",
+            "evidence": "Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "Не задано правило для строк без артикула производителя.",
+            "evidence": "Есть строки без артикула производителя, правила для них нет."
+          },
+          {
+            "category": "timeline_risk",
+            "severity": "high",
+            "description": "Дата выдачи доступа неизвестна, а импорт и предварительная сдача от него зависят.",
+            "evidence": "Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Заведующей мастерской нужен пилот в Airtable, чтобы видеть остатки запчастей на одном складе. Сдайте настроенную базу, импорт начальных остатков, автоматическое уведомление о низком остатке и лист запуска. Сведения о поставщиках нельзя выгружать за пределы Airtable. Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код. Если остатки в двух исходных файлах расходятся, главный источник пока не определён. Есть строки без артикула производителя, правила для них нет. Для уведомления не выбраны ни порог, ни получатель. После сдачи нужна «помощь по мере надобности», объём и период не заданы. Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили. Предварительная сдача — 2027-01-19, если доступ будет выдан заранее. Предварительный бюджет — 500–700 EUR; расширение не согласовано.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      },
+      "en": {
+        "issues": [
+          {
+            "category": "ambiguity",
+            "severity": "medium",
+            "description": "The low-stock alert has no threshold or recipient.",
+            "evidence": "Neither the low-stock threshold nor the notification recipient is set."
+          },
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "There is no authoritative stock source if the two files disagree.",
+            "evidence": "We have not picked an authoritative file when the two source files disagree about stock levels."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "low",
+            "description": "Post-delivery support has no limit on scope or duration.",
+            "evidence": "“help as needed” after delivery, with no duration or scope stated"
+          },
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "The two parties require incompatible exclusive matching rules: manufacturer part number or internal code.",
+            "evidence": "The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code."
+          },
+          {
+            "category": "missing_information",
+            "severity": "medium",
+            "description": "There is no rule for rows without a manufacturer part number.",
+            "evidence": "Some rows lack a manufacturer part number and no rule covers them."
+          },
+          {
+            "category": "timeline_risk",
+            "severity": "high",
+            "description": "The access date is unknown, and access is required for the import and tentative delivery date.",
+            "evidence": "The import can begin only once access is provided, and we have not been told when that will be."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "The workshop manager needs an Airtable pilot to see spare-parts stock at one warehouse. Deliver a configured base, an initial stock import, an automatic low-stock notification and a launch checklist. Supplier information must not leave Airtable. The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code. We have not picked an authoritative file when the two source files disagree about stock levels. Some rows lack a manufacturer part number and no rule covers them. Neither the low-stock threshold nor the notification recipient is set. We need “help as needed” after delivery, with no duration or scope stated. The import can begin only once access is provided, and we have not been told when that will be. Tentative delivery is 2027-01-19 if access is provided in advance. Tentative budget is 500–700 EUR; no expansion has been agreed.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Пилот Airtable на одном складе для заведующей. База, импорт, уведомление и лист запуска; данные поставщиков только в Airtable.",
+        "Стороны требуют два разных исключительных ключа. Не решены источник остатков, строки без артикула, порог и получатель, сроки доступа и границы поддержки.",
+        "2027-01-19 — предварительная дата при наличии доступа заранее. 500–700 EUR — предварительный диапазон без согласованного расширения."
+      ],
+      "required": [
+        "Из шести фиксированных находок задать до пяти вопросов, однозначно выяснить главный файл, ключ сопоставления и дату доступа в первую очередь. Сохранить ссылки на 1, 3 и 5.",
+        "Оставшиеся два вопроса адресуют порог и получателя уведомления (0) и обработку строк без артикула (4). Низкоприоритетный общий вопрос про поддержку не вытесняет их. Порядок по убыванию приоритета и номеру внутри равного приоритета."
+      ],
+      "prohibited": [
+        "Изобретать правило объединения, поставщика, порог, адрес уведомлений или подтверждение доступа. Подменить вопросами о поддержке и бюджете вопросы, блокирующие импорт."
+      ],
+      "allowed": [
+        "Смысл вопроса и причины может быть сформулирован свободно. Одно обращение может уточнять два взаимосвязанных параметра одной находки."
+      ],
+      "objective": {
+        "required_source_issue_indices": [
+          1,
+          3,
+          5,
+          0,
+          4
+        ],
+        "max_questions": 5
+      }
+    }
+  },
+  {
+    "case_id": "bd-h03-stock-a10",
+    "scenario_case_id": "bd-h03-stock",
+    "calibration": false,
+    "scenario_id": "brief_decoder.decode_v1",
+    "difficulty": "boundary",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/google-sheets/inventory-data-entry-assistant-40189557",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты ввод остатков и вопрос неполных идентификаторов. Airtable, пилот, стороны, правила, ограничения, поддержка и коммерческие условия составлены для эксперимента. Промежуточные результаты составлены."
+      }
+    ],
+    "atom_id": "A10",
+    "step_id": "generate_document",
+    "prompt_ref": "brief_decoder.generate_summary.v1",
+    "inputs": {
+      "ru": {
+        "template_ref": "brief_decoder.summary_v1",
+        "data": {
+          "source_brief": "Заведующей мастерской нужен пилот в Airtable, чтобы видеть остатки запчастей на одном складе. Сдайте настроенную базу, импорт начальных остатков, автоматическое уведомление о низком остатке и лист запуска. Сведения о поставщиках нельзя выгружать за пределы Airtable. Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код. Если остатки в двух исходных файлах расходятся, главный источник пока не определён. Есть строки без артикула производителя, правила для них нет. Для уведомления не выбраны ни порог, ни получатель. После сдачи нужна «помощь по мере надобности», объём и период не заданы. Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили. Предварительная сдача — 2027-01-19, если доступ будет выдан заранее. Предварительный бюджет — 500–700 EUR; расширение не согласовано.",
+          "brief": {
+            "values": {
+              "project_goal": "Пилот учёта остатков запчастей в Airtable на одном складе.",
+              "target_audience": "Заведующая мастерской.",
+              "deliverables": [
+                "Настроенная база",
+                "Импорт начальных остатков",
+                "Автоматическое уведомление о низком остатке",
+                "Лист запуска",
+                "Помощь после сдачи по мере надобности, без заданного объёма и периода"
+              ],
+              "deadline": "Предварительная сдача — 2027-01-19, если доступ будет выдан заранее",
+              "budget": "Предварительный бюджет — 500–700 EUR; расширение не согласовано",
+              "constraints": [
+                "Сведения о поставщиках нельзя выгружать за пределы Airtable.",
+                "Кладовщик требует сопоставлять только по артикулу производителя, заведующая — только по внутреннему коду для тех же записей.",
+                "Импорт начинается после выдачи доступа, дата выдачи не сообщена."
+              ]
+            },
+            "missing_fields": []
+          },
+          "issues": [
+            {
+              "category": "ambiguity",
+              "severity": "medium",
+              "description": "Уведомление о низком остатке пока не имеет порога и получателя.",
+              "evidence": "Для уведомления не выбраны ни порог, ни получатель."
+            },
+            {
+              "category": "missing_information",
+              "severity": "high",
+              "description": "Нет главного источника остатка на случай расхождения двух файлов.",
+              "evidence": "Если остатки в двух исходных файлах расходятся, главный источник пока не определён."
+            },
+            {
+              "category": "scope_risk",
+              "severity": "low",
+              "description": "Поддержка после сдачи не ограничена периодом или объёмом.",
+              "evidence": "«помощь по мере надобности», объём и период не заданы"
+            },
+            {
+              "category": "contradiction",
+              "severity": "high",
+              "description": "Две стороны требуют несовместимые исключительные правила сопоставления по артикулу или внутреннему коду.",
+              "evidence": "Кладовщик требует сопоставлять запчасти только по артикулу производителя; заведующая для тех же записей требует использовать только внутренний код."
+            },
+            {
+              "category": "missing_information",
+              "severity": "medium",
+              "description": "Не задано правило для строк без артикула производителя.",
+              "evidence": "Есть строки без артикула производителя, правила для них нет."
+            },
+            {
+              "category": "timeline_risk",
+              "severity": "high",
+              "description": "Дата выдачи доступа неизвестна, а импорт и предварительная сдача от него зависят.",
+              "evidence": "Импорт можно начать только после выдачи доступа, дату выдачи пока не сообщили."
+            }
+          ],
+          "questions": [
+            {
+              "question": "Если в двух файлах разные остатки, из какого файла брать число для импорта?",
+              "rationale": "Без выбора источника нельзя уверенно загрузить правильные остатки.",
+              "priority": "high",
+              "category": "missing_information",
+              "source_issue_index": 1
+            },
+            {
+              "question": "Какое поле использовать для сопоставления: артикул производителя или внутренний код?",
+              "rationale": "Два возможных правила по-разному объединят записи.",
+              "priority": "high",
+              "category": "contradiction",
+              "source_issue_index": 3
+            },
+            {
+              "question": "Когда вы сможете открыть доступ для импорта?",
+              "rationale": "Дата доступа определяет, когда начнётся импорт и выполнима ли предварительная дата сдачи.",
+              "priority": "high",
+              "category": "timeline_risk",
+              "source_issue_index": 5
+            },
+            {
+              "question": "При каком остатке отправлять уведомления и кому их адресовать?",
+              "rationale": "Без порога и получателя нельзя настроить полезное уведомление.",
+              "priority": "medium",
+              "category": "ambiguity",
+              "source_issue_index": 0
+            },
+            {
+              "question": "Как обработать строки, где нет артикула производителя?",
+              "rationale": "Ответ позволит избежать потери позиций или ошибочных совпадений.",
+              "priority": "medium",
+              "category": "missing_information",
+              "source_issue_index": 4
+            }
+          ]
+        }
+      },
+      "en": {
+        "template_ref": "brief_decoder.summary_v1",
+        "data": {
+          "source_brief": "The workshop manager needs an Airtable pilot to see spare-parts stock at one warehouse. Deliver a configured base, an initial stock import, an automatic low-stock notification and a launch checklist. Supplier information must not leave Airtable. The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code. We have not picked an authoritative file when the two source files disagree about stock levels. Some rows lack a manufacturer part number and no rule covers them. Neither the low-stock threshold nor the notification recipient is set. We need “help as needed” after delivery, with no duration or scope stated. The import can begin only once access is provided, and we have not been told when that will be. Tentative delivery is 2027-01-19 if access is provided in advance. Tentative budget is 500–700 EUR; no expansion has been agreed.",
+          "brief": {
+            "values": {
+              "project_goal": "Pilot spare-parts stock tracking for one warehouse in Airtable.",
+              "target_audience": "The workshop manager.",
+              "deliverables": [
+                "A configured base",
+                "An initial stock import",
+                "An automatic low-stock notification",
+                "A launch checklist",
+                "Help as needed after delivery, with no stated scope or duration"
+              ],
+              "deadline": "Tentative delivery is 2027-01-19 if access is provided in advance",
+              "budget": "Tentative budget is 500–700 EUR; no expansion has been agreed",
+              "constraints": [
+                "Supplier information must not leave Airtable.",
+                "For the same records, the storekeeper requires matching only by manufacturer part number and the manager requires matching only by internal code.",
+                "Import starts only after access is granted, and the access date is unknown."
+              ]
+            },
+            "missing_fields": []
+          },
+          "issues": [
+            {
+              "category": "ambiguity",
+              "severity": "medium",
+              "description": "The low-stock alert has no threshold or recipient.",
+              "evidence": "Neither the low-stock threshold nor the notification recipient is set."
+            },
+            {
+              "category": "missing_information",
+              "severity": "high",
+              "description": "There is no authoritative stock source if the two files disagree.",
+              "evidence": "We have not picked an authoritative file when the two source files disagree about stock levels."
+            },
+            {
+              "category": "scope_risk",
+              "severity": "low",
+              "description": "Post-delivery support has no limit on scope or duration.",
+              "evidence": "“help as needed” after delivery, with no duration or scope stated"
+            },
+            {
+              "category": "contradiction",
+              "severity": "high",
+              "description": "The two parties require incompatible exclusive matching rules: manufacturer part number or internal code.",
+              "evidence": "The storekeeper requires matching parts only by manufacturer part number; the manager requires matching those same records only by internal code."
+            },
+            {
+              "category": "missing_information",
+              "severity": "medium",
+              "description": "There is no rule for rows without a manufacturer part number.",
+              "evidence": "Some rows lack a manufacturer part number and no rule covers them."
+            },
+            {
+              "category": "timeline_risk",
+              "severity": "high",
+              "description": "The access date is unknown, and access is required for the import and tentative delivery date.",
+              "evidence": "The import can begin only once access is provided, and we have not been told when that will be."
+            }
+          ],
+          "questions": [
+            {
+              "question": "If the two files give different stock counts, which file should we use for the import?",
+              "rationale": "We need a source of truth to import the correct stock counts.",
+              "priority": "high",
+              "category": "missing_information",
+              "source_issue_index": 1
+            },
+            {
+              "question": "Should parts match by manufacturer part number or by internal code?",
+              "rationale": "The two rules would combine records differently.",
+              "priority": "high",
+              "category": "contradiction",
+              "source_issue_index": 3
+            },
+            {
+              "question": "When can you provide access for the import?",
+              "rationale": "That determines the start of the import and whether the tentative delivery date is feasible.",
+              "priority": "high",
+              "category": "timeline_risk",
+              "source_issue_index": 5
+            },
+            {
+              "question": "At what stock level should we send an alert, and who should receive it?",
+              "rationale": "Without a threshold and a recipient, the alert cannot be configured usefully.",
+              "priority": "medium",
+              "category": "ambiguity",
+              "source_issue_index": 0
+            },
+            {
+              "question": "What should we do with rows that have no manufacturer part number?",
+              "rationale": "The answer helps prevent losing an item or merging it incorrectly.",
+              "priority": "medium",
+              "category": "missing_information",
+              "source_issue_index": 4
+            }
+          ]
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Пилот Airtable на одном складе для заведующей. База, импорт, уведомление и лист запуска; данные поставщиков только в Airtable.",
+        "Стороны требуют два разных исключительных ключа. Не решены источник остатков, строки без артикула, порог и получатель, сроки доступа и границы поддержки.",
+        "2027-01-19 — предварительная дата при наличии доступа заранее. 500–700 EUR — предварительный диапазон без согласованного расширения.",
+        "Для данного атома единственный источник фактов — data.brief, data.issues и data.questions; язык выбирается по data.source_brief."
+      ],
+      "required": [
+        "Ровно четыре раздела шаблона в заданном порядке с точными английскими заголовками. У key-details и next-steps metadata.kind равен list.",
+        "Дословно отразить цель и аудиторию, если она задана в структурированном входе. Сохранить список результатов и ограничений, сроки и суммы с их статусом без изменения списка, строк и порядка.",
+        "Дословно скопировать описания проблем и вопросы в порядке входа, без рационализаций вопросов; отсутствующие сведения из brief.missing_fields назвать обычными словами.",
+        "Первая самостоятельная фраза summary сообщает о неготовности. Кратко указать, какие блокеры снять прежде всего, и не добавлять новых фактов. Авторский текст на языке брифа."
+      ],
+      "prohibited": [
+        "Добавлять факты из исходного текста помимо структурированных данных. Превращать предпочтительный или условный срок либо предел бюджета в согласованный.",
+        "Повторно формулировать или переводить дословные строки, терять переносы, менять порядок списка, терять авторство действия, релевантные риски или вопросы. Выводить служебные имена пропусков в авторском тексте."
+      ],
+      "allowed": [
+        "Формулировки авторских связок и краткого вердикта произвольны при выполнении остальных правил. Фиксированные заголовки, термины и процитированные строки сохраняют исходный язык."
+      ],
+      "objective": {
+        "sections": [
+          {
+            "id": "overview",
+            "title": "Project overview"
+          },
+          {
+            "id": "key-details",
+            "title": "Key details",
+            "metadata_kind": "list"
+          },
+          {
+            "id": "gaps",
+            "title": "Gaps and risks"
+          },
+          {
+            "id": "next-steps",
+            "title": "Questions to ask",
+            "metadata_kind": "list"
+          }
+        ],
+        "ordered_section_fragments": {
+          "ru": {
+            "overview": [
+              "Пилот учёта остатков запчастей в Airtable на одном складе.",
+              "Заведующая мастерской."
+            ],
+            "key-details": [
+              "- Настроенная база",
+              "- Импорт начальных остатков",
+              "- Автоматическое уведомление о низком остатке",
+              "- Лист запуска",
+              "- Помощь после сдачи по мере надобности, без заданного объёма и периода",
+              "Предварительная сдача — 2027-01-19, если доступ будет выдан заранее",
+              "Предварительный бюджет — 500–700 EUR; расширение не согласовано",
+              "- Сведения о поставщиках нельзя выгружать за пределы Airtable.",
+              "- Кладовщик требует сопоставлять только по артикулу производителя, заведующая — только по внутреннему коду для тех же записей.",
+              "- Импорт начинается после выдачи доступа, дата выдачи не сообщена."
+            ],
+            "gaps": [
+              "- Уведомление о низком остатке пока не имеет порога и получателя.",
+              "- Нет главного источника остатка на случай расхождения двух файлов.",
+              "- Поддержка после сдачи не ограничена периодом или объёмом.",
+              "- Две стороны требуют несовместимые исключительные правила сопоставления по артикулу или внутреннему коду.",
+              "- Не задано правило для строк без артикула производителя.",
+              "- Дата выдачи доступа неизвестна, а импорт и предварительная сдача от него зависят."
+            ],
+            "next-steps": [
+              "- Если в двух файлах разные остатки, из какого файла брать число для импорта?",
+              "- Какое поле использовать для сопоставления: артикул производителя или внутренний код?",
+              "- Когда вы сможете открыть доступ для импорта?",
+              "- При каком остатке отправлять уведомления и кому их адресовать?",
+              "- Как обработать строки, где нет артикула производителя?"
+            ]
+          },
+          "en": {
+            "overview": [
+              "Pilot spare-parts stock tracking for one warehouse in Airtable.",
+              "The workshop manager."
+            ],
+            "key-details": [
+              "- A configured base",
+              "- An initial stock import",
+              "- An automatic low-stock notification",
+              "- A launch checklist",
+              "- Help as needed after delivery, with no stated scope or duration",
+              "Tentative delivery is 2027-01-19 if access is provided in advance",
+              "Tentative budget is 500–700 EUR; no expansion has been agreed",
+              "- Supplier information must not leave Airtable.",
+              "- For the same records, the storekeeper requires matching only by manufacturer part number and the manager requires matching only by internal code.",
+              "- Import starts only after access is granted, and the access date is unknown."
+            ],
+            "gaps": [
+              "- The low-stock alert has no threshold or recipient.",
+              "- There is no authoritative stock source if the two files disagree.",
+              "- Post-delivery support has no limit on scope or duration.",
+              "- The two parties require incompatible exclusive matching rules: manufacturer part number or internal code.",
+              "- There is no rule for rows without a manufacturer part number.",
+              "- The access date is unknown, and access is required for the import and tentative delivery date."
+            ],
+            "next-steps": [
+              "- If the two files give different stock counts, which file should we use for the import?",
+              "- Should parts match by manufacturer part number or by internal code?",
+              "- When can you provide access for the import?",
+              "- At what stock level should we send an alert, and who should receive it?",
+              "- What should we do with rows that have no manufacturer part number?"
+            ]
+          }
+        }
+      }
+    }
+  }
+]

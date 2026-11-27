@@ -1,0 +1,2162 @@
+{
+  "ticket": "ANY-823",
+  "status": "live_acceptance_passed",
+  "source_revision": "95b62005e46130644ee80021ecc253a1f18c3fe1",
+  "historical_evidence": "docs/exec-plans/completed/any-604-prepaid-request-live-acceptance.evidence.json",
+  "workflow_id": "client_update_writer.prepaid_request_v1",
+  "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+  "working_tree_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+  "planned_attempts": [
+    {
+      "id": "A01-ru-ambiguous-1",
+      "historical_input_id": "A01-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-ambiguous-2",
+      "historical_input_id": "A01-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-ambiguous-3",
+      "historical_input_id": "A01-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-pending_start",
+      "historical_input_id": "A01-1",
+      "variant": "pending_start",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, работа над дизайном презентации на 12 слайдов ещё не началась. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов ещё не началась. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-confirmed_start",
+      "historical_input_id": "A01-1",
+      "variant": "confirmed_start",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, работа над дизайном презентации на 12 слайдов уже идёт. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов уже идёт. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-confirmed_overdue",
+      "historical_input_id": "A01-1",
+      "variant": "confirmed_overdue",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, согласованная предоплата за дизайн презентации на 12 слайдов просрочена. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, согласованная предоплата за дизайн презентации на 12 слайдов просрочена. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-ambiguous-1",
+      "historical_input_id": "A01-EN-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-ambiguous-2",
+      "historical_input_id": "A01-EN-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-ambiguous-3",
+      "historical_input_id": "A01-EN-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-pending_start",
+      "historical_input_id": "A01-EN-1",
+      "variant": "pending_start",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, design work on the 12-slide presentation has not started. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, design work on the 12-slide presentation has not started. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-confirmed_start",
+      "historical_input_id": "A01-EN-1",
+      "variant": "confirmed_start",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, work on the design of the 12-slide presentation is already underway. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, work on the design of the 12-slide presentation is already underway. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-confirmed_overdue",
+      "historical_input_id": "A01-EN-1",
+      "variant": "confirmed_overdue",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, the agreed deposit for the design of the 12-slide presentation is overdue. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, the agreed deposit for the design of the 12-slide presentation is overdue. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-ambiguous-1",
+      "historical_input_id": "A01-ES-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-ambiguous-2",
+      "historical_input_id": "A01-ES-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-ambiguous-3",
+      "historical_input_id": "A01-ES-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-pending_start",
+      "historical_input_id": "A01-ES-1",
+      "variant": "pending_start",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas aún no ha comenzado. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas aún no ha comenzado. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-confirmed_start",
+      "historical_input_id": "A01-ES-1",
+      "variant": "confirmed_start",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-confirmed_overdue",
+      "historical_input_id": "A01-ES-1",
+      "variant": "confirmed_overdue",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, el anticipo acordado para el diseño de la presentación de 12 diapositivas está vencido. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, el anticipo acordado para el diseño de la presentación de 12 diapositivas está vencido. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "A01-ru-ambiguous-1",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:27:56.030Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768076136121039_0000000002_cbd06efd90b4482fa95adb8bdfa5e318",
+      "artifact_id": "artifact_01795768084149348573_0000000013_02b977be22c1494794d75f5a960da267",
+      "output": {
+        "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед началом работы. Остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату."
+      },
+      "visible_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед началом работы. Остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату.",
+      "clipboard_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед началом работы. Остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 8741.663090999999,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "cbdd2b800525f1e275678718556dc5ed28f91460cf3f17a21fc4251a241c4adc",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768076136121039_0000000002_cbd06efd90b4482fa95adb8bdfa5e318",
+          "id": "action_run_01795768076658203514_0000000004_b05b2e57799c4a538e44b223bda455bd",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768084108895736_0000000009_68cbab272372432ba44bcfde01a3d194"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768076136121039_0000000002_cbd06efd90b4482fa95adb8bdfa5e318",
+          "id": "provider_call_01795768076829071466_0000000006_b3a83b4e8b0c4b8aa44331d073d46181",
+          "action_run_id": "action_run_01795768076658203514_0000000004_b05b2e57799c4a538e44b223bda455bd",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5920,
+          "output_tokens": 110,
+          "total_tokens": 6030,
+          "latency_ms": 7227,
+          "estimated_cost": 0.015898500000000003,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768076136121039_0000000002_cbd06efd90b4482fa95adb8bdfa5e318",
+          "id": "artifact_01795768084149348573_0000000013_02b977be22c1494794d75f5a960da267",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед началом работы. Остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "«предоплата вносится перед началом работы» states the term; no actual start or overdue assertion."
+    },
+    {
+      "id": "A01-ru-ambiguous-2",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:28:08.558Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768088745070481_0000000008_90bde2a658ce4376ae3ad532c35749e7",
+      "artifact_id": "artifact_01795768093331332927_0000000029_3af7f6eb4427441fa154b5815761f0fe",
+      "output": {
+        "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. По договорённости работа начинается после предоплаты, остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите платёж. Спасибо!"
+      },
+      "visible_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. По договорённости работа начинается после предоплаты, остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите платёж. Спасибо!",
+      "clipboard_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. По договорённости работа начинается после предоплаты, остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите платёж. Спасибо!",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6495.099739000001,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "0d2f63648054bc6a72d9399b4d21f6bd5ee2b267b7eb7e508b77aafaf1600281",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768088745070481_0000000008_90bde2a658ce4376ae3ad532c35749e7",
+          "id": "action_run_01795768089276832708_0000000020_70750a406249480d9f7a6c7c47a25e34",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768093297201336_0000000025_7bb37247c5cc4385ade7301413276809"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768088745070481_0000000008_90bde2a658ce4376ae3ad532c35749e7",
+          "id": "provider_call_01795768089292751047_0000000022_785c93fe033f4731bfe08240ae7c66e9",
+          "action_run_id": "action_run_01795768089276832708_0000000020_70750a406249480d9f7a6c7c47a25e34",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5920,
+          "output_tokens": 109,
+          "total_tokens": 6029,
+          "latency_ms": 3969,
+          "estimated_cost": 0.0016877,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768088745070481_0000000008_90bde2a658ce4376ae3ad532c35749e7",
+          "id": "artifact_01795768093331332927_0000000029_3af7f6eb4427441fa154b5815761f0fe",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. По договорённости работа начинается после предоплаты, остаток оплачивается после передачи финальных файлов PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите платёж. Спасибо!"
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "«По договорённости работа начинается после предоплаты» states the agreed ordering; neither event is asserted."
+    },
+    {
+      "id": "A01-ru-ambiguous-3",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:28:18.401Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768098490059208_0000000014_8daa2bcaf6aa4e67b8f93ff7d2353fcf",
+      "artifact_id": "artifact_01795768102967311875_0000000045_f3b6215c3c0142229cc158e3e623b396",
+      "output": {
+        "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите оплату. Спасибо!"
+      },
+      "visible_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите оплату. Спасибо!",
+      "clipboard_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите оплату. Спасибо!",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6334.286497999998,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "3012e6af6b1a8baff3b5d5d0be4f00c545b7b4c6dfcb96b2a21cc1d4f1f3812c",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768098490059208_0000000014_8daa2bcaf6aa4e67b8f93ff7d2353fcf",
+          "id": "action_run_01795768099462060963_0000000036_4b75d4ea50f94c6699823c30241ec9fa",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768102944963877_0000000041_27c9b165838349c38f084aba90ea13de"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768098490059208_0000000014_8daa2bcaf6aa4e67b8f93ff7d2353fcf",
+          "id": "provider_call_01795768099475502189_0000000038_faaee0b9887f44a1ad42071778a8dcf8",
+          "action_run_id": "action_run_01795768099462060963_0000000036_4b75d4ea50f94c6699823c30241ec9fa",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5920,
+          "output_tokens": 109,
+          "total_tokens": 6029,
+          "latency_ms": 3442,
+          "estimated_cost": 0.0016877,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768098490059208_0000000014_8daa2bcaf6aa4e67b8f93ff7d2353fcf",
+          "id": "artifact_01795768102967311875_0000000045_f3b6215c3c0142229cc158e3e623b396",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB; предоплата вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСообщите, пожалуйста, когда отправите оплату. Спасибо!"
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "«предоплата вносится перед стартом работы» preserves the term without actual status."
+    },
+    {
+      "id": "A01-ru-pending_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:28:27.958Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов ещё не началась. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768108049949724_0000000020_34d2cea871794c9bb1f2bc487e3a8efc",
+      "artifact_id": "artifact_01795768114389763971_0000000061_af997addda47474fa977e6cf71ab9d28",
+      "output": {
+        "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов: 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Работа ещё не началась; по согласованным условиям предоплата вносится перед стартом. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату."
+      },
+      "visible_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов: 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Работа ещё не началась; по согласованным условиям предоплата вносится перед стартом. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату.",
+      "clipboard_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов: 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Работа ещё не началась; по согласованным условиям предоплата вносится перед стартом. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 8367.482410999997,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "23019cb0f09d57fe4d94450071917d98fc9c890c110cf5beb7e30c2c27346f5d",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768108049949724_0000000020_34d2cea871794c9bb1f2bc487e3a8efc",
+          "id": "action_run_01795768109080372651_0000000052_c4f3e0f7a8704a3c85266aba6fc0707c",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768114364825543_0000000057_57946bb7b04c480085a3560fbf34ffc0"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768108049949724_0000000020_34d2cea871794c9bb1f2bc487e3a8efc",
+          "id": "provider_call_01795768109095150802_0000000054_1715f01da0974e57a833bbac180e224a",
+          "action_run_id": "action_run_01795768109080372651_0000000052_c4f3e0f7a8704a3c85266aba6fc0707c",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5925,
+          "output_tokens": 119,
+          "total_tokens": 6044,
+          "latency_ms": 5245,
+          "estimated_cost": 0.016001,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768108049949724_0000000020_34d2cea871794c9bb1f2bc487e3a8efc",
+          "id": "artifact_01795768114389763971_0000000061_af997addda47474fa977e6cf71ab9d28",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов: 50% от согласованной общей стоимости 30 000 RUB — 15 000 RUB. Работа ещё не началась; по согласованным условиям предоплата вносится перед стартом. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Сообщите, пожалуйста, когда отправите оплату."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "«Работа ещё не началась» explicitly preserves pending start; no overdue claim."
+    },
+    {
+      "id": "A01-ru-confirmed_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:28:39.425Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов уже идёт. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768119501062838_0000000026_6c5bc8b8baa34ecaa2b664d1724d3ea0",
+      "artifact_id": "artifact_01795768124355310144_0000000077_4132af800dff4f42a21ef1575b7dcab5",
+      "output": {
+        "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB, что составляет 50% от согласованной общей стоимости 30 000 RUB. По договорённости предоплата вносится перед стартом; работа над презентацией уже идёт. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату."
+      },
+      "visible_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB, что составляет 50% от согласованной общей стоимости 30 000 RUB. По договорённости предоплата вносится перед стартом; работа над презентацией уже идёт. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату.",
+      "clipboard_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB, что составляет 50% от согласованной общей стоимости 30 000 RUB. По договорённости предоплата вносится перед стартом; работа над презентацией уже идёт. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6330.272488999995,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "18a8a6f32fe3a2bc28338cc7af8b42ca0c60433d288afb83a2d957367c061e9f",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768119501062838_0000000026_6c5bc8b8baa34ecaa2b664d1724d3ea0",
+          "id": "action_run_01795768120500063089_0000000068_69305cbe03a24586b87ac2441f810b5d",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768124340203801_0000000073_d8cba84deddf4bd7bc0f7ffa6ea5d1f9"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768119501062838_0000000026_6c5bc8b8baa34ecaa2b664d1724d3ea0",
+          "id": "provider_call_01795768120520029891_0000000070_2a36cd5caed449899c384724bf388427",
+          "action_run_id": "action_run_01795768120500063089_0000000068_69305cbe03a24586b87ac2441f810b5d",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5924,
+          "output_tokens": 122,
+          "total_tokens": 6046,
+          "latency_ms": 3788,
+          "estimated_cost": 0.0160285,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768119501062838_0000000026_6c5bc8b8baa34ecaa2b664d1724d3ea0",
+          "id": "artifact_01795768124355310144_0000000077_4132af800dff4f42a21ef1575b7dcab5",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите предоплату за дизайн презентации на 12 слайдов — 15 000 RUB, что составляет 50% от согласованной общей стоимости 30 000 RUB. По договорённости предоплата вносится перед стартом; работа над презентацией уже идёт. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "«работа над презентацией уже идёт» preserves commencement independently of the deposit term; no delinquency."
+    },
+    {
+      "id": "A01-ru-confirmed_overdue",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:28:48.608Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, согласованная предоплата за дизайн презентации на 12 слайдов просрочена. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768128683011701_0000000032_a54e106f543a40bb977023373dbf983f",
+      "artifact_id": "artifact_01795768133094331113_0000000093_71677c68417c4fd5a85b2003201a5e88",
+      "output": {
+        "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите согласованную предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. Срок предоплаты уже прошёл; по нашим условиям она вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату."
+      },
+      "visible_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите согласованную предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. Срок предоплаты уже прошёл; по нашим условиям она вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату.",
+      "clipboard_text": "Здравствуйте, Елена!\n\nПожалуйста, внесите согласованную предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. Срок предоплаты уже прошёл; по нашим условиям она вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6366.633767999992,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "89e796e71901c3092a3c1a7b591fedd8c3beee8711009c70a36dd48e5378f83d",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768128683011701_0000000032_a54e106f543a40bb977023373dbf983f",
+          "id": "action_run_01795768129471514951_0000000084_fa01d867313f489eb4d4d329d6a18ecb",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768133072742723_0000000089_8b220d843ea94e57b445ac5b75941e6b"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768128683011701_0000000032_a54e106f543a40bb977023373dbf983f",
+          "id": "provider_call_01795768129491325824_0000000086_0b8b2e58842c4c41a03ee2fa135e6ad9",
+          "action_run_id": "action_run_01795768129471514951_0000000084_fa01d867313f489eb4d4d329d6a18ecb",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5929,
+          "output_tokens": 124,
+          "total_tokens": 6053,
+          "latency_ms": 3557,
+          "estimated_cost": 0.016061000000000002,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768128683011701_0000000032_a54e106f543a40bb977023373dbf983f",
+          "id": "artifact_01795768133094331113_0000000093_71677c68417c4fd5a85b2003201a5e88",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Здравствуйте, Елена!\n\nПожалуйста, внесите согласованную предоплату за дизайн презентации на 12 слайдов — 15 000 RUB. Это 50% от согласованной общей стоимости 30 000 RUB. Срок предоплаты уже прошёл; по нашим условиям она вносится перед стартом работы. Остаток оплачивается после передачи финального PDF и PPTX. Реквизиты будут в отдельном счёте.\n\nСпасибо! Пожалуйста, сообщите, когда отправите оплату."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "«Срок предоплаты уже прошёл» preserves delinquency; actual commencement remains unspecified."
+    },
+    {
+      "id": "A01-en-ambiguous-1",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:28:57.930Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768137988871012_0000000038_079b641edb494609b5ec0cde8723c9c3",
+      "artifact_id": "artifact_01795768142983844086_0000000109_e3c53af8dbdf4f82a0b67475fcc16654",
+      "output": {
+        "text": "Hi Elena,\n\nPlease pay the 15 000 RUB prepayment for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you! Please let me know once you’ve sent the payment."
+      },
+      "visible_text": "Hi Elena,\n\nPlease pay the 15 000 RUB prepayment for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you! Please let me know once you’ve sent the payment.",
+      "clipboard_text": "Hi Elena,\n\nPlease pay the 15 000 RUB prepayment for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you! Please let me know once you’ve sent the payment.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6322.798072999998,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "bc14ad27f28be7d3a27600e205670ca43f881d3a0f34d0d6e4cadf9d05849f21",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768137988871012_0000000038_079b641edb494609b5ec0cde8723c9c3",
+          "id": "action_run_01795768138213346883_0000000100_e6f9e2dd25b349b1b98a453c5d7f2705",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768142963771204_0000000105_a0eb4b64b40a4fe5a462eb91a815a108"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768137988871012_0000000038_079b641edb494609b5ec0cde8723c9c3",
+          "id": "provider_call_01795768138225927675_0000000102_df0363d9fd3e456fa1f39963088c46fd",
+          "action_run_id": "action_run_01795768138213346883_0000000100_e6f9e2dd25b349b1b98a453c5d7f2705",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5913,
+          "output_tokens": 94,
+          "total_tokens": 6007,
+          "latency_ms": 4716,
+          "estimated_cost": 0.015721000000000002,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768137988871012_0000000038_079b641edb494609b5ec0cde8723c9c3",
+          "id": "artifact_01795768142983844086_0000000109_e3c53af8dbdf4f82a0b67475fcc16654",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hi Elena,\n\nPlease pay the 15 000 RUB prepayment for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you! Please let me know once you’ve sent the payment."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“payable before work starts” preserves the term, no actual work-start or overdue claim."
+    },
+    {
+      "id": "A01-en-ambiguous-2",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:29:06.991Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768147080315165_0000000044_eb86e424823041288f0df70b31073724",
+      "artifact_id": "artifact_01795768151608087709_0000000125_75299f9511b847498dd35988a8ddebab",
+      "output": {
+        "text": "Hi Elena,\n\nPlease pay the agreed prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work begins. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment."
+      },
+      "visible_text": "Hi Elena,\n\nPlease pay the agreed prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work begins. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment.",
+      "clipboard_text": "Hi Elena,\n\nPlease pay the agreed prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work begins. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6359.444576000009,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "e8c71de45a7e8e84b18c13fc6d4b7d218c53596cae02424648fd121d014a5bfa",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768147080315165_0000000044_eb86e424823041288f0df70b31073724",
+          "id": "action_run_01795768148086507303_0000000116_3723fee866354bec860d5fadfb40e303",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768151587718476_0000000121_f0a92986069b41a7948fa295a6cd872f"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768147080315165_0000000044_eb86e424823041288f0df70b31073724",
+          "id": "provider_call_01795768148100012125_0000000118_aa498c69f7b7475a90f785731d07cbb3",
+          "action_run_id": "action_run_01795768148086507303_0000000116_3723fee866354bec860d5fadfb40e303",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5913,
+          "output_tokens": 98,
+          "total_tokens": 6011,
+          "latency_ms": 3466,
+          "estimated_cost": 0.0015770000000000003,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768147080315165_0000000044_eb86e424823041288f0df70b31073724",
+          "id": "artifact_01795768151608087709_0000000125_75299f9511b847498dd35988a8ddebab",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hi Elena,\n\nPlease pay the agreed prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work begins. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“due before work begins” states the condition, without asserting it has been missed."
+    },
+    {
+      "id": "A01-en-ambiguous-3",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:29:16.565Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768156671762817_0000000050_08b59a9cffe044d39cb7f7382a802516",
+      "artifact_id": "artifact_01795768161992954622_0000000141_b76eeaf9704248f59dc3e60ed49929a2",
+      "output": {
+        "text": "Hi Elena,\n\nPlease pay the prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work starts. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment."
+      },
+      "visible_text": "Hi Elena,\n\nPlease pay the prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work starts. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment.",
+      "clipboard_text": "Hi Elena,\n\nPlease pay the prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work starts. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6370.284972999987,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "6a7f773a52fb15ef06f469d76fbee649a4d0a63189812e89c9650cc03cc6e83d",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768156671762817_0000000050_08b59a9cffe044d39cb7f7382a802516",
+          "id": "action_run_01795768157721689223_0000000132_5511d5f95edb405693dcaba0947a00f5",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768161975788621_0000000137_ae74df773f4945fd9ab92b2ef2af057b"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768156671762817_0000000050_08b59a9cffe044d39cb7f7382a802516",
+          "id": "provider_call_01795768157738961946_0000000134_23e0a4e3262b4f408108bdacabcff9a3",
+          "action_run_id": "action_run_01795768157721689223_0000000132_5511d5f95edb405693dcaba0947a00f5",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5913,
+          "output_tokens": 97,
+          "total_tokens": 6010,
+          "latency_ms": 4209,
+          "estimated_cost": 0.001567,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768156671762817_0000000050_08b59a9cffe044d39cb7f7382a802516",
+          "id": "artifact_01795768161992954622_0000000141_b76eeaf9704248f59dc3e60ed49929a2",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hi Elena,\n\nPlease pay the prepayment of 15 000 RUB for the design of your 12-slide presentation. This is 50% of the agreed total price of 30,000 RUB and is due before work starts. The balance is payable after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“due before work starts” is a payment term, not a past event or overdue payment."
+    },
+    {
+      "id": "A01-en-pending_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:29:26.207Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, design work on the 12-slide presentation has not started. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768166282734193_0000000056_eb190f37061b4e949c86852c8ce28a70",
+      "artifact_id": "artifact_01795768170623704950_0000000157_d993353a64e34943a3d2d9253de6d616",
+      "output": {
+        "text": "Hi Elena,\n\nCould you please pay the 15 000 RUB prepayment for the design of your 12-slide presentation? This is 50% of the agreed total price of 30,000 RUB, payable before work starts. Work has not yet started, and the balance is due after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment."
+      },
+      "visible_text": "Hi Elena,\n\nCould you please pay the 15 000 RUB prepayment for the design of your 12-slide presentation? This is 50% of the agreed total price of 30,000 RUB, payable before work starts. Work has not yet started, and the balance is due after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment.",
+      "clipboard_text": "Hi Elena,\n\nCould you please pay the 15 000 RUB prepayment for the design of your 12-slide presentation? This is 50% of the agreed total price of 30,000 RUB, payable before work starts. Work has not yet started, and the balance is due after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6580.740166000003,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "63f072965c8a2c7dac70575382e0f362c33c00499474f12a92e9527851ff5cb1",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768166282734193_0000000056_eb190f37061b4e949c86852c8ce28a70",
+          "id": "action_run_01795768167069601055_0000000148_c6eb6540fe1246f9bd07da6c9121c05f",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768170602097908_0000000153_0ea72d74c623451889eaa3e30c275f3e"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768166282734193_0000000056_eb190f37061b4e949c86852c8ce28a70",
+          "id": "provider_call_01795768167083958851_0000000150_09ecf71a65a24dac800b872c0b2f7199",
+          "action_run_id": "action_run_01795768167069601055_0000000148_c6eb6540fe1246f9bd07da6c9121c05f",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5913,
+          "output_tokens": 104,
+          "total_tokens": 6017,
+          "latency_ms": 3496,
+          "estimated_cost": 0.015821,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768166282734193_0000000056_eb190f37061b4e949c86852c8ce28a70",
+          "id": "artifact_01795768170623704950_0000000157_d993353a64e34943a3d2d9253de6d616",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hi Elena,\n\nCould you please pay the 15 000 RUB prepayment for the design of your 12-slide presentation? This is 50% of the agreed total price of 30,000 RUB, payable before work starts. Work has not yet started, and the balance is due after delivery of the final PDF and PPTX.\n\nPayment details will be provided in a separate invoice. Thank you, and please let me know once you’ve sent the payment."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“Work has not yet started” preserves pending work; no delinquency."
+    },
+    {
+      "id": "A01-en-confirmed_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:29:38.277Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, work on the design of the 12-slide presentation is already underway. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768178360358898_0000000062_a85adde2e0f5493f9d19a48ca738e70b",
+      "artifact_id": "artifact_01795768181940617320_0000000173_ddf1c62d1f4342f9b59b36132fd4d0d8",
+      "output": {
+        "text": "Hi Elena,\n\nWork on your 12-slide presentation design is already underway. Could you please pay the prepayment of 15 000 RUB, which is 50% of the agreed total price of 30,000 RUB? The agreed terms provide for prepayment before work starts, with the balance payable after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment."
+      },
+      "visible_text": "Hi Elena,\n\nWork on your 12-slide presentation design is already underway. Could you please pay the prepayment of 15 000 RUB, which is 50% of the agreed total price of 30,000 RUB? The agreed terms provide for prepayment before work starts, with the balance payable after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment.",
+      "clipboard_text": "Hi Elena,\n\nWork on your 12-slide presentation design is already underway. Could you please pay the prepayment of 15 000 RUB, which is 50% of the agreed total price of 30,000 RUB? The agreed terms provide for prepayment before work starts, with the balance payable after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4337.820135000002,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "b1358a630d3dd9bfaba99d6d65eb59dc0bd83ceb8312e6ef0565f29edd51227b",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768178360358898_0000000062_a85adde2e0f5493f9d19a48ca738e70b",
+          "id": "action_run_01795768178750569139_0000000164_bb57d8d5b30f4b9e8df766b5346d9cc4",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768181919602500_0000000169_90fcc0ca25254a22bbae89b27db5f1fd"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768178360358898_0000000062_a85adde2e0f5493f9d19a48ca738e70b",
+          "id": "provider_call_01795768178767435327_0000000166_9d7444dc6df5418d84c0a9cb36739bfb",
+          "action_run_id": "action_run_01795768178750569139_0000000164_bb57d8d5b30f4b9e8df766b5346d9cc4",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5915,
+          "output_tokens": 107,
+          "total_tokens": 6022,
+          "latency_ms": 3127,
+          "estimated_cost": 0.015856000000000002,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768178360358898_0000000062_a85adde2e0f5493f9d19a48ca738e70b",
+          "id": "artifact_01795768181940617320_0000000173_ddf1c62d1f4342f9b59b36132fd4d0d8",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hi Elena,\n\nWork on your 12-slide presentation design is already underway. Could you please pay the prepayment of 15 000 RUB, which is 50% of the agreed total price of 30,000 RUB? The agreed terms provide for prepayment before work starts, with the balance payable after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“already underway” preserves commencement; “agreed terms provide for prepayment” avoids a missed-payment assertion."
+    },
+    {
+      "id": "A01-en-confirmed_overdue",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:29:45.572Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, the agreed deposit for the design of the 12-slide presentation is overdue. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768185677133211_0000000068_b0e0f95be0a940b5a271a9f5079f4f68",
+      "artifact_id": "artifact_01795768189608575389_0000000189_c56cfeafb42a44c5983575a22d08eefe",
+      "output": {
+        "text": "Hi Elena,\n\nCould you please pay the overdue deposit of 15 000 RUB for the design of your 12-slide presentation? This is the agreed 50% prepayment of the total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment."
+      },
+      "visible_text": "Hi Elena,\n\nCould you please pay the overdue deposit of 15 000 RUB for the design of your 12-slide presentation? This is the agreed 50% prepayment of the total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment.",
+      "clipboard_text": "Hi Elena,\n\nCould you please pay the overdue deposit of 15 000 RUB for the design of your 12-slide presentation? This is the agreed 50% prepayment of the total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4305.002734000009,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "5d5f85a7c4c7e16c23fab6772254f332658ab7e1e65c7c7eea3be35ad78282f5",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768185677133211_0000000068_b0e0f95be0a940b5a271a9f5079f4f68",
+          "id": "action_run_01795768186029390372_0000000180_795017f48c5d4159854eebd8e5e5bbe2",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768189597942830_0000000185_5c11235f21bb47c482137d4dd2bda267"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768185677133211_0000000068_b0e0f95be0a940b5a271a9f5079f4f68",
+          "id": "provider_call_01795768186045090364_0000000182_02f1cb0f01da4051838d0968c8ad8b78",
+          "action_run_id": "action_run_01795768186029390372_0000000180_795017f48c5d4159854eebd8e5e5bbe2",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5916,
+          "output_tokens": 101,
+          "total_tokens": 6017,
+          "latency_ms": 3534,
+          "estimated_cost": 0.0157985,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768185677133211_0000000068_b0e0f95be0a940b5a271a9f5079f4f68",
+          "id": "artifact_01795768189608575389_0000000189_c56cfeafb42a44c5983575a22d08eefe",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hi Elena,\n\nCould you please pay the overdue deposit of 15 000 RUB for the design of your 12-slide presentation? This is the agreed 50% prepayment of the total price of 30,000 RUB, payable before work starts. The balance is due after delivery of the final PDF and PPTX. Payment details will be provided in a separate invoice.\n\nThank you, and please let me know once you’ve sent the payment."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“overdue deposit” preserves delinquency; the before-start term does not assert commencement."
+    },
+    {
+      "id": "A01-es-ambiguous-1",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:29:52.761Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768192818966354_0000000074_73218cafb94d4f0fb43a46864015b50c",
+      "artifact_id": "artifact_01795768197345314724_0000000205_de0c8d02ea6d4aa495304984496ca8ec",
+      "output": {
+        "text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y, según lo acordado, se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago."
+      },
+      "visible_text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y, según lo acordado, se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago.",
+      "clipboard_text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y, según lo acordado, se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6326.656185,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "6ff0e0b37d0915372d1c8523139c0fdac0b0da0cb8f18b73b663e78f56a505b2",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768192818966354_0000000074_73218cafb94d4f0fb43a46864015b50c",
+          "id": "action_run_01795768193694915412_0000000196_4ad68fdc3c014cc5878b894e53daff9a",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768197330662186_0000000201_9b38dbd774014ff8ac61ed6f258c1b43"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768192818966354_0000000074_73218cafb94d4f0fb43a46864015b50c",
+          "id": "provider_call_01795768193709227517_0000000198_3a6e3630b2f242c8914138bd67ca5116",
+          "action_run_id": "action_run_01795768193694915412_0000000196_4ad68fdc3c014cc5878b894e53daff9a",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5923,
+          "output_tokens": 117,
+          "total_tokens": 6040,
+          "latency_ms": 3599,
+          "estimated_cost": 0.015976,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768192818966354_0000000074_73218cafb94d4f0fb43a46864015b50c",
+          "id": "artifact_01795768197345314724_0000000205_de0c8d02ea6d4aa495304984496ca8ec",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y, según lo acordado, se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“según lo acordado, se abona antes de empezar” states the term without actual status."
+    },
+    {
+      "id": "A01-es-ambiguous-2",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:30:02.624Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768202690318308_0000000080_d9a31d31d1c6456b9b266aa3df452a6f",
+      "artifact_id": "artifact_01795768207111357379_0000000221_2eb169625a4946a4bbef9d33b51cb12f",
+      "output": {
+        "text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar el trabajo. El saldo se paga después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Gracias!"
+      },
+      "visible_text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar el trabajo. El saldo se paga después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Gracias!",
+      "clipboard_text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar el trabajo. El saldo se paga después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Gracias!",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6351.258180000004,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "1d36b80693fa6d55be1d7b6194f7626d1496f7790309cdb040fcc229542f0872",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768202690318308_0000000080_d9a31d31d1c6456b9b266aa3df452a6f",
+          "id": "action_run_01795768203431255322_0000000212_892a7cb777094460ae4e55d96a49de36",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768207097819836_0000000217_f05775a3aea64c119ef5c7b550ec99af"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768202690318308_0000000080_d9a31d31d1c6456b9b266aa3df452a6f",
+          "id": "provider_call_01795768203447735105_0000000214_8cabaca5ff2f43abadd0033fd082790a",
+          "action_run_id": "action_run_01795768203431255322_0000000212_892a7cb777094460ae4e55d96a49de36",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5923,
+          "output_tokens": 111,
+          "total_tokens": 6034,
+          "latency_ms": 3630,
+          "estimated_cost": 0.001708,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768202690318308_0000000080_d9a31d31d1c6456b9b266aa3df452a6f",
+          "id": "artifact_01795768207111357379_0000000221_2eb169625a4946a4bbef9d33b51cb12f",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar el trabajo. El saldo se paga después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Gracias!"
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“se abona antes de empezar el trabajo” preserves the term; actual commencement and delinquency open."
+    },
+    {
+      "id": "A01-es-ambiguous-3",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:30:12.447Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768212541628101_0000000086_69acae5cffba4843ba6898adefcd83c6",
+      "artifact_id": "artifact_01795768216491381822_0000000237_0ee319fd02b54cd59ce0e4776f03270d",
+      "output": {
+        "text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Gracias!"
+      },
+      "visible_text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Gracias!",
+      "clipboard_text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Gracias!",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4338.557984999992,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "ecaec4e16ee44038a4dd0d510ab3378a7b897f2c95f1735d2e069c414963ced7",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768212541628101_0000000086_69acae5cffba4843ba6898adefcd83c6",
+          "id": "action_run_01795768213194651283_0000000228_4ef5e0c907e8496fb65877c0c6a57a8c",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768216474311957_0000000233_0ad05db7be4e40149351ffa930a81273"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768212541628101_0000000086_69acae5cffba4843ba6898adefcd83c6",
+          "id": "provider_call_01795768213210598066_0000000230_3a5b254b71b04df8974bf99ec79feada",
+          "action_run_id": "action_run_01795768213194651283_0000000228_4ef5e0c907e8496fb65877c0c6a57a8c",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5923,
+          "output_tokens": 108,
+          "total_tokens": 6031,
+          "latency_ms": 3231,
+          "estimated_cost": 0.001678,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768212541628101_0000000086_69acae5cffba4843ba6898adefcd83c6",
+          "id": "artifact_01795768216491381822_0000000237_0ee319fd02b54cd59ce0e4776f03270d",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hola Elena,\n\nTe pido por favor el anticipo de 15 000 RUB para el diseño de la presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El saldo se abonará después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte. Por favor, avísame cuando hayas enviado el pago. ¡Gracias!"
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“se abona antes de empezar el trabajo” preserves the term; no claim of missed payment."
+    },
+    {
+      "id": "A01-es-pending_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:30:20.166Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas aún no ha comenzado. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768220224906563_0000000092_7e0f16247d6f45c3bd9c64e00a8b9032",
+      "artifact_id": "artifact_01795768223887760002_0000000253_6314303f1bb543b3acde93f94646bb43",
+      "output": {
+        "text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El trabajo aún no ha comenzado; el saldo se abona después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago."
+      },
+      "visible_text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El trabajo aún no ha comenzado; el saldo se abona después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago.",
+      "clipboard_text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El trabajo aún no ha comenzado; el saldo se abona después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 4329.162843999977,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "ba4a1c0fccb9371a6fd0ed8123f41ab26a00836fceca82e38c29e856c6c354d1",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768220224906563_0000000092_7e0f16247d6f45c3bd9c64e00a8b9032",
+          "id": "action_run_01795768220563397321_0000000244_23dbc641fa4843ac8084aee98ecf0887",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768223865725165_0000000249_0f2115d7ca9440e0b3febd1be5cc4c69"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768220224906563_0000000092_7e0f16247d6f45c3bd9c64e00a8b9032",
+          "id": "provider_call_01795768220575475642_0000000246_c6297e67f3cb417bbb64f73acb633e3a",
+          "action_run_id": "action_run_01795768220563397321_0000000244_23dbc641fa4843ac8084aee98ecf0887",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5928,
+          "output_tokens": 119,
+          "total_tokens": 6047,
+          "latency_ms": 3263,
+          "estimated_cost": 0.016008500000000002,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768220224906563_0000000092_7e0f16247d6f45c3bd9c64e00a8b9032",
+          "id": "artifact_01795768223887760002_0000000253_6314303f1bb543b3acde93f94646bb43",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hola Elena:\n\nPor favor, realiza el pago del anticipo de 15 000 RUB para el diseño de tu presentación de 12 diapositivas. Corresponde al 50% del precio total acordado de 30 000 RUB y se abona antes de empezar. El trabajo aún no ha comenzado; el saldo se abona después de entregar el PDF y el PPTX finales.\n\nLos datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“El trabajo aún no ha comenzado” preserves pending start; no overdue claim."
+    },
+    {
+      "id": "A01-es-confirmed_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:30:27.848Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768227953876537_0000000098_69e9a8b389ad40819303438ebad01600",
+      "artifact_id": "artifact_01795768236029306454_0000000269_1bf1309329f44d38bc25b9589da693de",
+      "output": {
+        "text": "Hola, Elena:\n\nTe escribo para pedirte amablemente el anticipo de 15 000 RUB por el diseño de la presentación de 12 diapositivas, que ya está en marcha.\n\nSegún lo acordado, el anticipo antes de empezar corresponde al 50% del precio total de 30 000 RUB. El saldo se abona después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!"
+      },
+      "visible_text": "Hola, Elena:\n\nTe escribo para pedirte amablemente el anticipo de 15 000 RUB por el diseño de la presentación de 12 diapositivas, que ya está en marcha.\n\nSegún lo acordado, el anticipo antes de empezar corresponde al 50% del precio total de 30 000 RUB. El saldo se abona después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!",
+      "clipboard_text": "Hola, Elena:\n\nTe escribo para pedirte amablemente el anticipo de 15 000 RUB por el diseño de la presentación de 12 diapositivas, que ya está en marcha.\n\nSegún lo acordado, el anticipo antes de empezar corresponde al 50% del precio total de 30 000 RUB. El saldo se abona después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!",
+      "ui_outcome": "result",
+      "ui_latency_ms": 8379.298762999999,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "d33fb732a22b575abb83efb78c69462349b0fe68a8a2f071e96e8ee872ca999f",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768227953876537_0000000098_69e9a8b389ad40819303438ebad01600",
+          "id": "action_run_01795768228976471642_0000000260_27d350d1aed74132a973cb57e1c92e88",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768236017519624_0000000265_9f0188f362cf470e9b039af623836d14"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768227953876537_0000000098_69e9a8b389ad40819303438ebad01600",
+          "id": "provider_call_01795768228993188332_0000000262_3d671f81e59f465faa8c4cdc2a2eb9bc",
+          "action_run_id": "action_run_01795768228976471642_0000000260_27d350d1aed74132a973cb57e1c92e88",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5927,
+          "output_tokens": 241,
+          "total_tokens": 6168,
+          "latency_ms": 7000,
+          "estimated_cost": 0.017226,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768227953876537_0000000098_69e9a8b389ad40819303438ebad01600",
+          "id": "artifact_01795768236029306454_0000000269_1bf1309329f44d38bc25b9589da693de",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hola, Elena:\n\nTe escribo para pedirte amablemente el anticipo de 15 000 RUB por el diseño de la presentación de 12 diapositivas, que ya está en marcha.\n\nSegún lo acordado, el anticipo antes de empezar corresponde al 50% del precio total de 30 000 RUB. El saldo se abona después de entregar el PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nPor favor, avísame cuando hayas enviado el pago. ¡Muchas gracias!"
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“ya está en marcha” preserves actual commencement; “Según lo acordado” describes the term without asserting delinquency."
+    },
+    {
+      "id": "A01-es-confirmed_overdue",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:30:39.569Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, el anticipo acordado para el diseño de la presentación de 12 diapositivas está vencido. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795768239682878610_0000000104_12f723d11bc14546bbfbb85fe6f35bb8",
+      "artifact_id": "artifact_01795768244014803465_0000000285_447ae81c60194bcd887e8e02d8e60893",
+      "output": {
+        "text": "Hola Elena:\n\nTe pido por favor que abones el anticipo pendiente de 15 000 RUB para el diseño de la presentación de 12 diapositivas, cuyo plazo de pago ya ha vencido.\n\nSegún lo acordado, el precio total es de 30 000 RUB y el anticipo de 15 000 RUB corresponde al 50% de ese total, pagadero antes de empezar. El saldo se abona después de la entrega del PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago."
+      },
+      "visible_text": "Hola Elena:\n\nTe pido por favor que abones el anticipo pendiente de 15 000 RUB para el diseño de la presentación de 12 diapositivas, cuyo plazo de pago ya ha vencido.\n\nSegún lo acordado, el precio total es de 30 000 RUB y el anticipo de 15 000 RUB corresponde al 50% de ese total, pagadero antes de empezar. El saldo se abona después de la entrega del PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago.",
+      "clipboard_text": "Hola Elena:\n\nTe pido por favor que abones el anticipo pendiente de 15 000 RUB para el diseño de la presentación de 12 diapositivas, cuyo plazo de pago ya ha vencido.\n\nSegún lo acordado, el precio total es de 30 000 RUB y el anticipo de 15 000 RUB corresponde al 50% de ese total, pagadero antes de empezar. El saldo se abona después de la entrega del PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago.",
+      "ui_outcome": "result",
+      "ui_latency_ms": 6401.292622000008,
+      "start_status": 200,
+      "result_status": 200,
+      "trace_sha256": "a8b572970e5b9e2ee6aec33177b5deb92247b3013129a1cd92be8f0d3289916a",
+      "error": null,
+      "diagnostic_errors": null,
+      "semantic_verdict": "pass",
+      "structural_verdict": "pass",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795768239682878610_0000000104_12f723d11bc14546bbfbb85fe6f35bb8",
+          "id": "action_run_01795768240097642615_0000000276_c6478d96d9a9438eb50a6e5e0a261ca3",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "succeeded",
+          "error_code": null,
+          "output_artifact_id": "artifact_01795768243999128933_0000000281_0a95e366ea254faebb774cc60e7048bb"
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795768239682878610_0000000104_12f723d11bc14546bbfbb85fe6f35bb8",
+          "id": "provider_call_01795768240110157307_0000000278_db0a80b77c6c4816ab8da728a0baeebc",
+          "action_run_id": "action_run_01795768240097642615_0000000276_c6478d96d9a9438eb50a6e5e0a261ca3",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "succeeded",
+          "input_tokens": 5930,
+          "output_tokens": 138,
+          "total_tokens": 6068,
+          "latency_ms": 3867,
+          "estimated_cost": 0.016203500000000003,
+          "error_code": null,
+          "error_message_safe": null,
+          "failure_kind": null,
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [
+        {
+          "scenario_session_id": "scenario_session_01795768239682878610_0000000104_12f723d11bc14546bbfbb85fe6f35bb8",
+          "id": "artifact_01795768244014803465_0000000285_447ae81c60194bcd887e8e02d8e60893",
+          "action_run_id": null,
+          "artifact_type": "structured_output",
+          "status": "stored",
+          "content_json": {
+            "text": "Hola Elena:\n\nTe pido por favor que abones el anticipo pendiente de 15 000 RUB para el diseño de la presentación de 12 diapositivas, cuyo plazo de pago ya ha vencido.\n\nSegún lo acordado, el precio total es de 30 000 RUB y el anticipo de 15 000 RUB corresponde al 50% de ese total, pagadero antes de empezar. El saldo se abona después de la entrega del PDF y el PPTX finales. Los datos de pago estarán en una factura aparte.\n\nMuchas gracias. Por favor, avísame cuando hayas enviado el pago."
+          }
+        }
+      ],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": "gpt-6.1-sol",
+      "submitted_input_verified": true,
+      "language_verdict": "pass",
+      "semantic_checks": {
+        "status_preserved": true,
+        "explicit_payment_request": true,
+        "deposit_15000_rub_50_percent_of_30000_rub": true,
+        "agreed_pre_start_condition": true,
+        "balance_after_final_pdf_and_pptx": true,
+        "future_separate_invoice": true,
+        "no_invented_urgency_or_date": true,
+        "no_invented_work_or_payment_status": true,
+        "addressee_and_12_slide_design": true,
+        "requested_payment_notification": true
+      },
+      "assessment_note": "“cuyo plazo de pago ya ha vencido” preserves delinquency; no actual work-start assertion."
+    }
+  ],
+  "configured_provider_policy": "sol_text_generation_v1",
+  "authorization": "User updated the provider key and explicitly requested a new live series.",
+  "previous_series": "any-823-prepaid-request-status.provider-failed.evidence.json",
+  "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+  "deployment_profile_fingerprint": "fb8ff7e205ef7a3b1d014e36d9a0754910fca4cfbea4024fffa5395ba97986cf",
+  "configured_model": "openai/gpt-6.1-sol",
+  "actual_model": "gpt-6.1-sol",
+  "live_blocker": null,
+  "summary": {
+    "planned": 18,
+    "submitted": 18,
+    "verified_payloads": 18,
+    "successful_actions": 18,
+    "failed_actions": 0,
+    "physical_attempts": 18,
+    "successful_physical_attempts": 18,
+    "result_artifacts": 18,
+    "structural_passes": 18,
+    "semantic_passes": 18,
+    "language_passes": 18,
+    "original_passes": 9,
+    "contrast_passes": 9,
+    "estimated_cost_usd": 0.2025049,
+    "median_ui_latency_ms": 6355.35
+  }
+}

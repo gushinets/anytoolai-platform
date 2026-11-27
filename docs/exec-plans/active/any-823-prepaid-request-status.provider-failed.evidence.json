@@ -1,0 +1,2212 @@
+{
+  "ticket": "ANY-823",
+  "status": "live_acceptance_failed_provider",
+  "source_revision": "95b62005e46130644ee80021ecc253a1f18c3fe1",
+  "historical_evidence": "docs/exec-plans/completed/any-604-prepaid-request-live-acceptance.evidence.json",
+  "workflow_id": "client_update_writer.prepaid_request_v1",
+  "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+  "working_tree_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+  "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+  "actual_model": null,
+  "planned_attempts": [
+    {
+      "id": "A01-ru-ambiguous-1",
+      "historical_input_id": "A01-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-ambiguous-2",
+      "historical_input_id": "A01-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-ambiguous-3",
+      "historical_input_id": "A01-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-pending_start",
+      "historical_input_id": "A01-1",
+      "variant": "pending_start",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, работа над дизайном презентации на 12 слайдов ещё не началась. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов ещё не началась. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-confirmed_start",
+      "historical_input_id": "A01-1",
+      "variant": "confirmed_start",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, работа над дизайном презентации на 12 слайдов уже идёт. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов уже идёт. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-ru-confirmed_overdue",
+      "historical_input_id": "A01-1",
+      "variant": "confirmed_overdue",
+      "input": {
+        "id": "A01",
+        "language": "ru",
+        "tone": "warm",
+        "notes": "Елена, согласованная предоплата за дизайн презентации на 12 слайдов просрочена. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Елена, согласованная предоплата за дизайн презентации на 12 слайдов просрочена. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-ambiguous-1",
+      "historical_input_id": "A01-EN-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-ambiguous-2",
+      "historical_input_id": "A01-EN-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-ambiguous-3",
+      "historical_input_id": "A01-EN-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-pending_start",
+      "historical_input_id": "A01-EN-1",
+      "variant": "pending_start",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, design work on the 12-slide presentation has not started. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, design work on the 12-slide presentation has not started. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-confirmed_start",
+      "historical_input_id": "A01-EN-1",
+      "variant": "confirmed_start",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, work on the design of the 12-slide presentation is already underway. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, work on the design of the 12-slide presentation is already underway. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-en-confirmed_overdue",
+      "historical_input_id": "A01-EN-1",
+      "variant": "confirmed_overdue",
+      "input": {
+        "id": "A01-EN",
+        "language": "en",
+        "tone": "warm",
+        "notes": "Elena, the agreed deposit for the design of the 12-slide presentation is overdue. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, the agreed deposit for the design of the 12-slide presentation is overdue. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-ambiguous-1",
+      "historical_input_id": "A01-ES-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-ambiguous-2",
+      "historical_input_id": "A01-ES-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-ambiguous-3",
+      "historical_input_id": "A01-ES-1",
+      "variant": "ambiguous",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-pending_start",
+      "historical_input_id": "A01-ES-1",
+      "variant": "pending_start",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas aún no ha comenzado. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas aún no ha comenzado. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-confirmed_start",
+      "historical_input_id": "A01-ES-1",
+      "variant": "confirmed_start",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    },
+    {
+      "id": "A01-es-confirmed_overdue",
+      "historical_input_id": "A01-ES-1",
+      "variant": "confirmed_overdue",
+      "input": {
+        "id": "A01-ES",
+        "language": "es",
+        "tone": "warm",
+        "notes": "Elena, el anticipo acordado para el diseño de la presentación de 12 diapositivas está vencido. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+        "amount": "15 000 RUB",
+        "due_date": ""
+      },
+      "expected_form_payload": {
+        "billing_context": {
+          "notes": "Elena, el anticipo acordado para el diseño de la presentación de 12 diapositivas está vencido. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "A01-ru-ambiguous-1",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:06:56.068Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766816219180211_0000000002_b0813aa716c64c39a65b99bfd31392ae",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 4419.459326,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "019e020ba3c39eb26a73a42932c916b3d5463195d4262b502efa9be2be1ea7ef",
+      "error": [
+        "При написании запроса что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766816219180211_0000000002_b0813aa716c64c39a65b99bfd31392ae",
+          "id": "action_run_01795766816759178611_0000000003_55a37e98616d47779d88ea28f02e3ab6",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766816219180211_0000000002_b0813aa716c64c39a65b99bfd31392ae",
+          "id": "provider_call_01795766817036613749_0000000005_c57023bc72e54b7bae57af90ee2e4e97",
+          "action_run_id": "action_run_01795766816759178611_0000000003_55a37e98616d47779d88ea28f02e3ab6",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 2681,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766816219180211_0000000002_b0813aa716c64c39a65b99bfd31392ae",
+          "id": "provider_call_01795766819767213815_0000000008_72f7206a4ae8480ea239af372a286796",
+          "action_run_id": "action_run_01795766816759178611_0000000003_55a37e98616d47779d88ea28f02e3ab6",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-ru-ambiguous-2",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:03.918Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766824001689998_0000000007_c1d4740f31c54f549898aea6b3528f38",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2268.949252000002,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "f2403f2891ade38d4d67bb33a67c7544af5b33377882f1184e7edcdd15c89e70",
+      "error": [
+        "При написании запроса что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766824001689998_0000000007_c1d4740f31c54f549898aea6b3528f38",
+          "id": "action_run_01795766824096875128_0000000018_a9b92310ed7549aeaec761e009bbcf8b",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766824001689998_0000000007_c1d4740f31c54f549898aea6b3528f38",
+          "id": "provider_call_01795766824115942948_0000000020_63bfce16e9b3407a9b8b3920723abdc1",
+          "action_run_id": "action_run_01795766824096875128_0000000018_a9b92310ed7549aeaec761e009bbcf8b",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766824001689998_0000000007_c1d4740f31c54f549898aea6b3528f38",
+          "id": "provider_call_01795766824137828091_0000000023_4722eae36ddd4c66aa8e109c59bf4313",
+          "action_run_id": "action_run_01795766824096875128_0000000018_a9b92310ed7549aeaec761e009bbcf8b",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-ru-ambiguous-3",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:10.171Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, начинаем дизайн презентации на 12 слайдов. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766830265121528_0000000012_3642cf8983354595b491f0dba2f0cbb2",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2265.2698520000013,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "06f9149c9e107a6b2a6f8790f04e0952b454c71d8c8063016c03f3146a0f31b3",
+      "error": [
+        "При написании запроса что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766830265121528_0000000012_3642cf8983354595b491f0dba2f0cbb2",
+          "id": "action_run_01795766830810380498_0000000034_b8d913bc02fa413ca19a0f75950bbfae",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766830265121528_0000000012_3642cf8983354595b491f0dba2f0cbb2",
+          "id": "provider_call_01795766830825539309_0000000036_3f8ccf212fd84d33a348626c9e1cf7f4",
+          "action_run_id": "action_run_01795766830810380498_0000000034_b8d913bc02fa413ca19a0f75950bbfae",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 494,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766830265121528_0000000012_3642cf8983354595b491f0dba2f0cbb2",
+          "id": "provider_call_01795766831334941484_0000000039_1c007574e4bf4814b01e1fc7c8dd6ced",
+          "action_run_id": "action_run_01795766830810380498_0000000034_b8d913bc02fa413ca19a0f75950bbfae",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 10,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-ru-pending_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:15.566Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов ещё не началась. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766835698499639_0000000017_95348e5dc5ae4282814f1ca262e5e46b",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2306.918032999998,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "5d37a521c25b214bae7e26d647725e2b011f55c4b5603b6a3447ab3474a4e320",
+      "error": [
+        "При написании запроса что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766835698499639_0000000017_95348e5dc5ae4282814f1ca262e5e46b",
+          "id": "action_run_01795766836541051108_0000000049_071472a14e85462f8f05bf28f51c614f",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766835698499639_0000000017_95348e5dc5ae4282814f1ca262e5e46b",
+          "id": "provider_call_01795766836555804738_0000000051_287038b3702b4799920da84b13a7903b",
+          "action_run_id": "action_run_01795766836541051108_0000000049_071472a14e85462f8f05bf28f51c614f",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 527,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766835698499639_0000000017_95348e5dc5ae4282814f1ca262e5e46b",
+          "id": "provider_call_01795766837096907519_0000000054_b7e54cff61334995802e40739801d141",
+          "action_run_id": "action_run_01795766836541051108_0000000049_071472a14e85462f8f05bf28f51c614f",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 6,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-ru-confirmed_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:21.313Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, работа над дизайном презентации на 12 слайдов уже идёт. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766841389051020_0000000022_a7d2db4b2b364b92a6b26e05addf3cc4",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2229.2572759999966,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "8c3f5b4e6f0d342f4357143cca5bf0d6d0948b2f5a7df911dd326871b59b1312",
+      "error": [
+        "При написании запроса что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766841389051020_0000000022_a7d2db4b2b364b92a6b26e05addf3cc4",
+          "id": "action_run_01795766842287718297_0000000064_f9a27b3bfabd4b95a90cbb66c5a1d82b",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766841389051020_0000000022_a7d2db4b2b364b92a6b26e05addf3cc4",
+          "id": "provider_call_01795766842302381414_0000000066_83e080903aa44c13a3502f0b299e8757",
+          "action_run_id": "action_run_01795766842287718297_0000000064_f9a27b3bfabd4b95a90cbb66c5a1d82b",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 528,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766841389051020_0000000022_a7d2db4b2b364b92a6b26e05addf3cc4",
+          "id": "provider_call_01795766842840808632_0000000069_adfc7328805248bb9f838de39cd9fade",
+          "action_run_id": "action_run_01795766842287718297_0000000064_f9a27b3bfabd4b95a90cbb66c5a1d82b",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-ru-confirmed_overdue",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:26.426Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Елена, согласованная предоплата за дизайн презентации на 12 слайдов просрочена. Согласованная общая цена 30 000 RUB, предоплата 50% перед стартом, остаток после передачи финального PDF и PPTX. Попросить предоплату вежливо; реквизиты будут в отдельном счёте. Не заявлять, что счёт уже отправлен.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766846491602959_0000000027_4ef1438d2d4449f7b7d311983ac7bcdc",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2238.493838000002,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "39d6c810e24d1ae4aa991e54b8cfbf3c502b22b883ef781a7628efd0091bc04f",
+      "error": [
+        "При написании запроса что-то пошло не так. Пожалуйста, попробуйте ещё раз.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766846491602959_0000000027_4ef1438d2d4449f7b7d311983ac7bcdc",
+          "id": "action_run_01795766847002759266_0000000079_e30c28a73fee4835ac60aa1564a22aab",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766846491602959_0000000027_4ef1438d2d4449f7b7d311983ac7bcdc",
+          "id": "provider_call_01795766847017184159_0000000081_59e1d3da9cd24b0480cf64f6074baa13",
+          "action_run_id": "action_run_01795766847002759266_0000000079_e30c28a73fee4835ac60aa1564a22aab",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766846491602959_0000000027_4ef1438d2d4449f7b7d311983ac7bcdc",
+          "id": "provider_call_01795766847032407933_0000000084_aa130a2c578d4239ac9ccf3f3555903b",
+          "action_run_id": "action_run_01795766847002759266_0000000079_e30c28a73fee4835ac60aa1564a22aab",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 2,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-en-ambiguous-1",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:31.581Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766851640113835_0000000032_53df6c2f8f2d43fb85fb1dcdf2283d94",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2226.658051999999,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "8be46ecd8587d42842479116a9465bc1cb3ef341e20b95d07a2e94d0b7450782",
+      "error": [
+        "Something went wrong writing your request. Please try again.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766851640113835_0000000032_53df6c2f8f2d43fb85fb1dcdf2283d94",
+          "id": "action_run_01795766852211838154_0000000094_c0bf033e486b4d18a68b2d9805fb84f6",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766851640113835_0000000032_53df6c2f8f2d43fb85fb1dcdf2283d94",
+          "id": "provider_call_01795766852227102906_0000000096_4ee27020318d4d8b819f7664ca4ba5f1",
+          "action_run_id": "action_run_01795766852211838154_0000000094_c0bf033e486b4d18a68b2d9805fb84f6",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 439,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766851640113835_0000000032_53df6c2f8f2d43fb85fb1dcdf2283d94",
+          "id": "provider_call_01795766852682709106_0000000099_9b25cf8933be4f5a96eb6352619c309d",
+          "action_run_id": "action_run_01795766852211838154_0000000094_c0bf033e486b4d18a68b2d9805fb84f6",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 6,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-en-ambiguous-2",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:36.752Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766856872713509_0000000037_17556e8c6d994cbb9f747965c4903c09",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2309.531092999998,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "a19ccc72062d281331cd812af62cb2b357b619b499503f43cbfb5d2f65c61252",
+      "error": [
+        "Something went wrong writing your request. Please try again.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766856872713509_0000000037_17556e8c6d994cbb9f747965c4903c09",
+          "id": "action_run_01795766857895241506_0000000109_ad4dae07b7bd4d7cad9b02b28e55847f",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766856872713509_0000000037_17556e8c6d994cbb9f747965c4903c09",
+          "id": "provider_call_01795766857910133228_0000000111_f7c936a7a9a2400686f3a55750d8066d",
+          "action_run_id": "action_run_01795766857895241506_0000000109_ad4dae07b7bd4d7cad9b02b28e55847f",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 571,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766856872713509_0000000037_17556e8c6d994cbb9f747965c4903c09",
+          "id": "provider_call_01795766858501450702_0000000114_c19638442910448791b12ed603345400",
+          "action_run_id": "action_run_01795766857895241506_0000000109_ad4dae07b7bd4d7cad9b02b28e55847f",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-en-ambiguous-3",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:41.972Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, we are starting the design of a 12-slide presentation. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766862044994063_0000000042_2d4b3e307ded416bb96cc1defaf7d128",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2244.3479439999937,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "3ee914d35688f71862123bcfb19ea697a5968c827aa34a299db9b2db4ddb6ab4",
+      "error": [
+        "Something went wrong writing your request. Please try again.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766862044994063_0000000042_2d4b3e307ded416bb96cc1defaf7d128",
+          "id": "action_run_01795766862708226829_0000000124_5ffe3050a28b439e923abf0ee0fc3e90",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766862044994063_0000000042_2d4b3e307ded416bb96cc1defaf7d128",
+          "id": "provider_call_01795766862721867076_0000000126_9c8051df175a447fa017ddc2ad8cd36e",
+          "action_run_id": "action_run_01795766862708226829_0000000124_5ffe3050a28b439e923abf0ee0fc3e90",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 4,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766862044994063_0000000042_2d4b3e307ded416bb96cc1defaf7d128",
+          "id": "provider_call_01795766862737485919_0000000129_f39aae9bde10488ba468636b23d4a03d",
+          "action_run_id": "action_run_01795766862708226829_0000000124_5ffe3050a28b439e923abf0ee0fc3e90",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-en-pending_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:47.147Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, design work on the 12-slide presentation has not started. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766867290343187_0000000047_c3624567d2e84b8683993f23b46129e8",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2307.7720980000013,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "66b24a7f1a9a224a94c20431066b163b68ed559bb42df3ca8a6cfd4a3c0dfa87",
+      "error": [
+        "Something went wrong writing your request. Please try again.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766867290343187_0000000047_c3624567d2e84b8683993f23b46129e8",
+          "id": "action_run_01795766867927036491_0000000139_12f220da44cb443cacf8d92621defe66",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766867290343187_0000000047_c3624567d2e84b8683993f23b46129e8",
+          "id": "provider_call_01795766868249351739_0000000141_07d34424617948539d800cb80da6e538",
+          "action_run_id": "action_run_01795766867927036491_0000000139_12f220da44cb443cacf8d92621defe66",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 423,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766867290343187_0000000047_c3624567d2e84b8683993f23b46129e8",
+          "id": "provider_call_01795766868685157866_0000000144_822d93aa7d3d4bceb2ffcc152f713cc2",
+          "action_run_id": "action_run_01795766867927036491_0000000139_12f220da44cb443cacf8d92621defe66",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-en-confirmed_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:52.602Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, work on the design of the 12-slide presentation is already underway. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766872699856681_0000000052_9a7a70ed857749948d7eb517c4b683cd",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2252.441433,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "e7abc3fbb57355acd9f3dac5f453ba094b8bc8a1729dbc72f7ee546d423b769a",
+      "error": [
+        "Something went wrong writing your request. Please try again.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766872699856681_0000000052_9a7a70ed857749948d7eb517c4b683cd",
+          "id": "action_run_01795766872865717092_0000000154_43b1580dd7e64acb8d3b624836209547",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766872699856681_0000000052_9a7a70ed857749948d7eb517c4b683cd",
+          "id": "provider_call_01795766872878999297_0000000156_d4c2ff5dfa994053a236de76f170d85b",
+          "action_run_id": "action_run_01795766872865717092_0000000154_43b1580dd7e64acb8d3b624836209547",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766872699856681_0000000052_9a7a70ed857749948d7eb517c4b683cd",
+          "id": "provider_call_01795766872892037374_0000000159_b831ab3055644efb8e37141b752a1646",
+          "action_run_id": "action_run_01795766872865717092_0000000154_43b1580dd7e64acb8d3b624836209547",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 2,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-en-confirmed_overdue",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:07:57.968Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, the agreed deposit for the design of the 12-slide presentation is overdue. The agreed total price is 30,000 RUB, with a 50% prepayment before starting and the balance after delivery of the final PDF and PPTX. Ask politely for the prepayment; payment details will be in a separate invoice. Do not claim the invoice has already been sent.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766878052068840_0000000057_915086f43a614fc7bc5a5f3eb12e9190",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2258.431885999991,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "07c491d73c7b91d47bf03bf7daff1a804df1b80293bb6a1845cd1f0e1afcb04f",
+      "error": [
+        "Something went wrong writing your request. Please try again.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766878052068840_0000000057_915086f43a614fc7bc5a5f3eb12e9190",
+          "id": "action_run_01795766879061700137_0000000169_2d5af871766e4b6d9ddf7649c920ac4c",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766878052068840_0000000057_915086f43a614fc7bc5a5f3eb12e9190",
+          "id": "provider_call_01795766879074880584_0000000171_f273331e1de1405a9d06592be6394281",
+          "action_run_id": "action_run_01795766879061700137_0000000169_2d5af871766e4b6d9ddf7649c920ac4c",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 576,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766878052068840_0000000057_915086f43a614fc7bc5a5f3eb12e9190",
+          "id": "provider_call_01795766879669771888_0000000174_0806a467fbb142e7ab9d2b1d45c45ba2",
+          "action_run_id": "action_run_01795766879061700137_0000000169_2d5af871766e4b6d9ddf7649c920ac4c",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-es-ambiguous-1",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:08:03.762Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766883831179194_0000000062_3ec82d037d92493fb3cb711410a9d812",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2194.292545000004,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "085501d4555185ec483a4a6bfa3f70f9f8248fa4e15c4e8d3e691404e055e536",
+      "error": [
+        "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766883831179194_0000000062_3ec82d037d92493fb3cb711410a9d812",
+          "id": "action_run_01795766884861253761_0000000184_0b79c27290aa4ce9b8eec12cf04c7d99",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766883831179194_0000000062_3ec82d037d92493fb3cb711410a9d812",
+          "id": "provider_call_01795766884873264073_0000000186_50c573d0d28f4bd7a4249e6b8de14b8e",
+          "action_run_id": "action_run_01795766884861253761_0000000184_0b79c27290aa4ce9b8eec12cf04c7d99",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 573,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766883831179194_0000000062_3ec82d037d92493fb3cb711410a9d812",
+          "id": "provider_call_01795766885459870892_0000000189_7f7cc0052d7345c09744d8b7cc162daf",
+          "action_run_id": "action_run_01795766884861253761_0000000184_0b79c27290aa4ce9b8eec12cf04c7d99",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-es-ambiguous-2",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:08:09.116Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766889204582221_0000000067_f9c3daafe4114647b402c61f41e8a81d",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2272.8177910000086,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "d51f162f0809566f214ff5fc562bcd3c4b7d36eb6e2236d6331311fbb86fda0f",
+      "error": [
+        "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766889204582221_0000000067_f9c3daafe4114647b402c61f41e8a81d",
+          "id": "action_run_01795766889623216846_0000000199_7b5ae980ec8b4086837f5b650771c835",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766889204582221_0000000067_f9c3daafe4114647b402c61f41e8a81d",
+          "id": "provider_call_01795766889636548750_0000000201_fb2983ce4b074330a9313bd14edc347d",
+          "action_run_id": "action_run_01795766889623216846_0000000199_7b5ae980ec8b4086837f5b650771c835",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 4,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766889204582221_0000000067_f9c3daafe4114647b402c61f41e8a81d",
+          "id": "provider_call_01795766889652608527_0000000204_4f4452267ad34ca282189fcecca83a96",
+          "action_run_id": "action_run_01795766889623216846_0000000199_7b5ae980ec8b4086837f5b650771c835",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 4,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-es-ambiguous-3",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:08:14.222Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, empezamos el diseño de una presentación de 12 diapositivas. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766894280682955_0000000072_53d85c93aa324adab47b9fcbe893da01",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2191.372734999997,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "2cf0f8b901e6549d2f0766d6b5d4e1d655bd688ca6b7075f88cd2f8f4eb6c89d",
+      "error": [
+        "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766894280682955_0000000072_53d85c93aa324adab47b9fcbe893da01",
+          "id": "action_run_01795766894942601019_0000000215_0283a8de609b4234b1e1ef7c3ba4526d",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766894280682955_0000000072_53d85c93aa324adab47b9fcbe893da01",
+          "id": "provider_call_01795766894957898614_0000000217_0535c8d948bf4b2e97f4e2d0fa91e5d8",
+          "action_run_id": "action_run_01795766894942601019_0000000215_0283a8de609b4234b1e1ef7c3ba4526d",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 558,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766894280682955_0000000072_53d85c93aa324adab47b9fcbe893da01",
+          "id": "provider_call_01795766895528073486_0000000220_9f0d6604bbe247fb952ee2b758731076",
+          "action_run_id": "action_run_01795766894942601019_0000000215_0283a8de609b4234b1e1ef7c3ba4526d",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-es-pending_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:08:19.550Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas aún no ha comenzado. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766899663148742_0000000077_2f9586a78af348cb9f6c359ef15a085a",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2259.702655999994,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "c9ae2c49832e52d0a1bcd05469be5c5d5892fa0bee32ffc752521ec6e8ccb96e",
+      "error": [
+        "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766899663148742_0000000077_2f9586a78af348cb9f6c359ef15a085a",
+          "id": "action_run_01795766899742880162_0000000230_e2dff6fb7caf4e2e8b7024cde173c28e",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766899663148742_0000000077_2f9586a78af348cb9f6c359ef15a085a",
+          "id": "provider_call_01795766899754303935_0000000232_aaa3490add1c457b88ccd8d43876cdde",
+          "action_run_id": "action_run_01795766899742880162_0000000230_e2dff6fb7caf4e2e8b7024cde173c28e",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766899663148742_0000000077_2f9586a78af348cb9f6c359ef15a085a",
+          "id": "provider_call_01795766899770733472_0000000235_7c3f25d063e64001b8c0753c07376772",
+          "action_run_id": "action_run_01795766899742880162_0000000230_e2dff6fb7caf4e2e8b7024cde173c28e",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 4,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-es-confirmed_start",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:08:24.617Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, el trabajo de diseño de la presentación de 12 diapositivas ya está en marcha. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766904707401132_0000000082_722d35f8453c4c5c83664986f5047dd1",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2273.111736000006,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "3ef32d4e95b7c2823486e45cba1ad3061556cdcceb2eb0214a627d1fbbe8f705",
+      "error": [
+        "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766904707401132_0000000082_722d35f8453c4c5c83664986f5047dd1",
+          "id": "action_run_01795766904946304654_0000000245_9a6c612a49dd43dba00bb4c8bccac39d",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766904707401132_0000000082_722d35f8453c4c5c83664986f5047dd1",
+          "id": "provider_call_01795766904958822808_0000000247_c7baf9296920420687184c852ee23a28",
+          "action_run_id": "action_run_01795766904946304654_0000000245_9a6c612a49dd43dba00bb4c8bccac39d",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 578,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766904707401132_0000000082_722d35f8453c4c5c83664986f5047dd1",
+          "id": "provider_call_01795766905550253331_0000000250_df194ef9b3ab4254814a9245f4266a0a",
+          "action_run_id": "action_run_01795766904946304654_0000000245_9a6c612a49dd43dba00bb4c8bccac39d",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 5,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    },
+    {
+      "id": "A01-es-confirmed_overdue",
+      "submitted": true,
+      "submitted_at": "2026-11-27T08:08:30.102Z",
+      "actual_payload": {
+        "billing_context": {
+          "notes": "Elena, el anticipo acordado para el diseño de la presentación de 12 diapositivas está vencido. El precio total acordado es de 30 000 RUB, con un anticipo del 50% antes de empezar y el saldo después de entregar el PDF y el PPTX finales. Pedir el anticipo con amabilidad; los datos de pago estarán en una factura aparte. No afirmar que la factura ya se ha enviado.",
+          "amount": "15 000 RUB"
+        },
+        "tone": "warm"
+      },
+      "session_id": "scenario_session_01795766910209110989_0000000087_045a8bb2b5614ea5920a79bf14029b6a",
+      "artifact_id": null,
+      "output": null,
+      "visible_text": null,
+      "clipboard_text": null,
+      "ui_outcome": "error",
+      "ui_latency_ms": 2318.519305000009,
+      "start_status": 200,
+      "result_status": null,
+      "trace_sha256": "534e7df8439f5c3da9962b99767f8d6841acb0a3c9c9186682af967c7391fef2",
+      "error": [
+        "Algo salió mal al redactar su solicitud. Inténtelo de nuevo.",
+        ""
+      ],
+      "diagnostic_errors": null,
+      "semantic_verdict": "not_evaluable",
+      "structural_verdict": "fail",
+      "actions": [
+        {
+          "scenario_session_id": "scenario_session_01795766910209110989_0000000087_045a8bb2b5614ea5920a79bf14029b6a",
+          "id": "action_run_01795766910728280723_0000000260_e15d7f2e18f44765b94a20647bb1693a",
+          "step_id": "compose_persuasive_text",
+          "action_type": "text.compose_persuasive_text",
+          "action_config_id": "client_update_writer.prepaid_request_compose_persuasive_text_v1",
+          "status": "failed",
+          "error_code": "provider_request_failed",
+          "output_artifact_id": null
+        }
+      ],
+      "provider_calls": [
+        {
+          "scenario_session_id": "scenario_session_01795766910209110989_0000000087_045a8bb2b5614ea5920a79bf14029b6a",
+          "id": "provider_call_01795766910740488660_0000000262_0001d0ed1df9471ca376f79acbaa3379",
+          "action_run_id": "action_run_01795766910728280723_0000000260_e15d7f2e18f44765b94a20647bb1693a",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 1,
+          "physical_call_index": 1,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 392,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        },
+        {
+          "scenario_session_id": "scenario_session_01795766910209110989_0000000087_045a8bb2b5614ea5920a79bf14029b6a",
+          "id": "provider_call_01795766911143437551_0000000265_6cec380e58ef4f39b66a8c91ec2434bf",
+          "action_run_id": "action_run_01795766910728280723_0000000260_e15d7f2e18f44765b94a20647bb1693a",
+          "step_id": "compose_persuasive_text",
+          "provider_policy_ref": "sol_text_generation_v1",
+          "provider": "litellm",
+          "model": "anytoolai.sol_text",
+          "gateway_model": "anytoolai.sol_text",
+          "workflow_id": "client_update_writer.prepaid_request_v1",
+          "workflow_version": 1,
+          "semantic_attempt_index": 1,
+          "transport_attempt_index": 2,
+          "physical_call_index": 2,
+          "status": "failed",
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0,
+          "latency_ms": 3,
+          "estimated_cost": 0,
+          "error_code": "provider_request_failed",
+          "error_message_safe": "Provider request failed.",
+          "failure_kind": "transport",
+          "http_status": null
+        }
+      ],
+      "result_artifacts": [],
+      "prompt_ref": "client_update_writer.prepaid_request_compose_persuasive_text.v1",
+      "deployed_prompt_sha256": "83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110",
+      "configured_model": "openai/gpt-6.1-sol",
+      "actual_model": null,
+      "submitted_input_verified": true,
+      "language_verdict": "not_evaluable",
+      "assessment_note": "The browser submitted the exact planned payload. The single A06 action failed with provider_request_failed after two transport attempts; no result artifact, rendered message or clipboard text exists. The worker reported BadRequestError; the upstream cause is not exposed by the safe ledger."
+    }
+  ],
+  "live_blocker": "All 18 logical actions failed with provider_request_failed (36 failed physical transport attempts; worker BadRequestError). No generated output exists to score. Upstream cause and actual response model are not established.",
+  "configured_provider_policy": "sol_text_generation_v1",
+  "deployment_profile_fingerprint": "fb8ff7e205ef7a3b1d014e36d9a0754910fca4cfbea4024fffa5395ba97986cf",
+  "authorization": "User explicitly authorized 18 planned browser submissions.",
+  "configured_model": "openai/gpt-6.1-sol",
+  "summary": {
+    "planned": 18,
+    "submitted": 18,
+    "verified_payloads": 18,
+    "successful_actions": 0,
+    "failed_actions": 18,
+    "physical_attempts": 36,
+    "successful_physical_attempts": 0,
+    "result_artifacts": 0,
+    "structural_passes": 0,
+    "semantic_evaluable": 0,
+    "language_evaluable": 0,
+    "estimated_cost_usd": 0
+  }
+}

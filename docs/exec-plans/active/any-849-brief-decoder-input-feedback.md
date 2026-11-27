@@ -126,3 +126,25 @@ published ordinary analyses. Every question in the new artifacts used an ordinar
 The 63 provider calls used Luna. The worker's A05 prompt SHA-256 was
 `a325382763259e06b9d282f1af6bac3f8559692d7db4027fe994647b090d7e8a` and its workflow SHA-256 was
 `964e68022708a94e586b77cdd6d267ab6847c7b67c7febbecf640bc37fa676be`.
+
+## Main integration
+
+- Integrate `main` at `cf8ae980` into `feature/ANY-849`.
+- Preserve both suites of tests for localized feedback and question copying. The rejected
+  result must expose neither copy action. Keep the task-presence and delivery-deviation
+  eval suites independently selectable.
+- Check the merged result recovery, A05 category validation, web and smoke tests. Compare
+  the executable Brief Decoder workflow, prompts, and model configuration to the previously
+  live-tested revision.
+
+All three merge conflicts were in test files. The combined tests preserve localized
+missing-task feedback, correction and session recovery, question-only copying, and
+both eval inventories. The schema, prompts, workflow, model policies, and provider router
+are identical to the live-tested revision `81c1bda8`.
+
+On the merged tree, 2,285 Python tests passed across Freelancer Suite, Brief Decoder and
+Acceptance Builder API bundles, and the relevant eval collectors. All 1,208 web-mirror
+tests passed, and the 74 focused Brief Decoder tests passed after adding assertions for
+the new Copy questions action. All nine isolated Playwright smoke tests passed, including
+missing-task rejection, correction, question-only copying and the zero-question outcome.
+Type checks, lint, config, architecture, documentation and generated-document checks passed.

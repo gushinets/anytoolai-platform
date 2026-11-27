@@ -67,6 +67,20 @@ it("preserves unknown-language prose without English fallback sentences", () => 
   expect(composeCopyText(result)).not.toContain("the client should confirm");
 });
 
+it("shows neutral Check labels with the original finding when analysis wording is unavailable", () => {
+  window.localStorage.setItem(LOCALE_STORAGE_KEY, "en");
+  const output = structuredClone(fixtures["ANY761-AB-C-RU-basic"]!) as {
+    extracted: { values: { analysis_language: string } };
+    comparison: { rationale: string };
+  };
+  output.extracted.values.analysis_language = "ja";
+  output.comparison.rationale = "報告書が提出されていません。";
+  const result = extractCheckResult(output)!;
+  render(<AcceptanceBuilderResultView result={result} onCopy={() => Promise.resolve(true)} />);
+  expect(screen.getByText("verdict: ✗.").nextElementSibling?.textContent).toBe(output.comparison.rationale);
+  expect(composeCopyText(result)).toMatch(`verdict: ✗.\n- ${output.comparison.rationale}\n\nscope_coverage:`);
+});
+
 it.each([undefined, "", 42])("rejects missing or invalid analysis language: %s", (language) => {
   const output = structuredClone(fixtures["ANY761-AB-D-RU-basic"]!) as { extracted: { values: Record<string, unknown> } };
   output.extracted.values.analysis_language = language;

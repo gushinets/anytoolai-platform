@@ -41,6 +41,11 @@ const PRODUCTS_ROOT = join(
   import.meta.dirname,
   "../../../../packages/backend/product-platforms/freelancer-suite/src/anytoolai_freelancer_suite/products",
 );
+const textSchema = JSON.parse(readFileSync(join(
+  import.meta.dirname,
+  "../../../../configs/kernel/schemas/generate_questions_output.schema.json",
+), "utf8")) as { $defs: { authoredText: { pattern: string } } };
+const authoredText = new RegExp(textSchema.$defs.authoredText.pattern, "u");
 // The guest quota this test exhausts, read from the product's own config instead of a second copy.
 const GUEST_QUOTA_LIMIT = Number(
   /limit_count:\s*(\d+)/.exec(readFileSync(join(PRODUCTS_ROOT, "acceptance_builder/quotas.yaml"), "utf8"))![1],
@@ -102,7 +107,16 @@ function composeCopyText({ extracted, comparison, issues, questions }: Output): 
   const blocks: string[] = [];
   if (comparison) {
     const lines = comparison.deltas.map((d) => `${DELTA_LABELS[d.criterion_id]}: ${STATUS_LABELS[d.status]}. ${d.evidence}`);
-    blocks.push(`Verdict\n${[`Verdict: ${VERDICT_WORDS[comparison.verdict]}.`, ...lines, comparison.rationale].join("\n")}`);
+    const verdict = `Verdict: ${VERDICT_WORDS[comparison.verdict]}.`;
+    if (comparison.verdict === "meets_expectations") {
+      blocks.push(verdict, [...lines, ...(authoredText.test(comparison.rationale) ? [comparison.rationale] : [])].join("\n"));
+    } else {
+      const findings = new Set(comparison.rationale
+        .split(/\r\n|[\r\n\u0085\u2028\u2029]/u)
+        .map((line) => line.trim())
+        .filter((line) => authoredText.test(line)));
+      blocks.push([verdict, ...Array.from(findings, (line) => `- ${line}`)].join("\n"), lines.join("\n"));
+    }
   }
   for (const [field, title] of LISTS) {
     const items = extracted.values[field];
@@ -133,10 +147,10 @@ async function submitDraft(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Draft criteria" }).click();
 }
 
-async function submitCheck(page: Page): Promise<void> {
+async function submitCheck(page: Page, brief = BRIEF, deliverable = DELIVERABLE): Promise<void> {
   await page.getByRole("radio", { name: "Check deliverable" }).check({ force: true });
-  await page.locator("#acceptance-builder-brief-text").fill(BRIEF);
-  await page.locator("#acceptance-builder-deliverable-text").fill(DELIVERABLE);
+  await page.locator("#acceptance-builder-brief-text").fill(brief);
+  await page.locator("#acceptance-builder-deliverable-text").fill(deliverable);
   await page.getByRole("button", { name: "Check deliverable" }).click();
 }
 
@@ -244,6 +258,50 @@ test.describe("Acceptance Builder web product", () => {
     await expectCopyActivation(page, run.sessionId(), composeCopyText(output));
   });
 
+  test("mobile Check: two distinct omissions lead the result and the clipboard", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    const run = trackRun(page);
+    const findings = ["The required reviews section is missing.", "The Figma source files were not handed over."];
+    const output = composedOutput("check", "");
+    output.extracted.values = {
+      ...output.extracted.values,
+      acceptance_criteria: ["Include a reviews section in the redesigned website."],
+      assumptions: ["The yoga studio has an existing website."],
+      deliverables: ["The redesigned website", "Figma source files"],
+    };
+    output.comparison = {
+      ...output.comparison!,
+      verdict: "does_not_meet",
+      rationale: `  ${findings[0]}  \r\n\r\n\u200b\n${findings[1]}\n ${findings[0]} `,
+      deltas: [
+        { criterion_id: "scope_coverage", status: "mismatch", evidence: "The website lacks the requested reviews section." },
+        { criterion_id: "requirement_fit", status: "mismatch", evidence: "The requested reviews are absent." },
+        { criterion_id: "completeness", status: "mismatch", evidence: "The required design source files were explicitly withheld." },
+        { criterion_id: "clarity", status: "match", evidence: "The delivery clearly identifies the delivered website and its omissions." },
+      ],
+    };
+    await overrideResult(page, output);
+    await page.goto(PRODUCT_URL);
+    await submitCheck(page,
+      "Redesign our yoga studio website with a reviews section and hand over the Figma source files.",
+      "Delivered the redesigned website. The reviews section is missing and the Figma source files were not handed over.",
+    );
+    const result = page.getByRole("region", { name: "Deliverable check", exact: true });
+    await expect(result.getByText("Verdict: does not meet expectations.", { exact: true })).toBeVisible({ timeout: 60_000 });
+    const recap = result.locator("details");
+    await expect(recap).not.toHaveAttribute("open", "");
+    const items = result.getByRole("listitem");
+    await expect(items).toHaveText(findings);
+    for (const item of await items.all()) await expect(item).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    const expectedCopy = composeCopyText(output);
+    expect(expectedCopy.split("\n\n")[0]).toBe(
+      `Verdict: does not meet expectations.\n- ${findings[0]}\n- ${findings[1]}`,
+    );
+    await expectCopyActivation(page, run.sessionId(), expectedCopy);
+    await expect(recap).not.toHaveAttribute("open", "");
+  });
+
   test("mobile: a long token fits with the recap collapsed and expanded", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     const output = composedOutput("draft", "");
@@ -327,7 +385,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await page.goto(BRIEF_DECODER_URL);
     await page.locator("#brief-decoder-brief-text").fill(BRIEF_DECODER_BRIEF);
     await page.getByRole("button", { name: "Decode brief" }).click();
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     const sourceSessionId = run.sessionId();
     expect(sourceSessionId).toBeTruthy();
     await page.getByRole("button", { name: "Create acceptance criteria" }).click();
@@ -484,7 +542,7 @@ test.describe("Brief Decoder -> Acceptance Builder handoff", () => {
     await page.goto(BRIEF_DECODER_URL);
     await page.locator("#brief-decoder-brief-text").fill(BRIEF_DECODER_BRIEF);
     await page.getByRole("button", { name: "Decode brief" }).click();
-    await expect(page.getByRole("button", { name: "Copy" })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 60_000 });
     await page.getByRole("button", { name: "Create acceptance criteria" }).click();
     await page.waitForURL(/\/handoff\/[^/?]+$/);
     await page.getByRole("button", { name: "Decline" }).click();

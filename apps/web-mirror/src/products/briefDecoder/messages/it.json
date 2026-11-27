@@ -38,6 +38,8 @@
     "document": "Documento di riepilogo"
   },
   "copy": {
+    "questions": "Copia le domande",
+    "questionsCopied": "Domande copiate",
     "missingFields": "Non indicato nel brief",
     "hint": "Si copiano parola per parola il brief, i problemi e le domande qui sopra. Il documento di riepilogo non viene copiato."
   },
