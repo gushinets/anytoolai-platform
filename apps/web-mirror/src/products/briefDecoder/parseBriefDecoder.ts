@@ -157,6 +157,18 @@ export function composeCopyText({ brief, issues, questions }: CopySource, t: Tra
   return blocks.join("\n\n");
 }
 
+/** Plain text for the client: one logical line per authored question, in result order. */
+export function composeQuestionsCopyText(questions: readonly ClarifyingQuestion[]): string {
+  return questions
+    .map(({ question }) => question)
+    .filter(hasAuthoredText)
+    .map((text) => text.split(/[\r\n\v\f\u0085\u2028\u2029]+/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" "))
+    .join("\n");
+}
+
 /** Activation = first rendering of a non-empty clarifying-question list. */
 export function hasQuestions(result: BriefDecoderResult): boolean {
   return result.questions.some(({ question }) => hasAuthoredText(question));

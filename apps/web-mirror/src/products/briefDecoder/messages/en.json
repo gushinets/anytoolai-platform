@@ -35,6 +35,8 @@
     "document": "Summary document"
   },
   "copy": {
+    "questions": "Copy questions",
+    "questionsCopied": "Questions copied",
     "missingFields": "Not stated in the brief",
     "hint": "Copy takes the brief, issues and questions above word for word. The summary document is not copied."
   },
