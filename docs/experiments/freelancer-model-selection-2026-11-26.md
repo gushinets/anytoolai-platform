@@ -67,5 +67,7 @@
 ## Где проверить данные
 
 - Методика и продуктовое решение также зафиксированы в [Linear, ANY-936](https://linear.app/paveldik/issue/ANY-936/freelancer-suite-vybor-luna-i-sol-po-shagam-pered-pilotom).
-- Планы и происхождение кейсов находятся в `docs/exec-plans/completed/freelancer-atom-unit-economics.md`, `docs/exec-plans/completed/luna-holdout-270.md` и `tests/fixtures/freelancer_atom_unit_economics/`.
-- Локальные артефакты измерений лежат в `.agent/freelancer-atom-unit-economics/`. Первая серия и сценарии — `series-01/README.md` и `series-01/report-scenarios.csv`. Примеры и основания пересмотра — `review-20261125/decisions.csv`. Итоговые сравнения — `luna-holdout-270/report.md`, `models.csv` и `by-prompt-and-language.csv` в том же каталоге.
+- Исходные кейсы, рубрики и ревизия промптов описаны в [README датасета](../../tests/fixtures/freelancer_atom_unit_economics/README.md). Замечания к ним собраны в [поправках для следующей версии](../../tests/fixtures/freelancer_atom_unit_economics/NEXT_VERSION.md).
+- [Отчёт первой серии](freelancer-atom-economics/series-01/README.md) и [результаты полных сценариев](freelancer-atom-economics/series-01/report-scenarios.csv).
+- [Отчёт о пересмотре оценок](freelancer-atom-economics/review-20261125/README.md) и [решения по 242 отказам](freelancer-atom-economics/review-20261125/decisions.csv).
+- [Отчёт о 270 прогонах Luna](freelancer-atom-economics/luna-holdout-270/report.md), [итоги по моделям](freelancer-atom-economics/luna-holdout-270/models.csv) и [разбивка по промптам и языкам](freelancer-atom-economics/luna-holdout-270/by-prompt-and-language.csv).

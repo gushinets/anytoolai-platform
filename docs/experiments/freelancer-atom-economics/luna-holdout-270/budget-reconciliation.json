@@ -1,0 +1,18 @@
+{
+  "cap_usd": "30",
+  "old_lower_usd": "8.941094430",
+  "old_upper_usd": "9.21470723000000059910",
+  "new_terminal": 270,
+  "new_provider_calls": 275,
+  "new_unknown_call_ids": [],
+  "new_partial_usage_call_ids": [],
+  "new_discrepancies": [],
+  "new_ledger_usd": "0.22781157499999999200",
+  "new_tariff_lower_usd": "0.227811575",
+  "new_tariff_upper_usd": "0.227811575",
+  "new_budget_upper_usd": "0.22781157500000000140",
+  "outstanding_reserved_usd": "0",
+  "combined_budget_upper_usd": "9.44251880500000060050",
+  "left_rounded_down_usd": "20.55",
+  "paid_evaluator_calls": 0
+}
