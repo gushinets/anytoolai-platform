@@ -573,6 +573,16 @@ def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:
     assert "explicit withholding directions still win" in prompt
 
 
+def test_prepaid_request_prompt_preserves_work_and_payment_status_independently() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert "State a prepayment-before-start condition as an agreed term." in prompt
+    assert (
+        "Preserve an explicitly stated work start or overdue payment independently; "
+        "evidence of one does not establish the other." in prompt
+    )
+
+
 def test_prepaid_request_prompt_keeps_percentage_attached_to_total() -> None:
     prompt = _normalized_prepaid_prompt()
 
