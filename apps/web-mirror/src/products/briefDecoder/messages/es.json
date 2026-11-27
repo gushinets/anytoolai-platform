@@ -35,6 +35,8 @@
     "document": "Documento resumen"
   },
   "copy": {
+    "questions": "Copiar preguntas",
+    "questionsCopied": "Preguntas copiadas",
     "missingFields": "No se indica en el brief",
     "hint": "Se copian literalmente el brief, los problemas y las preguntas de arriba. El documento resumen no se copia."
   },

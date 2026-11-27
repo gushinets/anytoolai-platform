@@ -1,0 +1,977 @@
+[
+  {
+    "case_id": "pa-01-yoga-figma",
+    "calibration": true,
+    "difficulty": "Заказ средней длины с обязательным условием старта.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/qa_cases.json#P01",
+        "date": "2026-11-02",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Адаптирован заказ на лендинг, уточнено условие старта, имя составлено. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Заказ от Анны Рощиной, владелицы студии йоги. Нужен лендинг в Figma в мобильной и десктопной версиях, с блоком расписания и кнопкой записи в существующий WhatsApp. Для старта студия передаст тексты и фото. Разработка сайта не входит. Опишите подход и следующий шаг. Стоимость и дату сдачи пока не согласовали.",
+          "freelancer_positioning": "Я UI-дизайнер. В Figma у меня есть адаптивный лендинг студии пилатеса с расписанием занятий и кнопкой записи. На нём использованы редактируемые компоненты и одна структура навигации для обеих версий.",
+          "tone": "warm"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "warm",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "This order is from Anna Roshchina, the owner of a yoga studio. She needs a Figma landing page for mobile and desktop, including a schedule section and a booking button that opens the studio's existing WhatsApp. The studio will supply copy and photos before work starts. Website development is excluded. Describe your approach and the next step. Price and delivery date remain open.",
+          "freelancer_positioning": "I'm a UI designer. My Figma work includes a responsive pilates studio landing page with a class schedule and a booking button. It uses editable components and one navigation structure for both versions.",
+          "tone": "warm"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "warm",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте, Анна Рощина!",
+        "en": "Hi Anna Roshchina,"
+      },
+      "facts": [
+        "Анна Рощина разместила заказ. Нужны обе версии в Figma, расписание и запись через существующий WhatsApp.",
+        "Тексты и фото обязательны до старта. Разработка вне объёма. Цена и дата открыты.",
+        "Подтверждён лендинг для студии пилатеса, включая адаптивность, расписание и кнопку записи."
+      ],
+      "required": [
+        "После обращения приведён конкретный кейс студии пилатеса.",
+        "Предложены обе версии Figma, расписание и кнопка в существующий WhatsApp.",
+        "Тексты и фото нужны до старта. Разработка исключена, цена и дата оставлены открытыми.",
+        "Следующий шаг конкретен, например передача текстов и фото."
+      ],
+      "prohibited": [
+        "Прежний проект для студии йоги, установка WhatsApp, рост записей, разработка сайта, взятые из воздуха цена или дата."
+      ],
+      "allowed": [
+        "Можно описать связь расписания и кнопки в макете. Программная интеграция WhatsApp не требуется."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-02-store-migration",
+    "calibration": false,
+    "difficulty": "Длинный технический заказ со смежным опытом и бюджетом клиента.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/woocommerce/woocommerce-shopify-seo-migration",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы. Публикация датирована относительным временем.",
+        "adaptation": "Пересказана часть публичного заказа о каталоге, контенте и редиректах. Условия сокращены. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Нужно перенести магазин с WooCommerce на Shopify. Примерно 1000 SKU. Сохранить цены, варианты, остатки, фото и категории, перенести страницы, блог и меню. Перед запуском каждый старый URL должен получить редирект 301 на соответствующую новую страницу. Сохранить SEO-метаданные и alt-тексты. Данные покупателей и редизайн исключены. Бюджет USD 250–750 предложен клиентом, конечная цена открыта. Экспорт товаров и список старых URL нужны до начала.",
+          "freelancer_positioning": "Импортирую каталоги из CSV в Shopify со сверкой вариантов, остатков и изображений. Для каталога в WordPress составляю и проверяю карты редиректов 301. Прямых миграций WooCommerce в Shopify в портфолио пока нет.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": [
+            {
+              "category": "experience_gap",
+              "severity": "high",
+              "description": "Нет подтверждённого опыта переноса магазина с WooCommerce на Shopify.",
+              "evidence": "перенести магазин с WooCommerce на Shopify"
+            }
+          ]
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "We need to move a WooCommerce store to Shopify. There are about 1,000 SKUs. Preserve prices, variants, stock, photos and categories, and move the pages, blog and navigation. Before launch every old URL needs a 301 redirect to the corresponding new page. Preserve SEO metadata and image alt text. Customer data and redesign are excluded. The client proposed USD 250–750. The final fee remains open. A product export and list of old URLs are required before work starts.",
+          "freelancer_positioning": "I import CSV catalogs into Shopify, checking variants, stock and imagery. I also build and test 301 redirect maps for a WordPress catalog. I don't have a direct WooCommerce-to-Shopify migration in my portfolio yet.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": [
+            {
+              "category": "experience_gap",
+              "severity": "high",
+              "description": "No verified experience migrating a store from WooCommerce to Shopify.",
+              "evidence": "move a WooCommerce store to Shopify"
+            }
+          ]
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      },
+      "facts": [
+        "Направление WooCommerce → Shopify, примерно 1000 SKU. Состав данных, контента и SEO указан во входе.",
+        "Редиректы 301 до запуска. Данные покупателей и редизайн исключены. Экспорт и старые URL обязательны до старта.",
+        "USD 250–750 предложил клиент. Подтверждён импорт в Shopify и редиректы WordPress, не прямая миграция."
+      ],
+      "required": [
+        "Назван релевантный подтверждённый импорт или кейс редиректов. Все названные данные каталога, контент и SEO сохранены.",
+        "Отражены направление, объём и редиректы до запуска. Сохранены исключения и обе стартовые предпосылки.",
+        "USD 250–750 обозначены как предложение клиента без согласия. Есть конкретный следующий шаг с экспортом или URL."
+      ],
+      "prohibited": [
+        "Прямой опыт миграции WooCommerce → Shopify, гарантия трафика или нулевого простоя, перенос покупателей, редизайн, собственная цена, назначенный срок."
+      ],
+      "allowed": [
+        "Можно описать будущий подход к миграции. Локальное написание чисел допустимо."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-03-sheet-notification",
+    "calibration": false,
+    "difficulty": "Короткий запрос без частоты, срока и полей уведомления.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/orders.json#en-short-make-telegram",
+        "date": "2026-10-19",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Собрана RU/EN пара, бюджет отнесён к заказчику. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Заказчику нужен сценарий Make.com, который присылает уведомление в Telegram при изменении строки в Google Sheets. Предложенный бюджет USD 150.",
+          "freelancer_positioning": "Настраиваю сценарии Make.com. У меня есть автоматизация для Google Sheets: она отслеживает изменения строк и отправляет уведомления в Telegram."
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "The client needs a Make.com scenario that sends a Telegram notification when a row changes in Google Sheets. The proposed budget is USD 150.",
+          "freelancer_positioning": "I build scenarios in Make.com. One of my Google Sheets automations watches for row changes and sends Telegram notifications."
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте!",
+        "en": "Hi,"
+      },
+      "facts": [
+        "Изменение строки Google Sheets → Make.com → Telegram. USD 150 предложены клиентом. Профиль подтверждает аналог без частоты или метрик."
+      ],
+      "required": [
+        "Названы три сервиса, верный триггер и конкретный аналог из профиля.",
+        "USD 150 обозначены как предложение клиента без согласия. Следующий шаг конкретен, например уточнить поля сообщения."
+      ],
+      "prohibited": [
+        "Только добавление строки вместо изменения, другой инструмент или канал, согласие на USD 150, обещание мгновенной доставки, срока или опыта сверх входа."
+      ],
+      "allowed": [
+        "Можно уточнить контролируемые столбцы или поля сообщения без выдуманной спецификации."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-04-hubspot-pilot",
+    "calibration": false,
+    "difficulty": "Обязательный порог опыта для полной работы и ограниченный пилот.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/gaps.json#hubspot-10y-en",
+        "date": "2026-11-12",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Адаптирован тест минимального стажа. Добавлен диагностический пилот. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Клиент хочет связать веб-формы с HubSpot CRM и развернуть воронки сделок. Для полной интеграции обязателен опыт работы с HubSpot от 10 лет. Моё предложение клиенту: отдельно обследовать одну пилотную форму и подготовить карту полей и правила обработки дубликатов. Развёртывание воронок сейчас исключено из моего предложения.",
+          "freelancer_positioning": "У меня 4 года опыта с процессами HubSpot и интеграциями API. В одном из проектов для HubSpot проводился отдельный пилот с сопоставлением полей формы с полями лидов и проверкой дубликатов.",
+          "tone": "firm",
+          "language": "ru-RU"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "firm",
+          "language": "ru-RU",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": [
+            {
+              "category": "experience_gap",
+              "severity": "high",
+              "description": "Для полной интеграции требуется опыт работы с HubSpot от 10 лет.",
+              "evidence": "обязателен опыт работы с HubSpot от 10 лет"
+            }
+          ]
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "The client wants to connect web forms to HubSpot CRM and roll out deal pipelines. Full integration requires at least 10 years of HubSpot experience. My proposal to the client is a separate review of one pilot form, with a field map and duplicate-handling rules. Pipeline rollout is outside my current offer.",
+          "freelancer_positioning": "I have 4 years of experience with HubSpot workflows and API integrations. One of my HubSpot projects included a separate pilot to map form fields to lead fields and check for duplicates.",
+          "tone": "firm",
+          "language": "en-US"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "firm",
+          "language": "en-US",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": [
+            {
+              "category": "experience_gap",
+              "severity": "high",
+              "description": "The freelancer does not meet the requirement for at least 10 years of HubSpot experience.",
+              "evidence": "requires at least 10 years of HubSpot experience"
+            }
+          ]
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      },
+      "facts": [
+        "10 лет — требование к полной интеграции, 4 года — подтверждённый стаж. Работы по пилоту ограничены одной формой, картой полей и правилами дубликатов."
+      ],
+      "required": [
+        "Релевантный пилот из профиля указан без завышения стажа.",
+        "Предложены обследование одной формы, карта полей и правила дубликатов. Воронки явно вне объёма.",
+        "Следующий шаг связан с формой, полями или примерами дубликатов."
+      ],
+      "prohibited": [
+        "Утверждение, что у исполнителя 10 лет опыта или он удовлетворяет порогу, полная интеграция, цена или срок из воздуха."
+      ],
+      "allowed": [
+        "Порог 10 лет не требуется пересказывать. Стаж 4 года допустим без намёка на соответствие порогу."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-05-supply-contract-translation",
+    "calibration": false,
+    "difficulty": "Длинный заказ с точными согласованными условиями.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/qa_cases.json#P05",
+        "date": "2026-11-02",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Адаптирован тест перевода с согласованными условиями, дата изменена. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Клиент согласовал перевод ровно 8 400 слов с английского на русский: договор поставки без приложений. Ставка 0,07 EUR за слово, всего 588 EUR. Предоплата 30%, то есть 176,40 EUR, остаток 411,60 EUR после сдачи. Готовый DOCX нужен до 17:00 UTC+3 14 декабря 2026 года. Включён один раунд исправлений ошибок перевода в течение 5 рабочих дней. Изменения исходника оплачиваются отдельно. Нотариальное заверение и юридическая экспертиза не входят.",
+          "freelancer_positioning": "Перевожу договоры поставки с английского на русский в DOCX. Среди проектов есть перевод договора поставки оборудования с проверкой определений по глоссарию клиента. Финальный оригинал и глоссарий нужны до начала перевода.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "The client confirmed translation from English into Russian of exactly 8,400 words from a supply agreement, excluding appendices. The rate is EUR 0.07 per word, EUR 588 total. Advance payment is 30%, or EUR 176.40, with the EUR 411.60 balance due after delivery. The DOCX is due by 17:00 UTC+3 on 14 December 2026. One round of translation-error corrections is included within 5 working days. Changes to the source are billed separately. Notarization and legal review are excluded.",
+          "freelancer_positioning": "I translate English-to-Russian supply agreements in DOCX. My work includes an equipment supply agreement translation that checked defined terms against the client's glossary. I require the final source and glossary before starting.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      },
+      "facts": [
+        "Подтверждены EN→RU, 8 400 слов, DOCX, без приложений, до 17:00 UTC+3 14 декабря 2026 года.",
+        "Подтверждены EUR 0,07 за слово, 588 всего, 30% или 176,40 аванс, 411,60 после сдачи.",
+        "Один раунд исправления ошибок за 5 рабочих дней, изменения оригинала отдельно, заверение и экспертиза исключены.",
+        "Оригинал и глоссарий обязательны до начала. В профиле перевод договора поставки оборудования."
+      ],
+      "required": [
+        "Есть релевантный подтверждённый кейс. Направление EN→RU сохранено и в англоязычном отклике.",
+        "Подтверждены все числовые условия и роли сумм, включая часовую зону и срок включённых правок.",
+        "Сохранены DOCX, три исключения, отдельная оплата изменений, оба обязательных исходника. Следующий шаг связан с исходниками."
+      ],
+      "prohibited": [
+        "Неверная цифра, единица, валюта или дата; потеря статуса согласования; безлимитные правки; обещание юридической точности, экспертизы или заверения."
+      ],
+      "allowed": [
+        "Локальные разделители чисел допустимы. «В течение 5 рабочих дней» относится к раунду исправлений, а не сдаче всего перевода."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-06-webflow-counteroffer",
+    "calibration": false,
+    "difficulty": "Явный отказ и встречное предложение с меньшим объёмом.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/terms.json#counteroffer-en",
+        "date": "2026-11-02",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Сохранены исходные условия и встречное предложение, названы страницы первого этапа. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Клиент просит полностью кастомный сайт на Webflow на 12 страниц за 48 часов и EUR 300. Тексты и изображения будут только на следующей неделе. Мои условия для ответа: прямо отказываюсь от EUR 300 и срока 48 часов. Предлагаю за EUR 800 первый этап на 5 страниц: главную, услуги, портфолио, о компании и контакты. Для начала нужны утверждённые тексты и изображения. Новую дату не назначаю.",
+          "freelancer_positioning": "Собираю маркетинговые сайты на Webflow. Среди моих работ сайт для небольшой мебельной мастерской с портфолио и страницей контактов. Согласовываю структуру до сборки.",
+          "tone": "firm"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "firm",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "The client wants a fully custom 12-page Webflow site within 48 hours for EUR 300. Copy and images won't be available until next week. My terms for the reply: I explicitly decline EUR 300 and the 48-hour deadline. I offer a first phase for EUR 800 covering 5 pages: home, services, portfolio, about and contact. Approved copy and images are required before work starts. I am setting no new date.",
+          "freelancer_positioning": "I build marketing sites in Webflow. My work includes a site for a small furniture studio with a portfolio and contact page. I align on the site structure before building.",
+          "tone": "firm"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "firm",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      },
+      "facts": [
+        "Клиент просит 12 страниц за 48 часов и EUR 300. Цена и срок явно отклонены исполнителем.",
+        "Встречные EUR 800 за 5 названных страниц. Утверждённые тексты и изображения нужны до начала, будут не раньше следующей недели.",
+        "Подтверждён сайт мебельной мастерской на Webflow."
+      ],
+      "required": [
+        "EUR 300 и 48 часов явно отклонены. EUR 800 предложены за пять названных страниц первого этапа.",
+        "Обе предпосылки старта сохранены, дата сдачи открыта.",
+        "Есть конкретный близкий кейс и следующий шаг вокруг материалов или первого этапа."
+      ],
+      "prohibited": [
+        "EUR 800 за 12 страниц, согласие на EUR 300 или 48 часов, обещание запуска на следующей неделе, новая цена или дата, обещание SEO-результатов."
+      ],
+      "allowed": [
+        "Можно опустить 12 страниц как исходный объём, если новый объём ограничен пятью названными страницами."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-07-onboarding-mail",
+    "calibration": false,
+    "difficulty": "Открытые условия при известном составе работ.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/terms.json#left-open-en",
+        "date": "2026-11-02",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Подготовлена RU/EN пара с открытыми датой, ценой и дополнительными письмами. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "SaaS-команде нужно переписать приветственное письмо и цепочку из 4 писем на пробный период. Количество дополнительных писем и стоимость согласуем после звонка на 30 минут. Черновики желательно получить в начале января 2027 года, но дата ещё не согласована. Настройка аналитики не входит. Звонок нужен для согласования состава работ.",
+          "freelancer_positioning": "Пишу письма для онбординга B2B SaaS. В проекте для сервиса управления запасами я отвечаю за переписывание приветственного письма и цепочки на пробный период. Мои тексты используют конкретные действия внутри продукта."
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "A SaaS team needs a rewrite of its welcome email and a 4-email trial sequence. We will agree the number of extra emails and the fee after a 30-minute discovery call. Early January 2027 is preferred for the first drafts, with no date agreed yet. Analytics setup is excluded. Use the call to align on scope.",
+          "freelancer_positioning": "I write onboarding emails for B2B SaaS. On an inventory-management product my work covers rewriting the welcome email and the trial sequence. The emails guide users through specific in-product actions."
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте!",
+        "en": "Hi,"
+      },
+      "facts": [
+        "Обязательны приветственное письмо и отдельная цепочка из 4 пробных писем.",
+        "Цена и число дополнительных писем открыты, звонок 30 минут. Начало января 2027 — пожелание для черновиков. Настройка аналитики исключена.",
+        "Подтверждён аналог для сервиса управления запасами, метрик нет."
+      ],
+      "required": [
+        "Предложены приветственное письмо и все 4 письма цепочки. Назван профильный пример.",
+        "Цена и количество дополнительных писем открыты. Начало января 2027 осталось пожеланием.",
+        "Настройка аналитики вне объёма. Предложен следующий шаг с 30-минутным звонком и его конкретным предметом."
+      ],
+      "prohibited": [
+        "Четыре письма вместе с приветственным, обещание сдать или начать в указанный период, выдуманные ставки или метрики активации, включение аналитики."
+      ],
+      "allowed": [
+        "Можно упомянуть желаемый период черновиков без подтверждения даты."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-08-podcast-edit",
+    "calibration": false,
+    "difficulty": "Длинный медиазаказ с тестом и обязательными исходниками.",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/audio-editing/podcast-editing-clip-creation",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы. Публикация датирована относительным временем.",
+        "adaptation": "Пересказана часть заказа о полном выпуске и коротких клипах. Составлено условие о согласованном тесте. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Ищем монтаж для разговорного видеоподкаста, в спокойной документальной манере. Нужны полный эпизод с выровненными голосами, естественными сменами планов и простыми плашками, отдельная аудиодорожка и от 3 до 5 вертикальных клипов с субтитрами. Публикацией занимаемся сами. До начала пришлём исходное видео и аудио. Клиент и исполнитель согласовали оплачиваемый тест на коротком фрагменте. Регулярный монтаж пока не согласован.",
+          "freelancer_positioning": "В DaVinci Resolve монтирую разговорные видео. Есть законченный выпуск подкаста о городской архитектуре: подчищены шумы, выровнены голоса, подготовлены отдельная аудиоверсия и вертикальные клипы с субтитрами.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "We need a restrained, documentary-style edit for an interview podcast. Deliver a full episode with level dialogue, natural cuts and simple lower thirds, a separate audio track, and 3 to 5 vertical captioned clips. We handle publishing. We will send the raw video and audio before work begins. The client and editor agreed to a paid test using a short excerpt. Recurring editing is still open.",
+          "freelancer_positioning": "I edit interview videos in DaVinci Resolve. My work includes a completed urban-architecture podcast episode with noise cleanup, level dialogue, an audio-only version and captioned vertical clips.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      },
+      "facts": [
+        "Полный эпизод с выровненными голосами, естественными склейками и простыми плашками, отдельное аудио, 3–5 клипов с субтитрами.",
+        "Оплачиваемый тест согласован, регулярная работа открыта, оба исходника нужны до старта. Публикует клиент.",
+        "Подтверждён выпуск подкаста об архитектуре, DaVinci Resolve и названные в профиле операции."
+      ],
+      "required": [
+        "Указан релевантный кейс. Предложены все названные результаты и спокойная манера, публикация явно исключена.",
+        "Подтверждён платный тест на отрывке, регулярность открыта. Указаны оба исходника до начала и конкретный шаг по тесту."
+      ],
+      "prohibited": [
+        "Гарантии роста аудитории, бесплатный тест, публикация, уже согласованная постоянная работа, выдуманные ставки, сроки и работы."
+      ],
+      "allowed": [
+        "Можно предложить выбрать фрагмент или запросить оба исходника для теста."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-09-logo-beginner",
+    "calibration": false,
+    "difficulty": "Минимальный достаточный заказ и узкий учебный опыт.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/input_sufficiency.json#short-ru",
+        "date": "2026-11-17",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Краткий заказ дополнен нишей, а профиль новичка учебным проектом. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Нужен логотип для мастерской керамики.",
+          "freelancer_positioning": "Я начинающий графический дизайнер. В учебном проекте созданы знак и монохромная версия логотипа для вымышленной ремесленной мастерской."
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "I need a logo for a pottery studio.",
+          "freelancer_positioning": "I'm a beginner graphic designer. A practice project of mine produced a mark and a monochrome logo version for a fictional craft studio."
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте!",
+        "en": "Hi,"
+      },
+      "facts": [
+        "Описана реальная задача: логотип мастерской керамики. Бюджета, срока и числа вариантов нет.",
+        "Профиль достаточен: начинающий дизайнер с учебной работой для вымышленной ремесленной мастерской."
+      ],
+      "required": [
+        "Краткий готовый отклик с конкретным учебным аналогом и сохранением статуса опыта.",
+        "Есть следующий шаг, например сверить название или носители логотипа."
+      ],
+      "prohibited": [
+        "Внутренний запрос заполнить поле вместо отклика, выдуманный платный клиент, опыт в керамической отрасли, сумма, срок либо число вариантов."
+      ],
+      "allowed": [
+        "Короткий отклик допустим. Можно уточнить название, стиль или носители без выдуманной спецификации."
+      ]
+    }
+  },
+  {
+    "case_id": "pa-10-spreadsheet-cleanup",
+    "calibration": false,
+    "difficulty": "Средний заказ на данные с предложенными бюджетом и сроком.",
+    "sources": [
+      {
+        "ref": "tests/fixtures/proposal_ai_eval/orders.json#fl-en-airtable-cleanup",
+        "date": "2026-10-19",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Собрана RU/EN пара, уточнены доступ и границы проверки данных. Профиль и фиксированный результат A04 составлены для теста."
+      }
+    ],
+    "inputs": {
+      "ru": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "Разовая очистка и объединение 3 файлов Excel примерно по 8000 строк в одну таблицу Google Sheets. Удалить дубликаты, привести телефоны к единому формату, отметить отсутствующие email. Проверка существования адресов не нужна. До начала заказчик передаст все выгрузки и таблицу с доступом на редактирование. Клиент назвал USD 120 и хочет результат к пятнице. Бюджет и дедлайн пока не согласовали.",
+          "freelancer_positioning": "В моих проектах по очистке данных есть консолидация выгрузок Excel в Google Sheets: сверка дублей, нормализация телефонов и отметки пустых полей. Для проверки объединения использую копию исходных таблиц.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      },
+      "en": {
+        "context": {
+          "result_contract": "proposal_ai.field_errors_v1",
+          "task_text": "A one-time job to clean and combine 3 Excel files of about 8,000 rows each into one Google Sheets spreadsheet. Remove duplicates, standardize phone formatting and flag missing email addresses. Do not verify whether addresses exist. The client will provide all exports and an editable target sheet before work starts. The client proposed USD 120 and wants the result by Friday. Neither term has been agreed.",
+          "freelancer_positioning": "My data cleanup projects include consolidating Excel exports into Google Sheets, with duplicate checks, phone normalization and flags for empty fields. I use copies of the source tables to check the consolidation.",
+          "tone": "neutral"
+        },
+        "objective": "Write a persuasive, truthful freelance proposal tailored to the task.",
+        "constraints": {
+          "tone": "neutral",
+          "format": "plain_text",
+          "length": 1800,
+          "plain_text_lists": "forbidden",
+          "numbers_must_appear_in_context": true,
+          "forbidden_patterns": [
+            "\\[[^\\]\\n]{1,80}\\]",
+            "\\{[^{}\\n]{1,80}\\}",
+            "<[^\\s\\d<>=][^<>\\n]{0,79}>",
+            "%\\pL[\\pL\\pN_.]{0,39}%",
+            "\\{\\{|\\}\\}",
+            "\\byour name\\b",
+            "based on the information i(?:.m| am| have| was| can)",
+            "truthfully (claim|say)",
+            "as an ai (?:language )?model",
+            "as an ai,? i (?:can|cannot|can.?t|am|do|don.?t)\\b"
+          ],
+          "claims_to_avoid": []
+        }
+      }
+    },
+    "rubric": {
+      "outcome": "send_ready_proposal",
+      "greeting": {
+        "ru": "Здравствуйте.",
+        "en": "Hello,"
+      },
+      "facts": [
+        "Разово объединить 3 Excel-файла примерно по 8 000 строк каждый в одну таблицу Google Sheets.",
+        "Удалить дубли, нормализовать телефоны, отметить отсутствующие email. Верификация адресов вне объёма.",
+        "Выгрузки и права редактирования нужны до начала. USD 120 и пятница предложены клиентом, не согласованы.",
+        "Подтверждён аналог объединения выгрузок Excel со схожими операциями."
+      ],
+      "required": [
+        "Назван близкий кейс. Приблизительный объём сохранён для каждого файла. Предложены три обработки.",
+        "Исключена верификация адресов, сохранены обе предпосылки. USD 120 и пятница явно оставлены предложениями клиента.",
+        "Есть следующий шаг, например определить ключ дубликатов при передаче выгрузок."
+      ],
+      "prohibited": [
+        "Приписанный прошлый объём, назначенные срок или цена, обещание верификации адресов или регулярной автоматизации вместо разовой работы."
+      ],
+      "allowed": [
+        "Можно уточнить правило сравнения дублей. Локальные форматы числа 8000 допустимы."
+      ]
+    }
+  }
+]

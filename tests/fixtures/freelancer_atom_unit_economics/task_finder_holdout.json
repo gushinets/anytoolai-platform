@@ -1,0 +1,1301 @@
+[
+  {
+    "case_id": "tf-h01-catalogue-csv-compare",
+    "calibration": false,
+    "atom_id": "A11",
+    "prompt_ref": "task_finder.compare.v1",
+    "scenario_case_id": "tf-h01-catalogue-csv",
+    "scenario_id": "task_finder.fit_v1",
+    "scenario_probe": true,
+    "difficulty": "Длинный пример явного соответствия по навыкам, опыту, объёму и условиям.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#TASK_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "За основу взяты структура проекта и четырёхкритериальная проверка. Задача и профиль для сильного совпадения составлены заново."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "task_text": "Нужна нормализация каталога из 600 строк CSV с помощью Python и pandas: привести два поля цены к общему виду, убрать повторы по SKU, отдать очищенный CSV и короткий отчёт о повторах. Доставка до 11 декабря 2026, фиксированный бюджет 420 EUR, удалённо.",
+        "freelancer_positioning": "Пишу скрипты на Python и pandas для товарных каталогов. На предыдущем проекте нормализовал два поля цены и дедуплицировал по SKU CSV на 1200 строк, передал очищенный файл и отчёт о повторах. Беру заказы до 2000 строк, могу выполнить к 11 декабря 2026 за фиксированные 420 EUR, работаю удалённо."
+      },
+      "en": {
+        "task_text": "Normalize a 600-row catalogue CSV with Python and pandas: standardize two price fields, remove duplicates by SKU, and deliver the cleaned CSV plus a short duplicate report. Due December 11, 2026, fixed budget EUR 420, remote.",
+        "freelancer_positioning": "I write Python and pandas scripts for product catalogues. On a previous project I standardized two price fields and removed duplicates by SKU from a 1,200-row CSV, then delivered the cleaned file and duplicate report. I take jobs up to 2,000 rows, can deliver by December 11, 2026 for a fixed EUR 420, and work remotely."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "subject_text": "Пишу скрипты на Python и pandas для товарных каталогов. На предыдущем проекте нормализовал два поля цены и дедуплицировал по SKU CSV на 1200 строк, передал очищенный файл и отчёт о повторах. Беру заказы до 2000 строк, могу выполнить к 11 декабря 2026 за фиксированные 420 EUR, работаю удалённо.",
+        "reference_text": "Нужна нормализация каталога из 600 строк CSV с помощью Python и pandas: привести два поля цены к общему виду, убрать повторы по SKU, отдать очищенный CSV и короткий отчёт о повторах. Доставка до 11 декабря 2026, фиксированный бюджет 420 EUR, удалённо.",
+        "categories": [
+          "strong_fit",
+          "partial_fit",
+          "weak_fit"
+        ],
+        "criteria": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "subject_text": "I write Python and pandas scripts for product catalogues. On a previous project I standardized two price fields and removed duplicates by SKU from a 1,200-row CSV, then delivered the cleaned file and duplicate report. I take jobs up to 2,000 rows, can deliver by December 11, 2026 for a fixed EUR 420, and work remotely.",
+        "reference_text": "Normalize a 600-row catalogue CSV with Python and pandas: standardize two price fields, remove duplicates by SKU, and deliver the cleaned CSV plus a short duplicate report. Due December 11, 2026, fixed budget EUR 420, remote.",
+        "categories": [
+          "strong_fit",
+          "partial_fit",
+          "weak_fit"
+        ],
+        "criteria": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+        "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+      ],
+      "required": [
+        "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+      ],
+      "allowed": [
+        "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+      ],
+      "allowed_verdicts": [
+        "strong_fit"
+      ],
+      "criterion_statuses": {
+        "skills_fit": [
+          "match"
+        ],
+        "experience_fit": [
+          "match"
+        ],
+        "scope_fit": [
+          "match"
+        ],
+        "constraints_fit": [
+          "match"
+        ]
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+        "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом strong_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+          "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "strong_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "match"
+          ],
+          "experience_fit": [
+            "match"
+          ],
+          "scope_fit": [
+            "match"
+          ],
+          "constraints_fit": [
+            "match"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+          "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            75,
+            100
+          ],
+          "experience_fit": [
+            75,
+            100
+          ],
+          "scope_fit": [
+            75,
+            100
+          ],
+          "constraints_fit": [
+            75,
+            100
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case_id": "tf-h01-catalogue-csv-score",
+    "calibration": false,
+    "atom_id": "A02",
+    "prompt_ref": "task_finder.score.v1",
+    "scenario_case_id": "tf-h01-catalogue-csv",
+    "scenario_id": "task_finder.fit_v1",
+    "scenario_probe": false,
+    "difficulty": "Длинный пример явного соответствия по навыкам, опыту, объёму и условиям.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#TASK_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "За основу взяты структура проекта и четырёхкритериальная проверка. Задача и профиль для сильного совпадения составлены заново."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "task_text": "Нужна нормализация каталога из 600 строк CSV с помощью Python и pandas: привести два поля цены к общему виду, убрать повторы по SKU, отдать очищенный CSV и короткий отчёт о повторах. Доставка до 11 декабря 2026, фиксированный бюджет 420 EUR, удалённо.",
+        "freelancer_positioning": "Пишу скрипты на Python и pandas для товарных каталогов. На предыдущем проекте нормализовал два поля цены и дедуплицировал по SKU CSV на 1200 строк, передал очищенный файл и отчёт о повторах. Беру заказы до 2000 строк, могу выполнить к 11 декабря 2026 за фиксированные 420 EUR, работаю удалённо."
+      },
+      "en": {
+        "task_text": "Normalize a 600-row catalogue CSV with Python and pandas: standardize two price fields, remove duplicates by SKU, and deliver the cleaned CSV plus a short duplicate report. Due December 11, 2026, fixed budget EUR 420, remote.",
+        "freelancer_positioning": "I write Python and pandas scripts for product catalogues. On a previous project I standardized two price fields and removed duplicates by SKU from a 1,200-row CSV, then delivered the cleaned file and duplicate report. I take jobs up to 2,000 rows, can deliver by December 11, 2026 for a fixed EUR 420, and work remotely."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "text_a": "Нужна нормализация каталога из 600 строк CSV с помощью Python и pandas: привести два поля цены к общему виду, убрать повторы по SKU, отдать очищенный CSV и короткий отчёт о повторах. Доставка до 11 декабря 2026, фиксированный бюджет 420 EUR, удалённо.",
+        "text_b": "Пишу скрипты на Python и pandas для товарных каталогов. На предыдущем проекте нормализовал два поля цены и дедуплицировал по SKU CSV на 1200 строк, передал очищенный файл и отчёт о повторах. Беру заказы до 2000 строк, могу выполнить к 11 декабря 2026 за фиксированные 420 EUR, работаю удалённо.",
+        "rubric": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "text_a": "Normalize a 600-row catalogue CSV with Python and pandas: standardize two price fields, remove duplicates by SKU, and deliver the cleaned CSV plus a short duplicate report. Due December 11, 2026, fixed budget EUR 420, remote.",
+        "text_b": "I write Python and pandas scripts for product catalogues. On a previous project I standardized two price fields and removed duplicates by SKU from a 1,200-row CSV, then delivered the cleaned file and duplicate report. I take jobs up to 2,000 rows, can deliver by December 11, 2026 for a fixed EUR 420, and work remotely.",
+        "rubric": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+        "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+      ],
+      "required": [
+        "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+        "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+      ],
+      "allowed": [
+        "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+      ],
+      "criterion_ids": [
+        "skills_fit",
+        "experience_fit",
+        "scope_fit",
+        "constraints_fit"
+      ],
+      "criterion_score_ranges": {
+        "skills_fit": [
+          75,
+          100
+        ],
+        "experience_fit": [
+          75,
+          100
+        ],
+        "scope_fit": [
+          75,
+          100
+        ],
+        "constraints_fit": [
+          75,
+          100
+        ]
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+        "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом strong_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+          "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "strong_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "match"
+          ],
+          "experience_fit": [
+            "match"
+          ],
+          "scope_fit": [
+            "match"
+          ],
+          "constraints_fit": [
+            "match"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+          "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            75,
+            100
+          ],
+          "experience_fit": [
+            75,
+            100
+          ],
+          "scope_fit": [
+            75,
+            100
+          ],
+          "constraints_fit": [
+            75,
+            100
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case_id": "tf-h02-podcast-chapters-compare",
+    "calibration": false,
+    "atom_id": "A11",
+    "prompt_ref": "task_finder.compare.v1",
+    "scenario_case_id": "tf-h02-podcast-chapters",
+    "scenario_id": "task_finder.fit_v1",
+    "scenario_probe": false,
+    "difficulty": "Короткая задача с подтверждённой специализацией и открытыми коммерческими условиями.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#WEAK_TASK_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Из проверки неполноты взят критерий нехватки сведений. Предмет, профиль и остальные условия составлены заново."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "task_text": "Нужно расшифровать один 25-минутный подкаст на английском и разметить главы таймкодами. Срок и бюджет пока не определили.",
+        "freelancer_positioning": "Расшифровываю подкасты на английском и размечаю главы таймкодами. Сделано несколько таких выпусков. Беру по одному выпуску до 60 минут. Ближайшая доступность и цена не указаны."
+      },
+      "en": {
+        "task_text": "Transcribe one 25-minute English-language podcast and add chapter timestamps. The deadline and budget have not been decided.",
+        "freelancer_positioning": "I transcribe English-language podcasts and add chapter timestamps. I have completed several episodes like this. I take one episode at a time, up to 60 minutes. My upcoming availability and rates are not stated."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "subject_text": "Расшифровываю подкасты на английском и размечаю главы таймкодами. Сделано несколько таких выпусков. Беру по одному выпуску до 60 минут. Ближайшая доступность и цена не указаны.",
+        "reference_text": "Нужно расшифровать один 25-минутный подкаст на английском и разметить главы таймкодами. Срок и бюджет пока не определили.",
+        "categories": [
+          "strong_fit",
+          "partial_fit",
+          "weak_fit"
+        ],
+        "criteria": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "subject_text": "I transcribe English-language podcasts and add chapter timestamps. I have completed several episodes like this. I take one episode at a time, up to 60 minutes. My upcoming availability and rates are not stated.",
+        "reference_text": "Transcribe one 25-minute English-language podcast and add chapter timestamps. The deadline and budget have not been decided.",
+        "categories": [
+          "strong_fit",
+          "partial_fit",
+          "weak_fit"
+        ],
+        "criteria": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+        "Срок, бюджет, доступность и тариф не подтверждены."
+      ],
+      "required": [
+        "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+      ],
+      "allowed": [
+        "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+      ],
+      "allowed_verdicts": [
+        "partial_fit"
+      ],
+      "criterion_statuses": {
+        "skills_fit": [
+          "match"
+        ],
+        "experience_fit": [
+          "match"
+        ],
+        "scope_fit": [
+          "match"
+        ],
+        "constraints_fit": [
+          "partial"
+        ]
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+        "Срок, бюджет, доступность и тариф не подтверждены."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом partial_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+          "Срок, бюджет, доступность и тариф не подтверждены."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "partial_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "match"
+          ],
+          "experience_fit": [
+            "match"
+          ],
+          "scope_fit": [
+            "match"
+          ],
+          "constraints_fit": [
+            "partial"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+          "Срок, бюджет, доступность и тариф не подтверждены."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            75,
+            100
+          ],
+          "experience_fit": [
+            75,
+            100
+          ],
+          "scope_fit": [
+            75,
+            100
+          ],
+          "constraints_fit": [
+            0,
+            55
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case_id": "tf-h02-podcast-chapters-score",
+    "calibration": false,
+    "atom_id": "A02",
+    "prompt_ref": "task_finder.score.v1",
+    "scenario_case_id": "tf-h02-podcast-chapters",
+    "scenario_id": "task_finder.fit_v1",
+    "scenario_probe": false,
+    "difficulty": "Короткая задача с подтверждённой специализацией и открытыми коммерческими условиями.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#WEAK_TASK_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Из проверки неполноты взят критерий нехватки сведений. Предмет, профиль и остальные условия составлены заново."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "task_text": "Нужно расшифровать один 25-минутный подкаст на английском и разметить главы таймкодами. Срок и бюджет пока не определили.",
+        "freelancer_positioning": "Расшифровываю подкасты на английском и размечаю главы таймкодами. Сделано несколько таких выпусков. Беру по одному выпуску до 60 минут. Ближайшая доступность и цена не указаны."
+      },
+      "en": {
+        "task_text": "Transcribe one 25-minute English-language podcast and add chapter timestamps. The deadline and budget have not been decided.",
+        "freelancer_positioning": "I transcribe English-language podcasts and add chapter timestamps. I have completed several episodes like this. I take one episode at a time, up to 60 minutes. My upcoming availability and rates are not stated."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "text_a": "Нужно расшифровать один 25-минутный подкаст на английском и разметить главы таймкодами. Срок и бюджет пока не определили.",
+        "text_b": "Расшифровываю подкасты на английском и размечаю главы таймкодами. Сделано несколько таких выпусков. Беру по одному выпуску до 60 минут. Ближайшая доступность и цена не указаны.",
+        "rubric": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "text_a": "Transcribe one 25-minute English-language podcast and add chapter timestamps. The deadline and budget have not been decided.",
+        "text_b": "I transcribe English-language podcasts and add chapter timestamps. I have completed several episodes like this. I take one episode at a time, up to 60 minutes. My upcoming availability and rates are not stated.",
+        "rubric": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+        "Срок, бюджет, доступность и тариф не подтверждены."
+      ],
+      "required": [
+        "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+        "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+      ],
+      "allowed": [
+        "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+      ],
+      "criterion_ids": [
+        "skills_fit",
+        "experience_fit",
+        "scope_fit",
+        "constraints_fit"
+      ],
+      "criterion_score_ranges": {
+        "skills_fit": [
+          75,
+          100
+        ],
+        "experience_fit": [
+          75,
+          100
+        ],
+        "scope_fit": [
+          75,
+          100
+        ],
+        "constraints_fit": [
+          0,
+          55
+        ]
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+        "Срок, бюджет, доступность и тариф не подтверждены."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом partial_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+          "Срок, бюджет, доступность и тариф не подтверждены."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "partial_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "match"
+          ],
+          "experience_fit": [
+            "match"
+          ],
+          "scope_fit": [
+            "match"
+          ],
+          "constraints_fit": [
+            "partial"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "На расшифровку английского подкаста и главы есть релевантные навыки и опыт, и 25 минут укладываются в 60.",
+          "Срок, бюджет, доступность и тариф не подтверждены."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Совместимость или конфликт по неизвестным условиям. Не придумывать перевод, число предыдущих выпусков, день, цену или формат экспорта."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            75,
+            100
+          ],
+          "experience_fit": [
+            75,
+            100
+          ],
+          "scope_fit": [
+            75,
+            100
+          ],
+          "constraints_fit": [
+            0,
+            55
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case_id": "tf-h03-iconfont-gap-compare",
+    "calibration": false,
+    "atom_id": "A11",
+    "prompt_ref": "task_finder.compare.v1",
+    "scenario_case_id": "tf-h03-iconfont-gap",
+    "scenario_id": "task_finder.fit_v1",
+    "scenario_probe": false,
+    "difficulty": "Смежный опыт с явным несовпадением обязательного результата и подтверждённым сроком.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#PROFILE_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Проверка явно исключённого обязательного результата адаптирована на новую задачу и составленный профиль."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "task_text": "Нужны 18 SVG-иконок в Figma для сайта библиотеки и обязательно готовый шрифт иконок WOFF2. Сдача до 15 декабря 2026. Согласован фиксированный бюджет 500 EUR.",
+        "freelancer_positioning": "Рисую в Figma SVG-иконки по дизайн-системам, включая набор из 24 иконок для сайтов. На этой неделе могу взять 18 SVG-иконок за 500 EUR и сдать до 15 декабря 2026. Экспорт шрифтов и сборку WOFF2 не делаю."
+      },
+      "en": {
+        "task_text": "Create 18 SVG icons in Figma for a library website and, as a required deliverable, supply a ready-to-use WOFF2 icon font. Due by December 15, 2026. Fixed budget of EUR 500 agreed.",
+        "freelancer_positioning": "I design SVG icons in Figma from design systems, including a 24-icon set for websites. This week I can take 18 SVG icons for EUR 500 and deliver by December 15, 2026. I do not export fonts or compile WOFF2 files."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "subject_text": "Рисую в Figma SVG-иконки по дизайн-системам, включая набор из 24 иконок для сайтов. На этой неделе могу взять 18 SVG-иконок за 500 EUR и сдать до 15 декабря 2026. Экспорт шрифтов и сборку WOFF2 не делаю.",
+        "reference_text": "Нужны 18 SVG-иконок в Figma для сайта библиотеки и обязательно готовый шрифт иконок WOFF2. Сдача до 15 декабря 2026. Согласован фиксированный бюджет 500 EUR.",
+        "categories": [
+          "strong_fit",
+          "partial_fit",
+          "weak_fit"
+        ],
+        "criteria": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "subject_text": "I design SVG icons in Figma from design systems, including a 24-icon set for websites. This week I can take 18 SVG icons for EUR 500 and deliver by December 15, 2026. I do not export fonts or compile WOFF2 files.",
+        "reference_text": "Create 18 SVG icons in Figma for a library website and, as a required deliverable, supply a ready-to-use WOFF2 icon font. Due by December 15, 2026. Fixed budget of EUR 500 agreed.",
+        "categories": [
+          "strong_fit",
+          "partial_fit",
+          "weak_fit"
+        ],
+        "criteria": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+        "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+      ],
+      "required": [
+        "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+      ],
+      "allowed": [
+        "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+      ],
+      "allowed_verdicts": [
+        "weak_fit"
+      ],
+      "criterion_statuses": {
+        "skills_fit": [
+          "partial",
+          "mismatch"
+        ],
+        "experience_fit": [
+          "match",
+          "partial"
+        ],
+        "scope_fit": [
+          "mismatch"
+        ],
+        "constraints_fit": [
+          "match",
+          "partial"
+        ]
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+        "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом weak_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+          "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "weak_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "partial",
+            "mismatch"
+          ],
+          "experience_fit": [
+            "match",
+            "partial"
+          ],
+          "scope_fit": [
+            "mismatch"
+          ],
+          "constraints_fit": [
+            "match",
+            "partial"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+          "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            0,
+            80
+          ],
+          "experience_fit": [
+            45,
+            100
+          ],
+          "scope_fit": [
+            0,
+            55
+          ],
+          "constraints_fit": [
+            45,
+            100
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case_id": "tf-h03-iconfont-gap-score",
+    "calibration": false,
+    "atom_id": "A02",
+    "prompt_ref": "task_finder.score.v1",
+    "scenario_case_id": "tf-h03-iconfont-gap",
+    "scenario_id": "task_finder.fit_v1",
+    "scenario_probe": false,
+    "difficulty": "Смежный опыт с явным несовпадением обязательного результата и подтверждённым сроком.",
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#PROFILE_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Проверка явно исключённого обязательного результата адаптирована на новую задачу и составленный профиль."
+      }
+    ],
+    "scenario_input": {
+      "ru": {
+        "task_text": "Нужны 18 SVG-иконок в Figma для сайта библиотеки и обязательно готовый шрифт иконок WOFF2. Сдача до 15 декабря 2026. Согласован фиксированный бюджет 500 EUR.",
+        "freelancer_positioning": "Рисую в Figma SVG-иконки по дизайн-системам, включая набор из 24 иконок для сайтов. На этой неделе могу взять 18 SVG-иконок за 500 EUR и сдать до 15 декабря 2026. Экспорт шрифтов и сборку WOFF2 не делаю."
+      },
+      "en": {
+        "task_text": "Create 18 SVG icons in Figma for a library website and, as a required deliverable, supply a ready-to-use WOFF2 icon font. Due by December 15, 2026. Fixed budget of EUR 500 agreed.",
+        "freelancer_positioning": "I design SVG icons in Figma from design systems, including a 24-icon set for websites. This week I can take 18 SVG icons for EUR 500 and deliver by December 15, 2026. I do not export fonts or compile WOFF2 files."
+      }
+    },
+    "inputs": {
+      "ru": {
+        "text_a": "Нужны 18 SVG-иконок в Figma для сайта библиотеки и обязательно готовый шрифт иконок WOFF2. Сдача до 15 декабря 2026. Согласован фиксированный бюджет 500 EUR.",
+        "text_b": "Рисую в Figma SVG-иконки по дизайн-системам, включая набор из 24 иконок для сайтов. На этой неделе могу взять 18 SVG-иконок за 500 EUR и сдать до 15 декабря 2026. Экспорт шрифтов и сборку WOFF2 не делаю.",
+        "rubric": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "text_a": "Create 18 SVG icons in Figma for a library website and, as a required deliverable, supply a ready-to-use WOFF2 icon font. Due by December 15, 2026. Fixed budget of EUR 500 agreed.",
+        "text_b": "I design SVG icons in Figma from design systems, including a 24-icon set for websites. This week I can take 18 SVG icons for EUR 500 and deliver by December 15, 2026. I do not export fonts or compile WOFF2 files.",
+        "rubric": [
+          {
+            "id": "skills_fit",
+            "description": "The stated skills of the freelancer and tools cover what the task needs.",
+            "weight": 3
+          },
+          {
+            "id": "experience_fit",
+            "description": "The stated experience of the freelancer is relevant to this kind of task.",
+            "weight": 2
+          },
+          {
+            "id": "scope_fit",
+            "description": "The size and scope of the task fit what the freelancer says they offer.",
+            "weight": 2
+          },
+          {
+            "id": "constraints_fit",
+            "description": "The constraints of the task (deadline, budget, working terms) are compatible with the stated availability and terms of the freelancer.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+        "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+      ],
+      "required": [
+        "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+        "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+      ],
+      "allowed": [
+        "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+      ],
+      "criterion_ids": [
+        "skills_fit",
+        "experience_fit",
+        "scope_fit",
+        "constraints_fit"
+      ],
+      "criterion_score_ranges": {
+        "skills_fit": [
+          0,
+          80
+        ],
+        "experience_fit": [
+          45,
+          100
+        ],
+        "scope_fit": [
+          0,
+          55
+        ],
+        "constraints_fit": [
+          45,
+          100
+        ]
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+        "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом weak_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+          "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "weak_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "partial",
+            "mismatch"
+          ],
+          "experience_fit": [
+            "match",
+            "partial"
+          ],
+          "scope_fit": [
+            "mismatch"
+          ],
+          "constraints_fit": [
+            "match",
+            "partial"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "Есть опыт с SVG и Figma. В обязательный объём входит готовый WOFF2, который исполнитель прямо исключает.",
+          "Срок и бюджет совпадают по сумме и дате для части заказа на 18 SVG."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "WOFF2 уже есть, будет сделан, факультативен либо у исполнителя не заявлено отношение к шрифтам. Не скрывать релевантный опыт по SVG."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            0,
+            80
+          ],
+          "experience_fit": [
+            45,
+            100
+          ],
+          "scope_fit": [
+            0,
+            55
+          ],
+          "constraints_fit": [
+            45,
+            100
+          ]
+        }
+      }
+    }
+  }
+]

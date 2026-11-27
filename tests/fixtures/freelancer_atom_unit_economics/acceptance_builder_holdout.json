@@ -1,0 +1,1580 @@
+[
+  {
+    "case_id": "ab-holdout-draft-01-bike-repair-site-a01",
+    "atom_id": "A01",
+    "prompt_ref": "acceptance_builder.extract.v1",
+    "calibration": false,
+    "difficulty": "короткий, обязательные решения не сформулированы",
+    "sources": [
+      {
+        "ref": "tests/fixtures/acceptance_builder_eval/any-894-live-acceptance.evidence.json#AB-894-B-RU",
+        "date": "2026-11-23",
+        "date_basis": "Дата серии в файле.",
+        "adaptation": "Новый синтетический бриф о веломастерской по мотивам структуры неполного заказа из фикстуры. Фото, стиль и бизнес-цель составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-01-bike-repair-site",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Нужен сайт для нашей веломастерской, чтобы посетителям было проще записаться на обслуживание. Хочется спокойную палитру и простой дизайн. Фото мастерской предоставим."
+      },
+      "en": {
+        "brief_text": "We need a website for our bicycle repair shop so visitors can book servicing more easily. We'd like a subdued palette and a simple design. We'll supply photos of the workshop."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Заказан сайт веломастерской. Цель — упростить запись на обслуживание.",
+        "Спокойные цвета — пожелание. Фотографии мастерской даёт заказчик.",
+        "Состав страниц, способ записи и способ согласования дизайна отсутствуют."
+      ],
+      "required": [
+        "Итоговый черновик на языке брифа называет сайт и условие о фотографиях. `extracted.missing_fields` содержит `acceptance_criteria`, которых нет в `values`.",
+        "Итог содержит два отдельных пробела и два уместных вопроса: про обязательные страницы или функции и про согласование дизайна.",
+        "Вопросы нацелены на решение заказчика и не вводят новых обязательств. Каждый соответствует одному фактическому риску."
+      ],
+      "prohibited": [
+        "Приписать брифу форму записи, число страниц, бюджет, дату сдачи или обязательную палитру.",
+        "Считать фото отсутствующими или вводить срок, цену, выбор платформы и обязательный способ записи.",
+        "Отмечать отсутствие срока и цены как риски только потому, что они не упомянуты.",
+        "Повторно спрашивать, кто предоставляет фото, спрашивать о сроке и цене раньше приёмочных решений, подставлять конкретный механизм записи как факт."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "source_text": "Нужен сайт для нашей веломастерской, чтобы посетителям было проще записаться на обслуживание. Хочется спокойную палитру и простой дизайн. Фото мастерской предоставим.",
+        "fields": [
+          {
+            "name": "acceptance_criteria",
+            "type": "nonempty_text_list",
+            "description": "Include only explicit, verifiable conditions on the delivered work or agreement. For each item identify what the client could inspect or test, or the explicit agreed term they could verify. Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test. A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria. In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers. Keep dates and amounts attached to the event or obligation they qualify.",
+            "required": false
+          },
+          {
+            "name": "assumptions",
+            "type": "nonempty_text_list",
+            "description": "Explicit project premises such as who supplies materials or an external dependency. General background, wishes, and the mere existence of the client or their business are not project premises. If none is stated, omit assumptions and list it in missing_fields.",
+            "required": false
+          },
+          {
+            "name": "deliverables",
+            "type": "nonempty_text_list",
+            "description": "Concrete deliverables the client expects.",
+            "required": false
+          },
+          {
+            "name": "analysis_language",
+            "type": "language_tag",
+            "description": "Case-insensitive analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it, even for a vague brief; it is presentation metadata, not a project requirement.",
+            "required": true
+          }
+        ],
+        "strict": true
+      },
+      "en": {
+        "source_text": "We need a website for our bicycle repair shop so visitors can book servicing more easily. We'd like a subdued palette and a simple design. We'll supply photos of the workshop.",
+        "fields": [
+          {
+            "name": "acceptance_criteria",
+            "type": "nonempty_text_list",
+            "description": "Include only explicit, verifiable conditions on the delivered work or agreement. For each item identify what the client could inspect or test, or the explicit agreed term they could verify. Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test. A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria. In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers. Keep dates and amounts attached to the event or obligation they qualify.",
+            "required": false
+          },
+          {
+            "name": "assumptions",
+            "type": "nonempty_text_list",
+            "description": "Explicit project premises such as who supplies materials or an external dependency. General background, wishes, and the mere existence of the client or their business are not project premises. If none is stated, omit assumptions and list it in missing_fields.",
+            "required": false
+          },
+          {
+            "name": "deliverables",
+            "type": "nonempty_text_list",
+            "description": "Concrete deliverables the client expects.",
+            "required": false
+          },
+          {
+            "name": "analysis_language",
+            "type": "language_tag",
+            "description": "Case-insensitive analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it, even for a vague brief; it is presentation metadata, not a project requirement.",
+            "required": true
+          }
+        ],
+        "strict": true
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Заказан сайт веломастерской. Цель — упростить запись на обслуживание.",
+        "Спокойные цвета — пожелание. Фотографии мастерской даёт заказчик.",
+        "Состав страниц, способ записи и способ согласования дизайна отсутствуют."
+      ],
+      "required": [
+        "Назвать сайт веломастерской как результат, а предоставление фотографий как исходное условие.",
+        "Оставить `acceptance_criteria` отсутствующим. Цель записи и желаемый стиль сами по себе не устанавливают проверку.",
+        "Вернуть язык брифа в `values.analysis_language`."
+      ],
+      "prohibited": [
+        "Приписать брифу форму записи, число страниц, бюджет, дату сдачи или обязательную палитру."
+      ],
+      "allowed": [],
+      "objective": {
+        "missing_fields": [
+          "acceptance_criteria"
+        ],
+        "value_fragments": {
+          "ru": {
+            "analysis_language": [
+              "ru"
+            ]
+          },
+          "en": {
+            "analysis_language": [
+              "en"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "ab-holdout-draft-01-bike-repair-site-a04",
+    "atom_id": "A04",
+    "prompt_ref": "acceptance_builder.detect_issues.v1",
+    "calibration": false,
+    "difficulty": "короткий, обязательные решения не сформулированы",
+    "sources": [
+      {
+        "ref": "tests/fixtures/acceptance_builder_eval/any-894-live-acceptance.evidence.json#AB-894-B-RU",
+        "date": "2026-11-23",
+        "date_basis": "Дата серии в файле.",
+        "adaptation": "Новый синтетический бриф о веломастерской по мотивам структуры неполного заказа из фикстуры. Фото, стиль и бизнес-цель составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-01-bike-repair-site",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Нужен сайт для нашей веломастерской, чтобы посетителям было проще записаться на обслуживание. Хочется спокойную палитру и простой дизайн. Фото мастерской предоставим."
+      },
+      "en": {
+        "brief_text": "We need a website for our bicycle repair shop so visitors can book servicing more easily. We'd like a subdued palette and a simple design. We'll supply photos of the workshop."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Заказан сайт веломастерской. Цель — упростить запись на обслуживание.",
+        "Спокойные цвета — пожелание. Фотографии мастерской даёт заказчик.",
+        "Состав страниц, способ записи и способ согласования дизайна отсутствуют."
+      ],
+      "required": [
+        "Итоговый черновик на языке брифа называет сайт и условие о фотографиях. `extracted.missing_fields` содержит `acceptance_criteria`, которых нет в `values`.",
+        "Итог содержит два отдельных пробела и два уместных вопроса: про обязательные страницы или функции и про согласование дизайна.",
+        "Вопросы нацелены на решение заказчика и не вводят новых обязательств. Каждый соответствует одному фактическому риску."
+      ],
+      "prohibited": [
+        "Приписать брифу форму записи, число страниц, бюджет, дату сдачи или обязательную палитру.",
+        "Считать фото отсутствующими или вводить срок, цену, выбор платформы и обязательный способ записи.",
+        "Отмечать отсутствие срока и цены как риски только потому, что они не упомянуты.",
+        "Повторно спрашивать, кто предоставляет фото, спрашивать о сроке и цене раньше приёмочных решений, подставлять конкретный механизм записи как факт."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "source_text": "Нужен сайт для нашей веломастерской, чтобы посетителям было проще записаться на обслуживание. Хочется спокойную палитру и простой дизайн. Фото мастерской предоставим.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      },
+      "en": {
+        "source_text": "We need a website for our bicycle repair shop so visitors can book servicing more easily. We'd like a subdued palette and a simple design. We'll supply photos of the workshop.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Заказан сайт веломастерской. Цель — упростить запись на обслуживание.",
+        "Спокойные цвета — пожелание. Фотографии мастерской даёт заказчик.",
+        "Состав страниц, способ записи и способ согласования дизайна отсутствуют."
+      ],
+      "required": [
+        "Выделить два отдельных решения: какие страницы или функции обязательны и как заказчик утверждает дизайн.",
+        "Отметить, что цель упростить запись не задаёт способ записи."
+      ],
+      "prohibited": [
+        "Считать фото отсутствующими или вводить срок, цену, выбор платформы и обязательный способ записи.",
+        "Отмечать отсутствие срока и цены как риски только потому, что они не упомянуты."
+      ],
+      "allowed": [
+        "Допустимы `missing_information` и `ambiguity`, когда категория соответствует конкретике замечания."
+      ],
+      "allowed_issue_categories": [
+        "missing_information",
+        "ambiguity"
+      ]
+    }
+  },
+  {
+    "case_id": "ab-holdout-draft-01-bike-repair-site-a05",
+    "atom_id": "A05",
+    "prompt_ref": "acceptance_builder.generate_questions.v1",
+    "calibration": false,
+    "difficulty": "короткий, обязательные решения не сформулированы",
+    "sources": [
+      {
+        "ref": "tests/fixtures/acceptance_builder_eval/any-894-live-acceptance.evidence.json#AB-894-B-RU",
+        "date": "2026-11-23",
+        "date_basis": "Дата серии в файле.",
+        "adaptation": "Новый синтетический бриф о веломастерской по мотивам структуры неполного заказа из фикстуры. Фото, стиль и бизнес-цель составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-01-bike-repair-site",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Нужен сайт для нашей веломастерской, чтобы посетителям было проще записаться на обслуживание. Хочется спокойную палитру и простой дизайн. Фото мастерской предоставим."
+      },
+      "en": {
+        "brief_text": "We need a website for our bicycle repair shop so visitors can book servicing more easily. We'd like a subdued palette and a simple design. We'll supply photos of the workshop."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Заказан сайт веломастерской. Цель — упростить запись на обслуживание.",
+        "Спокойные цвета — пожелание. Фотографии мастерской даёт заказчик.",
+        "Состав страниц, способ записи и способ согласования дизайна отсутствуют."
+      ],
+      "required": [
+        "Итоговый черновик на языке брифа называет сайт и условие о фотографиях. `extracted.missing_fields` содержит `acceptance_criteria`, которых нет в `values`.",
+        "Итог содержит два отдельных пробела и два уместных вопроса: про обязательные страницы или функции и про согласование дизайна.",
+        "Вопросы нацелены на решение заказчика и не вводят новых обязательств. Каждый соответствует одному фактическому риску."
+      ],
+      "prohibited": [
+        "Приписать брифу форму записи, число страниц, бюджет, дату сдачи или обязательную палитру.",
+        "Считать фото отсутствующими или вводить срок, цену, выбор платформы и обязательный способ записи.",
+        "Отмечать отсутствие срока и цены как риски только потому, что они не упомянуты.",
+        "Повторно спрашивать, кто предоставляет фото, спрашивать о сроке и цене раньше приёмочных решений, подставлять конкретный механизм записи как факт."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "Не определено, какие страницы или функции нужны на сайте, в том числе как посетители должны записываться на обслуживание."
+          },
+          {
+            "category": "ambiguity",
+            "severity": "medium",
+            "description": "Пожелания по внешнему виду не определяют, как заказчик согласует дизайн.",
+            "evidence": "Хочется спокойную палитру и простой дизайн."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Нужен сайт для нашей веломастерской, чтобы посетителям было проще записаться на обслуживание. Хочется спокойную палитру и простой дизайн. Фото мастерской предоставим.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      },
+      "en": {
+        "issues": [
+          {
+            "category": "missing_information",
+            "severity": "high",
+            "description": "The brief does not specify the essential pages or functions, including how visitors should book servicing."
+          },
+          {
+            "category": "ambiguity",
+            "severity": "medium",
+            "description": "The visual preferences do not define how the customer will approve the design.",
+            "evidence": "We'd like a subdued palette and a simple design."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "We need a website for our bicycle repair shop so visitors can book servicing more easily. We'd like a subdued palette and a simple design. We'll supply photos of the workshop.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Заказан сайт веломастерской. Цель — упростить запись на обслуживание.",
+        "Спокойные цвета — пожелание. Фотографии мастерской даёт заказчик.",
+        "Состав страниц, способ записи и способ согласования дизайна отсутствуют."
+      ],
+      "required": [
+        "Спросить, какие разделы или функции нужны для первого результата. Можно конкретизировать процесс записи как решение.",
+        "Отдельно спросить, как заказчик будет согласовывать дизайн. Запрос одних цветовых примеров недостаточен."
+      ],
+      "prohibited": [
+        "Повторно спрашивать, кто предоставляет фото, спрашивать о сроке и цене раньше приёмочных решений, подставлять конкретный механизм записи как факт."
+      ],
+      "allowed": [],
+      "required_source_issue_indices": [
+        0,
+        1
+      ]
+    },
+    "fixed_upstream": "Список issues составлен для изолированного теста и соответствует выходной схеме A04. В полном сценарии используется результат A04 текущего запуска."
+  },
+  {
+    "case_id": "ab-holdout-draft-02-explainer-voice-a01",
+    "atom_id": "A01",
+    "prompt_ref": "acceptance_builder.extract.v1",
+    "calibration": false,
+    "difficulty": "средний, прямое противоречие и открытый объём",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/2d-animation-explainer-video/need-software-explainer-video-series",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Форматы, длительность, число роликов и раскадровка по объявлению №40611627. Срок раскадровки, противоречие об озвучке и открытые раунды составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-02-explainer-voice",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено."
+      },
+      "en": {
+        "brief_text": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Итоговый черновик сохраняет форматы, три ролика, диапазон длительности, раскадровку до 5 декабря и источник материалов. Оба конфликтующих условия об озвучке отсутствуют в `extracted.values.acceptance_criteria`.",
+        "В рисках выделены одно противоречие с обеими формулировками и открытый объём правок. В вопросах есть выбор по озвучке и отдельный вопрос о границе правок.",
+        "Текст объяснений и вопросов на языке брифа, а ссылки вопросов соответствуют фактическим issues."
+      ],
+      "prohibited": [
+        "Утвердить любую из версий об озвучке. Приписать дату 5 декабря финальным роликам или установить предел правок.",
+        "Считать озвучку решённой. Выдумать число раундов, дату финала или бюджет.",
+        "Просить подтвердить уже ясную длительность/формат, предлагать произвольное число раундов или менять дату раскадровки."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "source_text": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено.",
+        "fields": [
+          {
+            "name": "acceptance_criteria",
+            "type": "nonempty_text_list",
+            "description": "Include only explicit, verifiable conditions on the delivered work or agreement. For each item identify what the client could inspect or test, or the explicit agreed term they could verify. Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test. A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria. In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers. Keep dates and amounts attached to the event or obligation they qualify.",
+            "required": false
+          },
+          {
+            "name": "assumptions",
+            "type": "nonempty_text_list",
+            "description": "Explicit project premises such as who supplies materials or an external dependency. General background, wishes, and the mere existence of the client or their business are not project premises. If none is stated, omit assumptions and list it in missing_fields.",
+            "required": false
+          },
+          {
+            "name": "deliverables",
+            "type": "nonempty_text_list",
+            "description": "Concrete deliverables the client expects.",
+            "required": false
+          },
+          {
+            "name": "analysis_language",
+            "type": "language_tag",
+            "description": "Case-insensitive analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it, even for a vague brief; it is presentation metadata, not a project requirement.",
+            "required": true
+          }
+        ],
+        "strict": true
+      },
+      "en": {
+        "source_text": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds.",
+        "fields": [
+          {
+            "name": "acceptance_criteria",
+            "type": "nonempty_text_list",
+            "description": "Include only explicit, verifiable conditions on the delivered work or agreement. For each item identify what the client could inspect or test, or the explicit agreed term they could verify. Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test. A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria. In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers. Keep dates and amounts attached to the event or obligation they qualify.",
+            "required": false
+          },
+          {
+            "name": "assumptions",
+            "type": "nonempty_text_list",
+            "description": "Explicit project premises such as who supplies materials or an external dependency. General background, wishes, and the mere existence of the client or their business are not project premises. If none is stated, omit assumptions and list it in missing_fields.",
+            "required": false
+          },
+          {
+            "name": "deliverables",
+            "type": "nonempty_text_list",
+            "description": "Concrete deliverables the client expects.",
+            "required": false
+          },
+          {
+            "name": "analysis_language",
+            "type": "language_tag",
+            "description": "Case-insensitive analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it, even for a vague brief; it is presentation metadata, not a project requirement.",
+            "required": true
+          }
+        ],
+        "strict": true
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Извлечь три ролика, длительность каждого, разрешение и формат, SRT и редактируемый проект. Сохранить обязательную раскадровку и её дату.",
+        "В предпосылках сохранить предоставление брендбука и текста. Не переносить противоречащие требования об озвучке в критерии."
+      ],
+      "prohibited": [
+        "Утвердить любую из версий об озвучке. Приписать дату 5 декабря финальным роликам или установить предел правок."
+      ],
+      "allowed": [],
+      "objective": {
+        "missing_fields": [],
+        "value_fragments": {
+          "ru": {
+            "analysis_language": [
+              "ru"
+            ],
+            "acceptance_criteria": [
+              "1080p",
+              "MP4",
+              "SRT"
+            ]
+          },
+          "en": {
+            "analysis_language": [
+              "en"
+            ],
+            "acceptance_criteria": [
+              "1080p",
+              "MP4",
+              "SRT"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "ab-holdout-draft-02-explainer-voice-a04",
+    "atom_id": "A04",
+    "prompt_ref": "acceptance_builder.detect_issues.v1",
+    "calibration": false,
+    "difficulty": "средний, прямое противоречие и открытый объём",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/2d-animation-explainer-video/need-software-explainer-video-series",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Форматы, длительность, число роликов и раскадровка по объявлению №40611627. Срок раскадровки, противоречие об озвучке и открытые раунды составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-02-explainer-voice",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено."
+      },
+      "en": {
+        "brief_text": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Итоговый черновик сохраняет форматы, три ролика, диапазон длительности, раскадровку до 5 декабря и источник материалов. Оба конфликтующих условия об озвучке отсутствуют в `extracted.values.acceptance_criteria`.",
+        "В рисках выделены одно противоречие с обеими формулировками и открытый объём правок. В вопросах есть выбор по озвучке и отдельный вопрос о границе правок.",
+        "Текст объяснений и вопросов на языке брифа, а ссылки вопросов соответствуют фактическим issues."
+      ],
+      "prohibited": [
+        "Утвердить любую из версий об озвучке. Приписать дату 5 декабря финальным роликам или установить предел правок.",
+        "Считать озвучку решённой. Выдумать число раундов, дату финала или бюджет.",
+        "Просить подтвердить уже ясную длительность/формат, предлагать произвольное число раундов или менять дату раскадровки."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "source_text": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      },
+      "en": {
+        "source_text": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Выделить одно `contradiction` с обеими точными фразами, разделёнными ` / `.",
+        "Выделить `scope_risk` открытых раундов с цитатой. Дата 5 декабря относится к раскадровке."
+      ],
+      "prohibited": [
+        "Считать озвучку решённой. Выдумать число раундов, дату финала или бюджет."
+      ],
+      "allowed": [],
+      "required_issue_categories": [
+        "contradiction",
+        "scope_risk"
+      ],
+      "required_contradiction_quotes": {
+        "ru": [
+          "В каждом ролике должна быть закадровая озвучка.",
+          "Сдайте все ролики без закадровой озвучки."
+        ],
+        "en": [
+          "Every video must have a voice-over.",
+          "Deliver all videos without a voice-over."
+        ]
+      }
+    }
+  },
+  {
+    "case_id": "ab-holdout-draft-02-explainer-voice-a05",
+    "atom_id": "A05",
+    "prompt_ref": "acceptance_builder.generate_questions.v1",
+    "calibration": false,
+    "difficulty": "средний, прямое противоречие и открытый объём",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/2d-animation-explainer-video/need-software-explainer-video-series",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Форматы, длительность, число роликов и раскадровка по объявлению №40611627. Срок раскадровки, противоречие об озвучке и открытые раунды составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-02-explainer-voice",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено."
+      },
+      "en": {
+        "brief_text": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Итоговый черновик сохраняет форматы, три ролика, диапазон длительности, раскадровку до 5 декабря и источник материалов. Оба конфликтующих условия об озвучке отсутствуют в `extracted.values.acceptance_criteria`.",
+        "В рисках выделены одно противоречие с обеими формулировками и открытый объём правок. В вопросах есть выбор по озвучке и отдельный вопрос о границе правок.",
+        "Текст объяснений и вопросов на языке брифа, а ссылки вопросов соответствуют фактическим issues."
+      ],
+      "prohibited": [
+        "Утвердить любую из версий об озвучке. Приписать дату 5 декабря финальным роликам или установить предел правок.",
+        "Считать озвучку решённой. Выдумать число раундов, дату финала или бюджет.",
+        "Просить подтвердить уже ясную длительность/формат, предлагать произвольное число раундов или менять дату раскадровки."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "issues": [
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "Одно условие требует озвучку в каждом ролике, второе требует её отсутствия во всех роликах.",
+            "evidence": "В каждом ролике должна быть закадровая озвучка. / Сдайте все ролики без закадровой озвучки."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "medium",
+            "description": "Количество раундов правок не ограничено, поэтому объём доработок остаётся открытым.",
+            "evidence": "Количество раундов правок не ограничено."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      },
+      "en": {
+        "issues": [
+          {
+            "category": "contradiction",
+            "severity": "high",
+            "description": "One requirement calls for a voice-over in every video, while another requires no voice-over in any video.",
+            "evidence": "Every video must have a voice-over. / Deliver all videos without a voice-over."
+          },
+          {
+            "category": "scope_risk",
+            "severity": "medium",
+            "description": "An unlimited number of revision rounds leaves the amount of rework open.",
+            "evidence": "There is no limit on revision rounds."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Спросить, какая версия об озвучке действует. Ответ должен прямо разрешать конфликт.",
+        "Задать отдельный вопрос о согласуемом количестве или границе раундов правок."
+      ],
+      "prohibited": [
+        "Просить подтвердить уже ясную длительность/формат, предлагать произвольное число раундов или менять дату раскадровки."
+      ],
+      "allowed": [],
+      "required_source_issue_indices": [
+        0,
+        1
+      ]
+    },
+    "fixed_upstream": "Список issues составлен для изолированного теста и соответствует выходной схеме A04. В полном сценарии используется результат A04 текущего запуска."
+  },
+  {
+    "case_id": "ab-holdout-draft-03-technical-translation-a01",
+    "atom_id": "A01",
+    "prompt_ref": "acceptance_builder.extract.v1",
+    "calibration": false,
+    "difficulty": "длинный, объём, стоимость и два разных календарных события",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/technical-translation/Technical-Document-Translation",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Перевод технической документации, сохранение структуры и замечания о двусмысленности адаптированы из объявления №40107908. Языки, объём, ручные сверки, бюджет и календарь составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-03-technical-translation",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Переведите с английского на немецкий 60 страниц инструкции. Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием, сохранить заголовки, списки и схемы на своих местах. Передайте редактируемый DOCX и отдельный список неоднозначных терминов с пояснениями. На всю работу фиксированный бюджет 90 EUR. Исходник и глоссарий станут доступны 2 декабря в 17:00. Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки. Печать назначена на 8 декабря."
+      },
+      "en": {
+        "brief_text": "Translate 60 pages of the manual from English into German. Manually check all warnings and the captions for 40 diagrams against the glossary, keeping headings, lists and diagrams in their original positions. Hand over an editable DOCX and a separate list of ambiguous terms with explanations. The fixed budget for all work is 90 EUR. The source file and glossary will be available on December 2 at 17:00. The finished package is needed on December 3 at 09:00 for internal review. Printing is scheduled for December 8."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Перевести 60 страниц с английского на немецкий. Вручную сверить предупреждения и подписи к 40 схемам по глоссарию.",
+        "Сохранить структуру, передать редактируемый DOCX и список неоднозначных терминов.",
+        "Фиксированный бюджет 90 EUR. Начать можно с 2 декабря в 17:00, весь комплект нужен 3 декабря к 09:00. Печать 8 декабря — отдельное событие."
+      ],
+      "required": [
+        "Черновик сохраняет объём, язык, ручные проверки, оба результата, 90 EUR и время доступа к исходникам. Внутренняя сдача 3 декабря к 09:00 отделена от печати 8 декабря.",
+        "Основной риск объединяет объём, деньги и короткое окно и подтверждён брифом. Один из приоритетных вопросов помогает заказчику выбрать объём именно для внутренней сдачи.",
+        "Результат пригоден для обсуждения требований: он не выдаёт прогноз за обещание и не навязывает новые условия."
+      ],
+      "prohibited": [
+        "Назначить 8 декабря сроком сдачи. Добавить цену за страницу, печать, другой формат, машинную проверку или новый срок.",
+        "Объявить выполнение невозможным, утверждать отсутствие глоссария, назначить печать дедлайном или дробить те же связанные ограничения на независимые проблемы.",
+        "Предлагать новую цену, размер пакета или календарную дату. Спрашивать, когда или на каком языке сдавать уже определённый комплект."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "source_text": "Переведите с английского на немецкий 60 страниц инструкции. Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием, сохранить заголовки, списки и схемы на своих местах. Передайте редактируемый DOCX и отдельный список неоднозначных терминов с пояснениями. На всю работу фиксированный бюджет 90 EUR. Исходник и глоссарий станут доступны 2 декабря в 17:00. Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки. Печать назначена на 8 декабря.",
+        "fields": [
+          {
+            "name": "acceptance_criteria",
+            "type": "nonempty_text_list",
+            "description": "Include only explicit, verifiable conditions on the delivered work or agreement. For each item identify what the client could inspect or test, or the explicit agreed term they could verify. Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test. A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria. In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers. Keep dates and amounts attached to the event or obligation they qualify.",
+            "required": false
+          },
+          {
+            "name": "assumptions",
+            "type": "nonempty_text_list",
+            "description": "Explicit project premises such as who supplies materials or an external dependency. General background, wishes, and the mere existence of the client or their business are not project premises. If none is stated, omit assumptions and list it in missing_fields.",
+            "required": false
+          },
+          {
+            "name": "deliverables",
+            "type": "nonempty_text_list",
+            "description": "Concrete deliverables the client expects.",
+            "required": false
+          },
+          {
+            "name": "analysis_language",
+            "type": "language_tag",
+            "description": "Case-insensitive analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it, even for a vague brief; it is presentation metadata, not a project requirement.",
+            "required": true
+          }
+        ],
+        "strict": true
+      },
+      "en": {
+        "source_text": "Translate 60 pages of the manual from English into German. Manually check all warnings and the captions for 40 diagrams against the glossary, keeping headings, lists and diagrams in their original positions. Hand over an editable DOCX and a separate list of ambiguous terms with explanations. The fixed budget for all work is 90 EUR. The source file and glossary will be available on December 2 at 17:00. The finished package is needed on December 3 at 09:00 for internal review. Printing is scheduled for December 8.",
+        "fields": [
+          {
+            "name": "acceptance_criteria",
+            "type": "nonempty_text_list",
+            "description": "Include only explicit, verifiable conditions on the delivered work or agreement. For each item identify what the client could inspect or test, or the explicit agreed term they could verify. Naming a deliverable, describing a desired look, or hoping for a business outcome does not establish an acceptance test. A request for a website with only aesthetic wishes and customer-growth goals has a deliverable but no acceptance criteria. In that case omit acceptance_criteria from values and list it in missing_fields. In mixed briefs keep the independently checkable conditions, even when a wish appears in the same sentence. When two statements directly contradict each other, put neither version in acceptance_criteria. Keep every consistent agreed term, including named items, tests, quantities with units and qualifiers. Keep dates and amounts attached to the event or obligation they qualify.",
+            "required": false
+          },
+          {
+            "name": "assumptions",
+            "type": "nonempty_text_list",
+            "description": "Explicit project premises such as who supplies materials or an external dependency. General background, wishes, and the mere existence of the client or their business are not project premises. If none is stated, omit assumptions and list it in missing_fields.",
+            "required": false
+          },
+          {
+            "name": "deliverables",
+            "type": "nonempty_text_list",
+            "description": "Concrete deliverables the client expects.",
+            "required": false
+          },
+          {
+            "name": "analysis_language",
+            "type": "language_tag",
+            "description": "Case-insensitive analysis language identifier using 2-3 ASCII letters, optionally followed by hyphen-separated 2-8-character alphanumeric subtags (ru, es-MX, zh-Hant-TW). Select it from the original brief by the prompt language rule. Always report it, even for a vague brief; it is presentation metadata, not a project requirement.",
+            "required": true
+          }
+        ],
+        "strict": true
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Перевести 60 страниц с английского на немецкий. Вручную сверить предупреждения и подписи к 40 схемам по глоссарию.",
+        "Сохранить структуру, передать редактируемый DOCX и список неоднозначных терминов.",
+        "Фиксированный бюджет 90 EUR. Начать можно с 2 декабря в 17:00, весь комплект нужен 3 декабря к 09:00. Печать 8 декабря — отдельное событие."
+      ],
+      "required": [
+        "Сохранить языки перевода, 60 страниц, ручную сверку предупреждений и подписей к 40 схемам и сохранение структуры.",
+        "Назвать оба результата. Бюджет отнести ко всей работе, 3 декабря 09:00 к внутренней сдаче, 2 декабря 17:00 к доступности исходника и глоссария.",
+        "Если упоминается печать, сохранить её отдельной от сдачи и не возлагать печать на переводчика."
+      ],
+      "prohibited": [
+        "Назначить 8 декабря сроком сдачи. Добавить цену за страницу, печать, другой формат, машинную проверку или новый срок."
+      ],
+      "allowed": [],
+      "objective": {
+        "missing_fields": [],
+        "value_fragments": {
+          "ru": {
+            "analysis_language": [
+              "ru"
+            ],
+            "deliverables": [
+              "DOCX"
+            ],
+            "acceptance_criteria": [
+              "60",
+              "40",
+              "90 EUR",
+              "09:00"
+            ]
+          },
+          "en": {
+            "analysis_language": [
+              "en"
+            ],
+            "deliverables": [
+              "DOCX"
+            ],
+            "acceptance_criteria": [
+              "60",
+              "40",
+              "90 EUR",
+              "09:00"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "case_id": "ab-holdout-draft-03-technical-translation-a04",
+    "atom_id": "A04",
+    "prompt_ref": "acceptance_builder.detect_issues.v1",
+    "calibration": false,
+    "difficulty": "длинный, объём, стоимость и два разных календарных события",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/technical-translation/Technical-Document-Translation",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Перевод технической документации, сохранение структуры и замечания о двусмысленности адаптированы из объявления №40107908. Языки, объём, ручные сверки, бюджет и календарь составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-03-technical-translation",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Переведите с английского на немецкий 60 страниц инструкции. Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием, сохранить заголовки, списки и схемы на своих местах. Передайте редактируемый DOCX и отдельный список неоднозначных терминов с пояснениями. На всю работу фиксированный бюджет 90 EUR. Исходник и глоссарий станут доступны 2 декабря в 17:00. Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки. Печать назначена на 8 декабря."
+      },
+      "en": {
+        "brief_text": "Translate 60 pages of the manual from English into German. Manually check all warnings and the captions for 40 diagrams against the glossary, keeping headings, lists and diagrams in their original positions. Hand over an editable DOCX and a separate list of ambiguous terms with explanations. The fixed budget for all work is 90 EUR. The source file and glossary will be available on December 2 at 17:00. The finished package is needed on December 3 at 09:00 for internal review. Printing is scheduled for December 8."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Перевести 60 страниц с английского на немецкий. Вручную сверить предупреждения и подписи к 40 схемам по глоссарию.",
+        "Сохранить структуру, передать редактируемый DOCX и список неоднозначных терминов.",
+        "Фиксированный бюджет 90 EUR. Начать можно с 2 декабря в 17:00, весь комплект нужен 3 декабря к 09:00. Печать 8 декабря — отдельное событие."
+      ],
+      "required": [
+        "Черновик сохраняет объём, язык, ручные проверки, оба результата, 90 EUR и время доступа к исходникам. Внутренняя сдача 3 декабря к 09:00 отделена от печати 8 декабря.",
+        "Основной риск объединяет объём, деньги и короткое окно и подтверждён брифом. Один из приоритетных вопросов помогает заказчику выбрать объём именно для внутренней сдачи.",
+        "Результат пригоден для обсуждения требований: он не выдаёт прогноз за обещание и не навязывает новые условия."
+      ],
+      "prohibited": [
+        "Назначить 8 декабря сроком сдачи. Добавить цену за страницу, печать, другой формат, машинную проверку или новый срок.",
+        "Объявить выполнение невозможным, утверждать отсутствие глоссария, назначить печать дедлайном или дробить те же связанные ограничения на независимые проблемы.",
+        "Предлагать новую цену, размер пакета или календарную дату. Спрашивать, когда или на каком языке сдавать уже определённый комплект."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "source_text": "Переведите с английского на немецкий 60 страниц инструкции. Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием, сохранить заголовки, списки и схемы на своих местах. Передайте редактируемый DOCX и отдельный список неоднозначных терминов с пояснениями. На всю работу фиксированный бюджет 90 EUR. Исходник и глоссарий станут доступны 2 декабря в 17:00. Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки. Печать назначена на 8 декабря.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      },
+      "en": {
+        "source_text": "Translate 60 pages of the manual from English into German. Manually check all warnings and the captions for 40 diagrams against the glossary, keeping headings, lists and diagrams in their original positions. Hand over an editable DOCX and a separate list of ambiguous terms with explanations. The fixed budget for all work is 90 EUR. The source file and glossary will be available on December 2 at 17:00. The finished package is needed on December 3 at 09:00 for internal review. Printing is scheduled for December 8.",
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Перевести 60 страниц с английского на немецкий. Вручную сверить предупреждения и подписи к 40 схемам по глоссарию.",
+        "Сохранить структуру, передать редактируемый DOCX и список неоднозначных терминов.",
+        "Фиксированный бюджет 90 EUR. Начать можно с 2 декабря в 17:00, весь комплект нужен 3 декабря к 09:00. Печать 8 декабря — отдельное событие."
+      ],
+      "required": [
+        "Сформулировать один высокий объединённый риск: 60 страниц, ручная сверка предупреждений и подписей к 40 схемам, сохранение структуры и сдача редактируемого DOCX со списком терминов за 90 EUR с 2 декабря 17:00 до 3 декабря 09:00.",
+        "Привести короткие выдержки про объём, стоимость и дедлайн. Печать 8 декабря отделить от сдачи, если упоминается."
+      ],
+      "prohibited": [
+        "Объявить выполнение невозможным, утверждать отсутствие глоссария, назначить печать дедлайном или дробить те же связанные ограничения на независимые проблемы."
+      ],
+      "allowed": [
+        "Для обоснованного объединённого риска допускается `scope_risk`, либо `timeline_risk`, если объяснение исходит из короткого интервала и охватывает все условия."
+      ],
+      "combined_risk_severity": "high"
+    }
+  },
+  {
+    "case_id": "ab-holdout-draft-03-technical-translation-a05",
+    "atom_id": "A05",
+    "prompt_ref": "acceptance_builder.generate_questions.v1",
+    "calibration": false,
+    "difficulty": "длинный, объём, стоимость и два разных календарных события",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/technical-translation/Technical-Document-Translation",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Перевод технической документации, сохранение структуры и замечания о двусмысленности адаптированы из объявления №40107908. Языки, объём, ручные сверки, бюджет и календарь составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.draft_v1",
+    "scenario_case_id": "ab-holdout-draft-03-technical-translation",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Переведите с английского на немецкий 60 страниц инструкции. Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием, сохранить заголовки, списки и схемы на своих местах. Передайте редактируемый DOCX и отдельный список неоднозначных терминов с пояснениями. На всю работу фиксированный бюджет 90 EUR. Исходник и глоссарий станут доступны 2 декабря в 17:00. Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки. Печать назначена на 8 декабря."
+      },
+      "en": {
+        "brief_text": "Translate 60 pages of the manual from English into German. Manually check all warnings and the captions for 40 diagrams against the glossary, keeping headings, lists and diagrams in their original positions. Hand over an editable DOCX and a separate list of ambiguous terms with explanations. The fixed budget for all work is 90 EUR. The source file and glossary will be available on December 2 at 17:00. The finished package is needed on December 3 at 09:00 for internal review. Printing is scheduled for December 8."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Перевести 60 страниц с английского на немецкий. Вручную сверить предупреждения и подписи к 40 схемам по глоссарию.",
+        "Сохранить структуру, передать редактируемый DOCX и список неоднозначных терминов.",
+        "Фиксированный бюджет 90 EUR. Начать можно с 2 декабря в 17:00, весь комплект нужен 3 декабря к 09:00. Печать 8 декабря — отдельное событие."
+      ],
+      "required": [
+        "Черновик сохраняет объём, язык, ручные проверки, оба результата, 90 EUR и время доступа к исходникам. Внутренняя сдача 3 декабря к 09:00 отделена от печати 8 декабря.",
+        "Основной риск объединяет объём, деньги и короткое окно и подтверждён брифом. Один из приоритетных вопросов помогает заказчику выбрать объём именно для внутренней сдачи.",
+        "Результат пригоден для обсуждения требований: он не выдаёт прогноз за обещание и не навязывает новые условия."
+      ],
+      "prohibited": [
+        "Назначить 8 декабря сроком сдачи. Добавить цену за страницу, печать, другой формат, машинную проверку или новый срок.",
+        "Объявить выполнение невозможным, утверждать отсутствие глоссария, назначить печать дедлайном или дробить те же связанные ограничения на независимые проблемы.",
+        "Предлагать новую цену, размер пакета или календарную дату. Спрашивать, когда или на каком языке сдавать уже определённый комплект."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "inputs": {
+      "ru": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "severity": "high",
+            "description": "60 страниц, ручная сверка предупреждений и подписей к 40 схемам, сохранение структуры и подготовка двух материалов за 90 EUR могут не поместиться между получением исходника 2 декабря в 17:00 и внутренней сдачей 3 декабря к 09:00.",
+            "evidence": "Переведите с английского на немецкий 60 страниц инструкции. / Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием / На всю работу фиксированный бюджет 90 EUR. / Исходник и глоссарий станут доступны 2 декабря в 17:00. / Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Переведите с английского на немецкий 60 страниц инструкции. Нужно вручную сверить все предупреждения и подписи к 40 схемам с глоссарием, сохранить заголовки, списки и схемы на своих местах. Передайте редактируемый DOCX и отдельный список неоднозначных терминов с пояснениями. На всю работу фиксированный бюджет 90 EUR. Исходник и глоссарий станут доступны 2 декабря в 17:00. Готовый комплект нужен 3 декабря к 09:00 для внутренней проверки. Печать назначена на 8 декабря.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      },
+      "en": {
+        "issues": [
+          {
+            "category": "scope_risk",
+            "severity": "high",
+            "description": "Translating 60 pages, manually checking the warnings and captions for 40 diagrams, preserving the layout and producing both deliverables for 90 EUR may not fit between source delivery on December 2 at 17:00 and internal review on December 3 at 09:00.",
+            "evidence": "Translate 60 pages of the manual from English into German. / Manually check all warnings and the captions for 40 diagrams against the glossary / The fixed budget for all work is 90 EUR. / The source file and glossary will be available on December 2 at 17:00. / The finished package is needed on December 3 at 09:00 for internal review."
+          }
+        ],
+        "taxonomy": [
+          "missing_information",
+          "ambiguity",
+          "scope_risk",
+          "timeline_risk",
+          "budget_risk",
+          "contradiction"
+        ],
+        "context": "Translate 60 pages of the manual from English into German. Manually check all warnings and the captions for 40 diagrams against the glossary, keeping headings, lists and diagrams in their original positions. Hand over an editable DOCX and a separate list of ambiguous terms with explanations. The fixed budget for all work is 90 EUR. The source file and glossary will be available on December 2 at 17:00. The finished package is needed on December 3 at 09:00 for internal review. Printing is scheduled for December 8.",
+        "target_audience": "the client who wrote the brief",
+        "max_questions": 5
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Перевести 60 страниц с английского на немецкий. Вручную сверить предупреждения и подписи к 40 схемам по глоссарию.",
+        "Сохранить структуру, передать редактируемый DOCX и список неоднозначных терминов.",
+        "Фиксированный бюджет 90 EUR. Начать можно с 2 декабря в 17:00, весь комплект нужен 3 декабря к 09:00. Печать 8 декабря — отдельное событие."
+      ],
+      "required": [
+        "Спросить, какие части комплекта обязательны к 3 декабря к 09:00 для внутренней проверки, если весь объём не помещается в названные условия.",
+        "Сохранить привязку времени, объёма и бюджета к исходным условиям, если они повторены в вопросе или объяснении."
+      ],
+      "prohibited": [
+        "Предлагать новую цену, размер пакета или календарную дату. Спрашивать, когда или на каком языке сдавать уже определённый комплект."
+      ],
+      "allowed": [],
+      "required_source_issue_indices": [
+        0
+      ]
+    },
+    "fixed_upstream": "Список issues составлен для изолированного теста и соответствует выходной схеме A04. В полном сценарии используется результат A04 текущего запуска."
+  },
+  {
+    "case_id": "ab-holdout-check-01-accessible-pdf-a11",
+    "atom_id": "A11",
+    "prompt_ref": "acceptance_builder.compare.v1",
+    "calibration": false,
+    "difficulty": "средний, подтверждение результата неполное",
+    "sources": [
+      {
+        "ref": "https://www.my.freelancer.com/projects/adobe-acrobat/pdf-ada-compliance-conversion",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "По объявлению №40256672 пересказаны доступность PDF, сохранение макета, проверки и отчёт. Названия файлов, тестовый фрагмент и сведения о сдаче составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.check_v1",
+    "scenario_case_id": "ab-holdout-check-01-accessible-pdf",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Сделайте доступную версию инструкции `guide.pdf` с тегами, закладками и логичным порядком чтения. Внешний вид должен совпасть с исходником. Обязательно прогоните PAC и вручную подтвердите экранным диктором порядок чтения таблицы на странице 4. Передайте исправленный PDF и короткий отчёт об обеих проверках. Исходник мы предоставим.",
+        "deliverable_text": "Передал обновлённый `guide.pdf` с тегами, закладками и прежним внешним видом. В отчёте PAC ошибок нет. Экранным диктором не проверял: проверка порядка чтения таблицы на странице 4 ещё не выполнена. В переданном отчёте об этом написано."
+      },
+      "en": {
+        "brief_text": "Make `guide.pdf` accessible with tags, bookmarks and a logical reading order. Keep the original appearance. You must run PAC and manually confirm the table reading order on page 4 with a screen reader. Deliver the corrected PDF and a brief report covering both checks. We will supply the original.",
+        "deliverable_text": "I handed over the updated `guide.pdf` with tags, bookmarks and its original appearance. PAC reports no errors. I did not use a screen reader, so the table reading order on page 4 has yet to be checked. That is noted in the report I handed over."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "PDF и отчёт есть. По сдаче теги, закладки и внешнее соответствие указаны.",
+        "PAC не выявил ошибок. Обязательная ручная проверка страницы 4 не сделана. Фактическое поведение таблицы неизвестно."
+      ],
+      "required": [
+        "Указать, что отсутствие самостоятельной ручной проверки мешает принять результат. PAC не заменяет экранный диктор.",
+        "Засчитать переданные файлы и прямо отличить отсутствие проверки от обнаруженной ошибки в таблице.",
+        "В извлечении есть PDF и отчёт, PAC и отдельная ручная проверка страницы 4, сохранение внешнего вида и исходник от заказчика. Язык анализа соответствует брифу."
+      ],
+      "prohibited": [
+        "Приписать непроверенной таблице исправный или неверный порядок чтения. Назвать PDF или отчёт отсутствующими.",
+        "Приписать документу подтверждённую фактическую или юридическую доступность."
+      ],
+      "allowed": [
+        "Можно оценить комплект как полученный или как неполный из-за содержания отчёта. Для основной проверки обязательная ручная проверка отсутствует в обоих случаях."
+      ],
+      "allowed_verdicts": [
+        "does_not_meet"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "partial",
+          "mismatch"
+        ],
+        "requirement_fit": [
+          "mismatch"
+        ],
+        "completeness": [
+          "match",
+          "partial"
+        ],
+        "clarity": [
+          "match"
+        ]
+      }
+    },
+    "inputs": {
+      "ru": {
+        "subject_text": "Передал обновлённый `guide.pdf` с тегами, закладками и прежним внешним видом. В отчёте PAC ошибок нет. Экранным диктором не проверял: проверка порядка чтения таблицы на странице 4 ещё не выполнена. В переданном отчёте об этом написано.",
+        "reference_text": "Сделайте доступную версию инструкции `guide.pdf` с тегами, закладками и логичным порядком чтения. Внешний вид должен совпасть с исходником. Обязательно прогоните PAC и вручную подтвердите экранным диктором порядок чтения таблицы на странице 4. Передайте исправленный PDF и короткий отчёт об обеих проверках. Исходник мы предоставим.",
+        "categories": [
+          "meets_expectations",
+          "partially_meets",
+          "does_not_meet"
+        ],
+        "criteria": [
+          {
+            "id": "scope_coverage",
+            "description": "The deliverable covers everything in scope that the brief asks for.",
+            "weight": 3
+          },
+          {
+            "id": "requirement_fit",
+            "description": "What was delivered does what the brief says it must do.",
+            "weight": 3
+          },
+          {
+            "id": "completeness",
+            "description": "Every deliverable the brief lists is present.",
+            "weight": 2
+          },
+          {
+            "id": "clarity",
+            "description": "The deliverable text states plainly what was done and what was not.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "subject_text": "I handed over the updated `guide.pdf` with tags, bookmarks and its original appearance. PAC reports no errors. I did not use a screen reader, so the table reading order on page 4 has yet to be checked. That is noted in the report I handed over.",
+        "reference_text": "Make `guide.pdf` accessible with tags, bookmarks and a logical reading order. Keep the original appearance. You must run PAC and manually confirm the table reading order on page 4 with a screen reader. Deliver the corrected PDF and a brief report covering both checks. We will supply the original.",
+        "categories": [
+          "meets_expectations",
+          "partially_meets",
+          "does_not_meet"
+        ],
+        "criteria": [
+          {
+            "id": "scope_coverage",
+            "description": "The deliverable covers everything in scope that the brief asks for.",
+            "weight": 3
+          },
+          {
+            "id": "requirement_fit",
+            "description": "What was delivered does what the brief says it must do.",
+            "weight": 3
+          },
+          {
+            "id": "completeness",
+            "description": "Every deliverable the brief lists is present.",
+            "weight": 2
+          },
+          {
+            "id": "clarity",
+            "description": "The deliverable text states plainly what was done and what was not.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "PDF и отчёт есть. По сдаче теги, закладки и внешнее соответствие указаны.",
+        "PAC не выявил ошибок. Обязательная ручная проверка страницы 4 не сделана. Фактическое поведение таблицы неизвестно."
+      ],
+      "required": [
+        "Указать, что отсутствие самостоятельной ручной проверки мешает принять результат. PAC не заменяет экранный диктор.",
+        "Засчитать переданные файлы и прямо отличить отсутствие проверки от обнаруженной ошибки в таблице."
+      ],
+      "prohibited": [
+        "Приписать непроверенной таблице исправный или неверный порядок чтения. Назвать PDF или отчёт отсутствующими.",
+        "Приписать документу подтверждённую фактическую или юридическую доступность."
+      ],
+      "allowed": [
+        "Можно оценить комплект как полученный или как неполный из-за содержания отчёта. Для основной проверки обязательная ручная проверка отсутствует в обоих случаях."
+      ],
+      "allowed_verdicts": [
+        "does_not_meet"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "partial",
+          "mismatch"
+        ],
+        "requirement_fit": [
+          "mismatch"
+        ],
+        "completeness": [
+          "match",
+          "partial"
+        ],
+        "clarity": [
+          "match"
+        ]
+      },
+      "criterion_evidence": {
+        "scope_coverage": "Файл и автоматическая проверка описаны. Одна обязательная ручная задача ещё открыта.",
+        "requirement_fit": "PAC чист, но обязательная проверка диктором страницы 4 не выполнена.",
+        "completeness": "Присутствуют PDF и отчёт, в отчёте указано ограничение.",
+        "clarity": "Текст прямо говорит, что сделано и чего ещё нет."
+      }
+    }
+  },
+  {
+    "case_id": "ab-holdout-check-02-podcast-master-a11",
+    "atom_id": "A11",
+    "prompt_ref": "acceptance_builder.compare.v1",
+    "calibration": false,
+    "difficulty": "короткий, все обязательные требования выполнены",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/audio-editing/podcast-audio-editing-40200822",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Форматы, звуковые параметры и отчёт адаптированы из объявления №40200822. Допуски и описание сдачи составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.check_v1",
+    "scenario_case_id": "ab-holdout-check-02-podcast-master",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Смонтируйте один выпуск подкаста. Исходные дорожки, заставку и финальный звук передаём. Уберите длинные паузы, явные запинки и слова-паразиты без разрывов в речи. Вставьте заставку и финальный звук. Сдать стерео WAV 44,1 кГц, 16 бит, стерео MP3 128 кбит/с и короткую записку о правках. Целевая громкость −16 LUFS с допуском ±1 LUFS.",
+        "deliverable_text": "Переданы стерео WAV 44,1 кГц, 16 бит, стерео MP3 128 кбит/с и записка. Длинные паузы, запинки и слова-паразиты убраны, переходы прослушаны, разрывов в речи нет. Заставка и финальный звук на месте. Для обоих экспортированных файлов измерено −17 LUFS."
+      },
+      "en": {
+        "brief_text": "Edit one podcast episode. We provide the source tracks, intro and outro. Remove long pauses, obvious stumbles and filler words without audible breaks in speech. Add the intro and outro. Deliver a stereo WAV at 44.1 kHz, 16-bit, a stereo MP3 at 128 kbps and a short edit note. The loudness target is −16 LUFS with a tolerance of ±1 LUFS.",
+        "deliverable_text": "I handed over a stereo WAV at 44.1 kHz, 16-bit, a stereo MP3 at 128 kbps, and an edit note. Long pauses, stumbles and filler words were removed. I checked the transitions by listening and found no audible breaks in speech. The intro and outro are in place. Both exports measured −17 LUFS."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Один выпуск. Переданы WAV, MP3 и записка. Частота 44,1 кГц, 16 бит у WAV, 128 кбит/с у MP3.",
+        "Звук отредактирован по описанию. −17 LUFS входит в допуск ±1 относительно −16 LUFS."
+      ],
+      "required": [
+        "Признать, что −17 LUFS находится ровно на допустимой границе. Подтвердить корректные форматы, правки и оба звуковых блока.",
+        "В извлечении сохранены оба звуковых формата, записка, громкость с допуском, правки и предпосылка о материалах. В сравнении единицы и параметры не перепутаны."
+      ],
+      "prohibited": [
+        "Требовать точного −16 LUFS при заданном допуске. Придумать платформу размещения, клиппинг, шум или отсутствие файлов."
+      ],
+      "allowed": [
+        "Допустимы обычные локализованные обозначения разрядности и десятичного разделителя при сохранении значения."
+      ],
+      "allowed_verdicts": [
+        "meets_expectations"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "match"
+        ],
+        "requirement_fit": [
+          "match"
+        ],
+        "completeness": [
+          "match"
+        ],
+        "clarity": [
+          "match"
+        ]
+      }
+    },
+    "inputs": {
+      "ru": {
+        "subject_text": "Переданы стерео WAV 44,1 кГц, 16 бит, стерео MP3 128 кбит/с и записка. Длинные паузы, запинки и слова-паразиты убраны, переходы прослушаны, разрывов в речи нет. Заставка и финальный звук на месте. Для обоих экспортированных файлов измерено −17 LUFS.",
+        "reference_text": "Смонтируйте один выпуск подкаста. Исходные дорожки, заставку и финальный звук передаём. Уберите длинные паузы, явные запинки и слова-паразиты без разрывов в речи. Вставьте заставку и финальный звук. Сдать стерео WAV 44,1 кГц, 16 бит, стерео MP3 128 кбит/с и короткую записку о правках. Целевая громкость −16 LUFS с допуском ±1 LUFS.",
+        "categories": [
+          "meets_expectations",
+          "partially_meets",
+          "does_not_meet"
+        ],
+        "criteria": [
+          {
+            "id": "scope_coverage",
+            "description": "The deliverable covers everything in scope that the brief asks for.",
+            "weight": 3
+          },
+          {
+            "id": "requirement_fit",
+            "description": "What was delivered does what the brief says it must do.",
+            "weight": 3
+          },
+          {
+            "id": "completeness",
+            "description": "Every deliverable the brief lists is present.",
+            "weight": 2
+          },
+          {
+            "id": "clarity",
+            "description": "The deliverable text states plainly what was done and what was not.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "subject_text": "I handed over a stereo WAV at 44.1 kHz, 16-bit, a stereo MP3 at 128 kbps, and an edit note. Long pauses, stumbles and filler words were removed. I checked the transitions by listening and found no audible breaks in speech. The intro and outro are in place. Both exports measured −17 LUFS.",
+        "reference_text": "Edit one podcast episode. We provide the source tracks, intro and outro. Remove long pauses, obvious stumbles and filler words without audible breaks in speech. Add the intro and outro. Deliver a stereo WAV at 44.1 kHz, 16-bit, a stereo MP3 at 128 kbps and a short edit note. The loudness target is −16 LUFS with a tolerance of ±1 LUFS.",
+        "categories": [
+          "meets_expectations",
+          "partially_meets",
+          "does_not_meet"
+        ],
+        "criteria": [
+          {
+            "id": "scope_coverage",
+            "description": "The deliverable covers everything in scope that the brief asks for.",
+            "weight": 3
+          },
+          {
+            "id": "requirement_fit",
+            "description": "What was delivered does what the brief says it must do.",
+            "weight": 3
+          },
+          {
+            "id": "completeness",
+            "description": "Every deliverable the brief lists is present.",
+            "weight": 2
+          },
+          {
+            "id": "clarity",
+            "description": "The deliverable text states plainly what was done and what was not.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Один выпуск. Переданы WAV, MP3 и записка. Частота 44,1 кГц, 16 бит у WAV, 128 кбит/с у MP3.",
+        "Звук отредактирован по описанию. −17 LUFS входит в допуск ±1 относительно −16 LUFS."
+      ],
+      "required": [
+        "Признать, что −17 LUFS находится ровно на допустимой границе. Подтвердить корректные форматы, правки и оба звуковых блока."
+      ],
+      "prohibited": [
+        "Требовать точного −16 LUFS при заданном допуске. Придумать платформу размещения, клиппинг, шум или отсутствие файлов."
+      ],
+      "allowed": [
+        "Допустимы обычные локализованные обозначения разрядности и десятичного разделителя при сохранении значения."
+      ],
+      "allowed_verdicts": [
+        "meets_expectations"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "match"
+        ],
+        "requirement_fit": [
+          "match"
+        ],
+        "completeness": [
+          "match"
+        ],
+        "clarity": [
+          "match"
+        ]
+      },
+      "criterion_evidence": {
+        "scope_coverage": "Выполнен монтаж одного выпуска со всеми указанными правками.",
+        "requirement_fit": "Форматы соответствуют, −17 вписывается в допуск. Заставка и финал добавлены.",
+        "completeness": "Оба стереофайла и записка переданы.",
+        "clarity": "Названы параметры, измерение и выполненные работы."
+      }
+    }
+  },
+  {
+    "case_id": "ab-holdout-check-03-interior-renders-a11",
+    "atom_id": "A11",
+    "prompt_ref": "acceptance_builder.compare.v1",
+    "calibration": false,
+    "difficulty": "средний, неполный комплект после частичной сдачи",
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/google-sketchup/refine-render-sketchup-interior-project",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Формат .skp, ресурсы V-Ray и заданные ракурсы взяты из объявления №39807879. Количество видов, размеры и сведения о сдаче составлены."
+      }
+    ],
+    "scenario_id": "acceptance_builder.check_v1",
+    "scenario_case_id": "ab-holdout-check-03-interior-renders",
+    "scenario_input": {
+      "ru": {
+        "brief_text": "Доработайте модель интерьера в SketchUp. Геометрию помещения менять нельзя. Нужны редактируемый файл .skp, комплект ресурсов V-Ray с материалами и светом и 3 изображения, по одному на каждый согласованный ракурс: вход, стол и окно. Изображения допускаются в JPEG или PNG, с длинной стороной не менее 2400 пикселей. Анимация не входит в заказ.",
+        "deliverable_text": "Переданы редактируемый .skp и архив V-Ray с материалами и светом. Геометрия комнаты не менялась. Переданы 2 PNG с длинной стороной 2400 пикселей: вход и стол. Изображение окна пока не готово. Анимацию не делали."
+      },
+      "en": {
+        "brief_text": "Refine the SketchUp interior model without changing the room geometry. Deliver an editable .skp, a V-Ray asset package with materials and lighting, and 3 images, one for each approved view: entrance, table and window. JPEG or PNG is acceptable, with a long edge of at least 2400 pixels. Animation is outside the order.",
+        "deliverable_text": "I handed over an editable .skp and a V-Ray archive with materials and lighting. The room geometry was unchanged. I delivered 2 PNGs with a 2400-pixel long edge: the entrance and the table. The window image is not ready yet. I did not make an animation."
+      }
+    },
+    "scenario_rubric": {
+      "facts": [
+        "Нужны .skp, ресурсы V-Ray и 3 ракурса с длинной стороной ≥2400 пикселей. JPEG и PNG равно допустимы.",
+        "Переданы .skp, ресурсы и 2 PNG допустимого размера. Окно отсутствует. Геометрия сохранена. Анимация вне объёма."
+      ],
+      "required": [
+        "Указать недостающий вид окна. Оба PNG по 2400 пикселей считать подходящими по формату и размеру.",
+        "Не снижать статус за анимацию и не считать PNG неверным из-за отсутствия JPEG.",
+        "Извлечение сохраняет все три требуемых ракурса, исходник, ресурсы, неизменность геометрии и допустимый формат/размер. Извлечённые условия основаны на брифе, ответ о сдаче не меняет список требований."
+      ],
+      "prohibited": [
+        "Считать все 3 вида готовыми. Объявить, что геометрия изменена, нет исходника, или материалы V-Ray отсутствуют.",
+        "Утверждать, что модель сама проверила представленные файлы."
+      ],
+      "allowed": [
+        "Неполный комплект допустимо классифицировать `partial` по широким критериям или `mismatch` по обязательному отсутствующему виду. Вердикт следует из статусов."
+      ],
+      "allowed_verdicts": [
+        "partially_meets",
+        "does_not_meet"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "partial",
+          "mismatch"
+        ],
+        "requirement_fit": [
+          "match",
+          "partial",
+          "mismatch"
+        ],
+        "completeness": [
+          "partial",
+          "mismatch"
+        ],
+        "clarity": [
+          "match"
+        ]
+      }
+    },
+    "inputs": {
+      "ru": {
+        "subject_text": "Переданы редактируемый .skp и архив V-Ray с материалами и светом. Геометрия комнаты не менялась. Переданы 2 PNG с длинной стороной 2400 пикселей: вход и стол. Изображение окна пока не готово. Анимацию не делали.",
+        "reference_text": "Доработайте модель интерьера в SketchUp. Геометрию помещения менять нельзя. Нужны редактируемый файл .skp, комплект ресурсов V-Ray с материалами и светом и 3 изображения, по одному на каждый согласованный ракурс: вход, стол и окно. Изображения допускаются в JPEG или PNG, с длинной стороной не менее 2400 пикселей. Анимация не входит в заказ.",
+        "categories": [
+          "meets_expectations",
+          "partially_meets",
+          "does_not_meet"
+        ],
+        "criteria": [
+          {
+            "id": "scope_coverage",
+            "description": "The deliverable covers everything in scope that the brief asks for.",
+            "weight": 3
+          },
+          {
+            "id": "requirement_fit",
+            "description": "What was delivered does what the brief says it must do.",
+            "weight": 3
+          },
+          {
+            "id": "completeness",
+            "description": "Every deliverable the brief lists is present.",
+            "weight": 2
+          },
+          {
+            "id": "clarity",
+            "description": "The deliverable text states plainly what was done and what was not.",
+            "weight": 1
+          }
+        ]
+      },
+      "en": {
+        "subject_text": "I handed over an editable .skp and a V-Ray archive with materials and lighting. The room geometry was unchanged. I delivered 2 PNGs with a 2400-pixel long edge: the entrance and the table. The window image is not ready yet. I did not make an animation.",
+        "reference_text": "Refine the SketchUp interior model without changing the room geometry. Deliver an editable .skp, a V-Ray asset package with materials and lighting, and 3 images, one for each approved view: entrance, table and window. JPEG or PNG is acceptable, with a long edge of at least 2400 pixels. Animation is outside the order.",
+        "categories": [
+          "meets_expectations",
+          "partially_meets",
+          "does_not_meet"
+        ],
+        "criteria": [
+          {
+            "id": "scope_coverage",
+            "description": "The deliverable covers everything in scope that the brief asks for.",
+            "weight": 3
+          },
+          {
+            "id": "requirement_fit",
+            "description": "What was delivered does what the brief says it must do.",
+            "weight": 3
+          },
+          {
+            "id": "completeness",
+            "description": "Every deliverable the brief lists is present.",
+            "weight": 2
+          },
+          {
+            "id": "clarity",
+            "description": "The deliverable text states plainly what was done and what was not.",
+            "weight": 1
+          }
+        ]
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Нужны .skp, ресурсы V-Ray и 3 ракурса с длинной стороной ≥2400 пикселей. JPEG и PNG равно допустимы.",
+        "Переданы .skp, ресурсы и 2 PNG допустимого размера. Окно отсутствует. Геометрия сохранена. Анимация вне объёма."
+      ],
+      "required": [
+        "Указать недостающий вид окна. Оба PNG по 2400 пикселей считать подходящими по формату и размеру.",
+        "Не снижать статус за анимацию и не считать PNG неверным из-за отсутствия JPEG."
+      ],
+      "prohibited": [
+        "Считать все 3 вида готовыми. Объявить, что геометрия изменена, нет исходника, или материалы V-Ray отсутствуют.",
+        "Утверждать, что модель сама проверила представленные файлы."
+      ],
+      "allowed": [
+        "Неполный комплект допустимо классифицировать `partial` по широким критериям или `mismatch` по обязательному отсутствующему виду. Вердикт следует из статусов."
+      ],
+      "allowed_verdicts": [
+        "partially_meets",
+        "does_not_meet"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "partial",
+          "mismatch"
+        ],
+        "requirement_fit": [
+          "match",
+          "partial",
+          "mismatch"
+        ],
+        "completeness": [
+          "partial",
+          "mismatch"
+        ],
+        "clarity": [
+          "match"
+        ]
+      },
+      "criterion_evidence": {
+        "scope_coverage": "Переданы исходник и материалы, но только два из трёх ракурсов.",
+        "requirement_fit": "Формат и размер двух изображений подходят, геометрия сохранена. Ракурс окна не подтверждён.",
+        "completeness": "Не хватает изображения окна, анимация не входит в комплект.",
+        "clarity": "Сообщение перечисляет, какие артефакты переданы и что не готово."
+      }
+    }
+  }
+]
