@@ -150,7 +150,18 @@ def review_run(
     reviewer = row["reviewer"]
     questions = run["input"]["criteria"]
     print(f"Модель: {run['model']}; reasoning: {run['reasoning_effort']}; проверяющий: {reviewer}")
-    print(f"\nИсходный запрос:\n{review_input_text(run['input'])}")
+    if run["input"].get("mode", "update") == "prepaid_request":
+        billing_context = run["input"].get("billing_context")
+        if isinstance(billing_context, dict):
+            safe_context = {"billing_context_keys": sorted(billing_context.keys())}
+        else:
+            safe_context = {"billing_context_present": billing_context is not None}
+        print(
+            "\nИсходный запрос: [REDACTED: billing_context contains potentially sensitive data]"
+        )
+        print(json.dumps(safe_context, ensure_ascii=False, indent=2))
+    else:
+        print(f"\nИсходный запрос:\n{review_input_text(run['input'])}")
     print("\nОтвет модели (text и call_to_action вместе):")
     print(json.dumps(run["output"], ensure_ascii=False, indent=2))
     if observation and matches(observation, run):
