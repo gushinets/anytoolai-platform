@@ -566,7 +566,10 @@ def test_evaluator_uses_the_shared_language_tag_contract():
 
 def test_verdict_suite_covers_the_ticket_in_three_languages():
     suite = ROOT / "tests/fixtures/acceptance_verdict_eval/cases.json"
-    cases = json.loads(suite.read_text(encoding="utf-8"))["cases"]
+    cases = [
+        case for case in json.loads(suite.read_text(encoding="utf-8"))["cases"]
+        if case["family"] == "verdict"
+    ]
     families = {"W1", "HELLO", "JUNK", "NO-REVIEWS", "NO-FIGMA", "IRRELEVANT", "FULL"}
     expected = {f"ANY893-{family}{suffix}" for family in families for suffix in ("", "-EN", "-ES")}
     assert len(cases) == len(expected)
@@ -576,6 +579,25 @@ def test_verdict_suite_covers_the_ticket_in_three_languages():
         assert case["family"] == "verdict"
         assert case["criteria"] and all(
             case["input"][key] for key in ("brief_text", "deliverable_text")
+        )
+
+
+def test_deviation_suite_covers_the_ticket_in_three_languages():
+    suite = evaluation.SUITE_PATHS[evaluation.VERDICT_SUITE]
+    cases = [
+        case for case in json.loads(suite.read_text(encoding="utf-8"))["cases"]
+        if case["family"] == "deviations"
+    ]
+    suffixes = {"": "ru", "-EN": "en", "-ES": "es"}
+    labels = ("W2", "W3", "W4-DELIVERY", "W4-LAUNCH", "FULL")
+    expected = {f"ANY895-{label}{suffix}": lang for label in labels for suffix, lang in suffixes.items()}
+    assert len(cases) == len(expected) == 15
+    assert {case["id"]: case["expected_language"] for case in cases} == expected
+    for case in cases:
+        assert case["source_language"] == case["expected_language"]
+        assert case["scenario_id"] == evaluation.CHECK
+        assert case["criteria"] and all(
+            case["input"][key].strip() for key in ("brief_text", "deliverable_text")
         )
 
 
