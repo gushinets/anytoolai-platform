@@ -7,12 +7,12 @@
 - Created: 2026-11-27
 - Last updated: 2026-11-27
 - Review date: 2026-12-04
-- Next action: Owner review of the verified fix; ticket remains open at the owner's request.
-- Blocker: None for live acceptance; canonical full-check still has three pre-existing environment-dependent runner failures.
+- Next action: Owner review of the round 2 local fix; live rerun deferred at the owner's request.
+- Blocker: No fresh live evidence for the round 2 prompt; canonical full-check previously had three environment-dependent runner failures.
 
 ## Goal
 
-Keep an agreed deposit-before-start term separate from actual work commencement and payment delinquency. Preserve explicitly stated statuses independently in all languages without changing payment-request selection or financial terms.
+Keep a stated deposit-before-start term, its agreement status, actual work commencement and payment delinquency separate. Preserve explicitly stated statuses independently in all languages without changing payment-request selection or financial terms.
 
 ## Scope and contracts
 
@@ -62,3 +62,12 @@ Only the product-owned `client_update_writer.prepaid_request_compose_persuasive_
 The product test pins the agreed-term and explicit-status instructions but not the ambiguous-start prohibition. Confirm the omission by temporarily removing only that sentence and running the test; add the normalized sentence assertion and repeat the mutation check, restoring the prompt bytes in both cases. Run the product module and documentation checks. Production prompt and live evidence remain unchanged.
 
 Verified: removing exactly the ambiguous-start sentence left the original test green (1 passed). With the added assertion, the same mutation failed at that assertion (1 failed). Restoring the original prompt produced 77/77 passing product tests. The deployed-tested prompt SHA-256 remains `83d8467aff887e4c66970df02acbf03c3451ccff1eb5464d5706fc4e2d80f110`, so the retained 18/18 live acceptance evidence still applies to production behavior. No additional provider calls required.
+
+
+## Review round 2 — payment term versus agreement
+
+Both independent P2 findings identify the same error: the unconditional agreed-term instruction conflicts with Step 2, which permits a consistent payment request even when agreement is unspecified. Preserve each term's agreement status independently of timing, actual start and delinquency. A silent agreement status is neither assent nor a dispute; explicit open conditions continue to select rule B. The ProposalAI and sibling reply prompts already distinguish agreement from a proposal or request; the other products do not share this payment-request path.
+
+Plan: update the existing normalized-prompt contract test first, verify failure against the current prompt, then replace only the unconditional agreement instruction. Keep the other two assertions and pin Step 2's existing silent-agreement behavior. Run product and config/documentation checks. Retain the earlier live evidence; the changed prompt requires a fresh 18-case status matrix plus 12 agreement contrasts (standard, explicitly agreed, only another term agreed, explicitly open; RU/EN/ES), pending authorization for the provider calls.
+
+Verified locally: the updated contract test failed against the former prompt, then the product module passed 77/77 after the fix. Configuration, architecture and documentation validation passed. Freelancer Suite initially had the known sandbox dependency-resolution failure in its packaging test (1725 passed); the network-enabled local retry passed all 1726 tests. The owner requested local tests only, so no new provider calls were made and the proposed 30-case matrix is deferred. New working-tree prompt SHA-256: `cf2b80ff1f0064213e3ca43b47a02d138b7cc2ddf870a67061bee9c4602090d9`. The recorded 18/18 live matrix applies only to the prior prompt hash; semantic acceptance of the new version is unverified.
