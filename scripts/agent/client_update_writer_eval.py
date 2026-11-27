@@ -107,9 +107,12 @@ def validate_suite(suite: dict) -> str:
 
 
 def review_input_text(case: dict) -> str:
-    if case.get("mode", "update") == "prepaid_request":
-        return json.dumps(case["billing_context"], ensure_ascii=False, indent=2)
-    return case["progress_notes"]
+    """Render the complete case for a private review artifact, not console logging."""
+    return json.dumps(
+        {key: value for key, value in case.items() if key != "criteria"},
+        ensure_ascii=False,
+        indent=2,
+    )
 
 
 def source_revision(record: dict) -> str | None:

@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 import sys
 import zipfile
 from copy import deepcopy
@@ -518,6 +519,17 @@ def saved_verdict(directory):
     return json.loads((directory / "verdicts.jsonl").read_text(encoding="utf-8").splitlines()[-1])
 
 
+def read_private_review_file(capsys):
+    captured = capsys.readouterr()
+    prefix = "Откройте локальный файл проверки: "
+    path = Path(next(line.removeprefix(prefix) for line in captured.out.splitlines()
+                     if line.startswith(prefix)))
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o077 == 0
+        assert path.parent.stat().st_mode & 0o077 == 0
+    return path, path.read_text(encoding="utf-8"), captured.out + captured.err
+
+
 def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp_path, capsys):
     directory, run = review_directory(tmp_path)
     observation = {
@@ -530,9 +542,16 @@ def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp
     (tmp_path / "agent-observations.json").write_text(
         json.dumps({"observations": [observation]}), encoding="utf-8"
     )
-    with patch(
-        "builtins.input", side_effect=["", "invalid", "n", "Readiness is misstated", "Still", "y"]
-    ):
+    answers = iter(["", "invalid", "n", "Readiness is misstated", "Still", "y"])
+    private_view = []
+
+    def answer(prompt):
+        assert "Preserves readiness." not in prompt
+        if not private_view:
+            private_view.append(read_private_review_file(capsys))
+        return next(answers)
+
+    with patch("builtins.input", side_effect=answer):
         review_module.review(directory, " Putilin ", "sol-medium")
     verdict = saved_verdict(directory)
     assert verdict["reviewer"] == "Putilin"
@@ -541,10 +560,13 @@ def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp
     assert verdict["answers"][0]["reason"] == "Readiness is misstated"
     assert verdict["critical_error"] is True
     assert report_module.human_status(run, verdict) == ("FAIL", True)
-    display = capsys.readouterr().out
-    assert "Internal complete; tests fail." in display
-    assert "Still in progress." in display
-    assert "agent suggests yes" in display
+    [(path, view, console)] = private_view
+    console += capsys.readouterr().out
+    for value in ("Internal complete; tests fail.", "Still in progress.",
+                  "Preserves readiness.", "agent suggests yes", "Agent explanation"):
+        assert value in view
+        assert value not in console
+    assert not path.parent.exists()
     # A confirmed verdict is not requested again, even for another reviewer.
     with patch("builtins.input", side_effect=AssertionError("already reviewed")):
         review_module.review(directory, "Another reviewer")
@@ -596,10 +618,20 @@ def test_review_discards_stale_or_differently_attributed_partial_decisions(tmp_p
     (tmp_path / "agent-observations.json").write_text(
         json.dumps({"observations": [observation]}), encoding="utf-8"
     )
-    with patch("builtins.input", side_effect=["n", "New assessment", "", "n"]):
+    answers = iter(["n", "New assessment", "", "n"])
+    private_view = []
+
+    def answer(_prompt):
+        if not private_view:
+            private_view.append(read_private_review_file(capsys))
+        return next(answers)
+
+    with patch("builtins.input", side_effect=answer):
         review_module.review(directory, "Putilin")
     assert saved_verdict(directory)["answers"][0]["reason"] == "New assessment"
-    assert "STALE SUGGESTION" not in capsys.readouterr().out
+    [(path, view, console)] = private_view
+    assert "STALE SUGGESTION" not in view + console + capsys.readouterr().out
+    assert not path.parent.exists()
 
 
 def test_unknown_or_skipped_review_is_pending_and_eof_preserves_progress(tmp_path):
@@ -740,23 +772,54 @@ def test_report_preserves_utf8_with_legacy_default_encoding(tmp_path):
     assert text in (tmp_path / "report.html").read_text(encoding="utf-8")
 
 
-def test_prepaid_review_and_report_show_all_billing_fields(capsys):
+@pytest.mark.parametrize("case_index", [0, 6])  # Payment request and settled acknowledgment.
+@pytest.mark.parametrize("interruption", [review_module.ReviewStopped, EOFError])
+def test_prepaid_review_and_report_show_all_billing_fields(capsys, case_index, interruption):
     suite = json.loads(eval_module.FIXTURE.with_name("prepaid_scope_grammar.json").read_text(
         encoding="utf-8"
     ))
-    case = suite["cases"][0]
+    case = suite["cases"][case_index]
     run = {**record(), "id": case["id"], "input": case}
     rendered = report_module.render_run("luna-medium", run, "PENDING", case, [])
     row = {"reviewer": "Putilin", "answers": [{"decision": None} for _ in case["criteria"]]}
+    private_view = []
+
+    def stop(prompt):
+        assert case["criteria"][0] not in prompt
+        private_view.append(read_private_review_file(capsys))
+        raise interruption
+
+    saved = []
     with (
-        patch.object(review_module, "choose", side_effect=review_module.ReviewStopped),
-        pytest.raises(review_module.ReviewStopped),
+        patch.object(review_module, "choose", side_effect=stop),
+        pytest.raises(interruption),
     ):
-        review_module.review_run(run, row, None, lambda _: None)
-    display = capsys.readouterr().out
+        review_module.review_run(run, row, None, saved.append)
+    [(path, view, console)] = private_view
+    console += capsys.readouterr().out
+    assert not saved
+    assert not path.parent.exists()
+    assert eval_module.review_input_text(case) in view
+    assert report_module.html.escape(eval_module.review_input_text(case)) in rendered
     for value in case["billing_context"].values():
-        assert value in display
+        assert value in view
+        assert value not in console
         assert report_module.html.escape(value) in rendered
+    for value in (*case["criteria"], *run["output"].values()):
+        assert value in view
+        assert value not in console
+
+
+def test_review_stops_before_decisions_if_private_file_cannot_be_written(tmp_path):
+    directory, _ = review_directory(tmp_path)
+    with (
+        patch.object(Path, "write_text", side_effect=OSError("cannot write private review")),
+        patch.object(review_module, "choose") as choose,
+        pytest.raises(OSError, match="cannot write private review"),
+    ):
+        review_module.review(directory, "Putilin")
+    choose.assert_not_called()
+    assert not (directory / "verdicts.jsonl").exists()
 
 
 @pytest.mark.usefixtures("valid_report_runtime")

@@ -141,6 +141,28 @@ until a separate owner-approved, broader model decision. Sol passes all 18 targe
 - After these fixes, 416 focused evaluation, product, prompt and API tests passed; config,
   architecture, documentation and whitespace checks passed. No runtime prompt was changed.
 
+### Second code review round: private interactive review
+
+The interim CodeQL autofix hid Prepaid billing values in the terminal but left Update
+inputs, generated responses, criteria and agent observations in the same output channel.
+It also prevented the reviewer from comparing a Prepaid response against the actual case.
+The review tool now uses a single private presentation contract for both modes:
+
+- Run the existing `client_update_writer_eval.py review` command, then open the printed
+  temporary `case.txt` path in a local editor. The file contains the complete case (including
+  language, tone and billing fields where present), response, numbered criteria and any
+  hash-matching agent observation. The HTML report uses the same complete input rendering.
+- Enter decisions in the terminal by criterion number. The terminal shows progress and
+  outcomes, not the full inputs, responses, criteria or observation content. The temporary
+  directory is private, the file is owner-only on POSIX, and the file is removed on normal
+  completion or interruption. A file creation failure stops the review before any decision.
+  Persistent evidence and verdict files remain local review artifacts, not console logs.
+- 420 focused evaluation, product, prompt and API tests passed, including both modes,
+  private file contents and permissions, redaction, cleanup, and failure before decisions.
+  Config, architecture, documentation and whitespace checks passed. The GitHub CodeQL
+  result for this revision still needs CI verification. No runtime prompt, model or stored
+  live output was changed, and no additional paid calls were made.
+
 ## Handoff
 
 The scoped implementation is ready for owner review. All eighteen targeted payment requests
