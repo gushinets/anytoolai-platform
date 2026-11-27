@@ -7,8 +7,8 @@
 - Created: 2026-11-27
 - Last updated: 2026-11-27
 - Review date: 2026-11-27
-- Next action: Finish final-commit verification and review handoff.
-- Blocker: Docker daemon unavailable; PostgreSQL maintenance URL not configured.
+- Next action: Read the post-commit verification receipts and handoff; authorize a PR separately when ready.
+- Blocker: Local Windows baseline ACL failure is pre-existing; full verification history and definitive post-commit results are linked below. No blocker remains to resolving the dependency graph.
 - Baseline: freshly fetched origin/main `26128baa3ae87ad9213906af18697feafff28470`.
 - Branch: `codex/any-858-minimatch`.
 
@@ -16,7 +16,7 @@
 
 Remove all known applicable minimatch CVE/GHSA version matches from the complete resolved lint graph, with the smallest supported change. Keep the lint stack, scanning policy, allowBuilds and unrelated dependencies. No PR, merge, deployment, Linear mutation or alert closure is authorized. Personal timing remains only in the original checkout's ignored workpaper.md.
 
-Read AGENTS.md, its ten start documents, docs/agent/coding-conventions.md, .github/workflows/{backend,frontend,trivy}.yml and completed/trivy-dependabot-adoption-2026-11-03.md. Root manifests and this plan have no governing nested AGENTS.md; extensions/AGENTS.md is not changed. No API, DB, configuration-runtime, event or product contract changes.
+Read AGENTS.md, its ten start documents, docs/agent/coding-conventions.md, .github/workflows/{backend,frontend,trivy}.yml and completed/trivy-dependabot-adoption-2026-11-03.md. Root manifests and this plan have no governing nested AGENTS.md; extensions/AGENTS.md was also read; no extension source is changed. No API, DB, configuration-runtime, event or product contract changes.
 
 ## Decision
 
@@ -24,7 +24,7 @@ Upgrade root devDependency floors to ESLint `^10.15.0` and typescript-eslint `^8
 
 8.73.0 already changes typescript-estree's dependency to `^11.0.1`; 8.72.1 still declares `^10.2.2`. Therefore the proposed 8.74.0 is unnecessary for this fix. ESLint 10.14.0 still declares `^10.2.6`; 10.15.0 switches to `^11.0.5` and requires config-array `^0.23.6` (also `^11.0.5`). No override is needed: 11.0.9 satisfies every consumer's declared range. Forcing 11 into the old consumers would cross their major-version contracts without benefit over these supported releases.
 
-[ESLint 10.15.0 release](https://github.com/eslint/eslint/releases/tag/v10.15.0), [typescript-eslint 8.73.0 package](https://registry.npmjs.org/typescript-eslint/8.73.0), [estree 8.73.0 package](https://registry.npmjs.org/@typescript-eslint/typescript-estree/8.73.0), [estree 8.72.1 package](https://registry.npmjs.org/@typescript-eslint/typescript-estree/8.72.1), [minimatch 11.0.9 release](https://github.com/isaacs/minimatch/releases/tag/v11.0.9).
+[typescript-eslint 8.73.0 release](https://github.com/typescript-eslint/typescript-eslint/releases/tag/v8.73.0), [ESLint 10.15.0 release](https://github.com/eslint/eslint/releases/tag/v10.15.0), [typescript-eslint 8.73.0 package](https://registry.npmjs.org/typescript-eslint/8.73.0), [estree 8.73.0 package](https://registry.npmjs.org/@typescript-eslint/typescript-estree/8.73.0), [estree 8.72.1 package](https://registry.npmjs.org/@typescript-eslint/typescript-estree/8.72.1), [minimatch 11.0.9 release](https://github.com/isaacs/minimatch/releases/tag/v11.0.9).
 
 ## Decision matrix
 
@@ -35,6 +35,7 @@ E = ESLint direct path; C = ESLint → config-array; S = typescript-eslint → t
 | 10.9.1 | 8.69.0 | C 0.23.5, S 8.69.0 | E/C/S 10.2.6; generator 5.1.9 | Node 24, TS 5.9.3 supported | Baseline frozen install and lint pass; fresh Trivy reproduces Medium CVE | CVE-2026-118764 / GHSA-g3hv-75wg-m249; GHSA-c859-jr93-m5j4 |
 | 10.14.0 | 8.72.1 | Older PRs, S requires ^10.2.2 | E/S still 10.2.6; both PR HEAD locks contain 10.2.6 and 5.1.9 | Compatible peers do not fix vulnerable dependency ranges | Current PR HEAD locks inspected; not selected or runtime-tested | Same CVE and GHSA as baseline |
 | 10.15.0 | 8.69.0 | C 0.23.7, S 8.69.0 | E/C 11.0.9; S 10.2.6 | Compatible Node/peers | Independently resolved via pinned pnpm; rejected before runtime tests | CVE-2026-118764 and GHSA-c859 remain on S |
+| 10.9.1 | 8.73.0 | C 0.23.5, S 8.73.0 | E/C 10.2.6; S 11.0.9 | Compatible Node/peers | Independently resolved via pinned pnpm; rejected before runtime tests | CVE-2026-118764 and GHSA-c859 remain on E/C |
 | 10.9.1 | 8.74.0 | C 0.23.5, S 8.74.0 | E/C 10.2.6; S 11.0.9 | Compatible Node/peers | Independently resolved via pinned pnpm; rejected before runtime tests | CVE-2026-118764 and GHSA-c859 remain on E/C |
 | 10.15.0 | 8.74.0 | C 0.23.7, S 8.74.0 | E/C/S 11.0.9 | Compatible Node/peers | Independently resolved; viable, larger TS upgrade; no full runtime test claimed | None in resolved minimatch copies |
 | **10.15.0** | **8.73.0** | **C 0.23.7, S 8.73.0** | **E/C/S 11.0.9; generator 5.1.9** | **Node 24.19.0 and TS 5.9.3 supported** | **Selected; frozen install/lint and fresh all-severity scan verified before commit; final-SHA checks recorded separately** | **None in resolved minimatch copies** |
@@ -70,6 +71,7 @@ These are dependency version findings, not evidence of exploitation. Lint inputs
 - [PR #248](https://github.com/gushinets/anytoolai-platform/pull/248): closed, unmerged; HEAD `a06d1b3013b257f7523a2879d26923beaf1ef94b`, typescript-eslint 8.72.1. Lock inspected at this SHA still includes 10.2.6 and 5.1.9.
 - [Dependabot #181](https://github.com/gushinets/anytoolai-platform/security/dependabot/181): open at read time, transitive development minimatch 10.2.6, GHSA-g3hv-75wg-m249.
 - [Trivy #63](https://github.com/gushinets/anytoolai-platform/security/code-scanning/63): already marked fixed; most recent instance references main commit `06d79037316be9c76dff61c1b5349b502b19b5f6`, updated 2026-11-18. This remote state does not prove the current baseline lock safe: the fresh local baseline scan reproduces the CVE.
+- Current open-PR searches for eslint and minimatch returned no replacements. A supplementary all-open Dependabot alert-list request returned HTTP 400; the exact #181/#63 reads succeeded. Upstream advisory APIs and the complete fresh scan supply the independent coverage proof.
 - Read-only authenticated APIs were used; no alert or issue mutation occurred.
 
 ## Implementation and rollback
@@ -87,7 +89,13 @@ The final commit SHA and lockfile SHA-256 are recorded after commit in `final-ve
 - Selected pair's frozen install and complete `corepack pnpm lint` passed before commit. No new lint rules, test skips or suppressions.
 - Default shell pnpm is 11.25.0; all resolution used corepack pnpm 10.34.1. Python's Windows subprocess cannot directly launch the .cmd-only pnpm shim. Downloaded official @pnpm/win-x64@10.34.1, verified npm SHA-512 integrity, and placed its executable first on PATH for canonical checks. This is local environment setup, not a repo change.
 - Downloaded CI-pinned Trivy 0.76.1 and verified release SHA-256 `1051f49cb22d5284f43425f72aad9cda63ca12ceb92e7caa06903490c82dc9bf`. Fresh DB downloaded 2026-11-27. Preliminary all-severity root lock scan reports no minimatch vulnerability; three Medium findings remain on unchanged Next 15.5.28: CVE-2026-119346/119347/119348, outside the lint dependency graph and outside this fix's scope.
-- Full-check and frontend-check are running; definitive results and any blockers are in the final receipt. Additional required container/PostgreSQL gates must be distinguished from local graph/lint proof.
+- Implementation-source commit: `b0a5c8e94ecc9a35d66c7b5f17cf12ea4684620f`. Only this plan changes in the handoff commit. Lock SHA-256: `88f9f81ff40acbb1305083889d3a2bece3b77bf2ebead9adca57a18fe6d19fff`.
+- The scan inventory was checked against every one of the 176 distinct package versions in the root development-tool closure, normalizing the existing picomatch alias to @ryotsu/picomatch. No package is missing from the scanner inventory and no closure package has a finding. The complete root scan has three Medium Next findings and zero High/Critical findings. Both minimatch versions were machine-compared with the union of nine distinct global/upstream advisory ranges, with zero matches.
+- Docker Desktop was started successfully. The worktree-scoped dev stack booted, and atoms-proof passed 11/11 standalone plus 3/3 composite workflows. The credential-free production image build and prod-smoke also passed 11/11 plus 3/3; its stack was torn down. Initial production attempts failed on a transient registry TLS reset and then use of system Python without yaml; the successful retry used the managed interpreter.
+- Windows full-check, with PYTEST_ADDOPTS=-x (failure diagnosis, no passing claim), stopped at the pre-existing temp-ACL failure: 317 passed, 3 skipped, 723 deselected before the failure. The same exact test fails on baseline 26128baa. Windows frontend-check initially failed its unchanged 5000 ms hooks test. A later default-timeout targeted rerun passed in 4.07 s after heavy builds completed; the definitive complete frontend rerun is recorded after this commit.
+- Windows postgresql-check was run with the managed interpreter and the correct maintenance URL `postgresql+psycopg://anytoolai:anytoolai@127.0.0.1:16214/postgres`: 714 passed, 1 failed, 2 platform skips. The failure is test_due_snapshot_and_expired_lease_report_pending, comparing caller now+31 seconds against a 30-second lease claimed with database time after an observed 2.4-second delay. No backend assertion or code was changed.
+- Preliminary native Ubuntu full-check: 4381 passed, 2 failed, 12 skipped, 723 deselected in the baseline phase. The failures were missing passwordless sudo for the real nobody-user marker test, and the agent-added PYTHONUTF8=1 defeating a fixture that expects io.text_encoding(None) to be locale. Both exact tests pass as WSL root with PYTHONUTF8=0. This uses existing root capability, performs the actual nobody-user check, and changes neither sudo policy nor test assertions. Definitive Linux checks use that environment, PYTHONIOENCODING=utf-8 for logs, and a safe.directory entry scoped to this agent-created native checkout.
+- Definitive post-commit results are in final-verification.json (Windows), final-verification-linux.json (Ubuntu), postgresql-linux-verification.json, production-verification.json, security-proof.json and advisory-proof.json under the evidence directory. These record actual exits, SHA and lock hash; failed setup attempts remain in separate logs. The handoff reports the final outcomes without treating any failed, skipped or unrun gate as a pass.
 
 Exact final verification commands (using the verified pnpm executable first on PATH):
 
@@ -116,11 +124,11 @@ pnpm why -r minimatch --json
 | Frontend and relevant repository checks work | Final receipt contains each actual result; no missing check counts as pass. |
 | Dependabot #181 closes after merge to main | Pending authorized PR/merge and GitHub rescan; cannot be proven locally. No PR or alert mutation authorized. |
 
-Local remaining limitations: unavailable Docker daemon and missing PostgreSQL maintenance URL prevent container/DB production-semantics proof. Required GitHub statuses still need to run on a future authorized PR and merge. Unrelated Next.js Medium findings remain visible. Recheck advisories when integrating because security data can change.
+Local Windows limitations and the exact Linux environment corrections are recorded above; definitive receipts determine each final local outcome. Required GitHub statuses still need to run on a future authorized PR, with alert closure checked after merge. Unrelated Next.js Medium findings remain visible. Recheck advisories when integrating because security data can change.
 
 ## Complete path proof
 
-The lockfile snapshot traversal follows dependencies and optional dependencies, including pnpm-materialized peers, stops cycles per path, and starts at every importer dependency kind. Baseline and final each yield 38 simple paths: 35 root dev lint/peer paths, two kernel-demo-ce dev WXT optional-peer paths, and one CE-kit dev generator path. No runtime importer reaches minimatch. Workspace links add no runtime path because CE-kit declares the generator only as devDependency. WXT declares an optional ESLint peer; pnpm materializes it as an optional dependency edge.
+The lockfile snapshot traversal follows dependencies and optional dependencies, including pnpm-materialized peers, stops cycles per path, and starts at every importer dependency kind. Baseline and final each yield 38 simple paths: 35 root dev lint/peer paths, two kernel-demo-ce dev WXT optional-peer paths, and one CE-kit dev generator path. No runtime importer reaches minimatch. All 14 maintained workspaces invoke the shared root lint stack through their lint scripts; this execution relationship adds no package dependency edge. The workspace lint preflight and complete recursive lint enforce coverage. Workspace links add no runtime path because CE-kit declares the generator only as devDependency. WXT declares an optional ESLint peer; pnpm materializes it as an optional dependency edge.
 
 Each alias below has its exact baseline and final version. Every path uses those versions; ranges on every edge follow in the table.
 
@@ -173,7 +181,7 @@ Each alias below has its exact baseline and final version. Every path uses those
 | D → M | dependency | `5.1.9` → 5.1.9 | `5.1.9` → 5.1.9 |
 | W → E | peer | `^8.57.0 || ^9.0.0 || ^10.0.0` → 10.9.1 | `^8.57.0 || ^9.0.0 || ^10.0.0` → 10.15.0 |
 
-Importer edges: root dev J `^10.0.1`, E `^10.9.1` → `^10.15.0`, R `^7.1.1`, T `^8.69.0` → `^8.73.0`; CE-kit dev O `^7.13.0`. Resolved versions are in the alias table. Package-internal dependency edges inherit development-only use from these importer edges.
+Importer edges: root dev J `^10.0.1`, E `^10.9.1` → `^10.15.0`, R `^7.1.1`, T `^8.69.0` → `^8.73.0`; CE-kit dev O `^7.13.0`; kernel-demo-ce dev W `^0.21.4`. Resolved versions are in the alias table. Package-internal dependency edges inherit development-only use from these importer edges.
 
 | # | Complete path (root dev unless CE-kit specified) |
 |---|---|
@@ -212,8 +220,8 @@ Importer edges: root dev J `^10.0.1`, E `^10.9.1` → `^10.15.0`, R `^7.1.1`, T 
 | 33 | T → U → E → M |
 | 34 | T → E → C → M |
 | 35 | T → E → M |
-| 36 | W → E → C → M |
-| 37 | W → E → M |
+| 36 | kernel-demo-ce dev → W → E → C → M |
+| 37 | kernel-demo-ce dev → W → E → M |
 | 38 | CE-kit dev → O → D → M |
 
 ## Host diagnostics before final verification
@@ -221,3 +229,5 @@ Importer edges: root dev J `^10.0.1`, E `^10.9.1` → `^10.15.0`, R `^7.1.1`, T 
 The selected pair's normal frontend-check reached tests and failed only the existing ce-kit hooks regression test's 5000 ms timeout. A focused diagnostic with a 30000 ms command-line timeout passed the assertion in approximately 5980 ms; that diagnostic is not a passing canonical check. An exact baseline source snapshot (26128baa, frozen install) passed the focused test in 4420 ms on Windows. The performance margin is a remaining Windows validation concern, not dismissed as an established pre-existing failure.
 
 The preliminary full-check was interrupted after repeated backend lock tests failed. A focused fail-fast diagnostic identifies an untrusted write grant on C:/Users/jackd/AppData/Local/Temp, rejected by the repository's production deployment-lock ACL validator. No Windows permissions or security checks were weakened. Existing Ubuntu WSL (Python 3.12.3, uv 0.12.5) is available; final-commit Linux checks will use a native filesystem checkout to avoid the host ACL condition and measure standard frontend tests independently. Windows canonical check failures remain explicitly reported even if Linux passes.
+
+The final handoff commit is intentionally created before definitive replay; a commit cannot contain its own SHA or results produced later. The receipts and chat handoff carry its actual SHA and exact outcomes. No source, manifest or lockfile amendment is made after that replay.
