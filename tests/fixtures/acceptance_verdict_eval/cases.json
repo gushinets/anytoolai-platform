@@ -320,6 +320,246 @@
         "meets_expectations with all four criteria confirmed."
       ],
       "provenance": "ANY-893 reconstructed brief A and delivery W1, with case-specific substitutions and translations."
+    },
+    {
+      "id": "ANY895-W2",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Блока с отзывами нет, файлы Figma не переданы. Два раунда правок проведены. Сдано 3 декабря."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence naming both explicitly omitted items.",
+        "Exactly two short rationale lines: the missing reviews section and the Figma sources that were not handed over. Each omission appears once."
+      ],
+      "provenance": "ANY-895 reconstructed brief A and W2–W4, with explicit launch control and ANY-893 FULL adapted."
+    },
+    {
+      "id": "ANY895-W3",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Подготовлены и переданы логотип и фирменные цвета для кафе."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence identifying the unrelated work.",
+        "One short rationale line identifies both the requested yoga studio website and the submitted cafe logo and brand colors."
+      ],
+      "provenance": "ANY-895 reconstructed brief A and W2–W4, with explicit launch control and ANY-893 FULL adapted."
+    },
+    {
+      "id": "ANY895-W4-DELIVERY",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 23 декабря."
+      },
+      "criteria": [
+        "partially_meets with no mismatch. The launch date and other unstated conditions are unconfirmed.",
+        "One finding pairs the December 10 launch deadline with December 23 as delivery and states that the launch date is unconfirmed. Neither rationale nor evidence calls this a late launch."
+      ],
+      "provenance": "ANY-895 reconstructed brief A and W2–W4, with explicit launch control and ANY-893 FULL adapted."
+    },
+    {
+      "id": "ANY895-W4-LAUNCH",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 23 декабря. Сайт запущен 23 декабря."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence identifying December 10 as the launch deadline and December 23 as the launch date.",
+        "One finding pairs the two launch dates and identifies the confirmed late launch once."
+      ],
+      "provenance": "ANY-895 reconstructed brief A and W2–W4, with explicit launch control and ANY-893 FULL adapted."
+    },
+    {
+      "id": "ANY895-FULL",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "input": {
+        "brief_text": "Нужен редизайн одностраничного сайта йога-студии. На сайте нужны главный экран, расписание, тренеры, цены, отзывы и форма записи. Нужна адаптивная вёрстка, форма должна отправлять заявки на почту студии. Тексты и фотографии предоставим сами. Срок — три недели с начала работ, запуск не позднее 10 декабря. Бюджет — 90 000 рублей. Включено два раунда правок. Макеты согласую лично. Результат — рабочий сайт на нашем домене и исходники макетов в Figma.",
+        "deliverable_text": "Сдан одностраничный сайт на домене клиента: главный экран, расписание, тренеры, цены, отзывы, форма записи. Вёрстка адаптивная, форма записи приходит на почту студии. Макеты в Figma переданы. Два раунда правок проведены и закрыты. Сдано 3 декабря. Работы начаты 12 ноября, макеты согласованы с вами лично 18 ноября. Итоговая стоимость — 90 000 рублей. На запущенном сайте использованы тексты и фотографии клиента. Сайт запущен 3 декабря."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed, including the explicit on-time launch.",
+        "The ordinary rationale explains the match without inventing a deviation or an unconfirmed condition."
+      ],
+      "provenance": "ANY-895 reconstructed brief A and W2–W4, with explicit launch control and ANY-893 FULL adapted."
+    },
+    {
+      "id": "ANY895-W2-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered a single-page site on the client's domain with a hero section, schedule, trainers, pricing and a booking form. The layout is responsive and bookings reach the studio by email. There is no reviews section, and the Figma source files were not handed over. Both revision rounds were completed. Delivered on December 3."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence naming both explicitly omitted items.",
+        "Exactly two short rationale lines: the missing reviews section and the Figma sources that were not handed over. Each omission appears once."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W3-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Prepared and handed over a logo and brand colors for a cafe."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence identifying the unrelated work.",
+        "One short rationale line identifies both the requested yoga studio website and the submitted cafe logo and brand colors."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W4-DELIVERY-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered a single-page site on the client's domain with a hero section, schedule, trainers, pricing, reviews and a booking form. The layout is responsive and bookings reach the studio by email. The Figma mock-ups were handed over. Both revision rounds were completed and closed. Delivered on December 23."
+      },
+      "criteria": [
+        "partially_meets with no mismatch. The launch date and other unstated conditions are unconfirmed.",
+        "One finding pairs the December 10 launch deadline with December 23 as delivery and states that the launch date is unconfirmed. Neither rationale nor evidence calls this a late launch."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W4-LAUNCH-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered a single-page site on the client's domain with a hero section, schedule, trainers, pricing, reviews and a booking form. The layout is responsive and bookings reach the studio by email. The Figma mock-ups were handed over. Both revision rounds were completed and closed. Delivered on December 23. The site went live on December 23."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence identifying December 10 as the launch deadline and December 23 as the launch date.",
+        "One finding pairs the two launch dates and identifies the confirmed late launch once."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-FULL-EN",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "en",
+      "expected_language": "en",
+      "input": {
+        "brief_text": "We need a redesign of our one-page yoga studio website. Include a hero section, schedule, trainers, pricing, reviews and a booking form. The layout must be responsive and bookings must reach the studio by email. We will provide text and photos. The timeframe is three weeks from the start, with launch by December 10. The budget is 90,000 rubles. Two revision rounds are included. I will personally approve the mock-ups. Deliver a working site on our domain and the Figma source files.",
+        "deliverable_text": "Delivered the single-page site on the client domain with a hero section, schedule, trainers, pricing, reviews, and booking form. The layout is responsive and bookings reach the studio by email. The Figma files were handed over. Both revision rounds were completed. Delivered on December 3. Work started on November 12 and you personally approved the mock-ups on November 18. The final cost was 90,000 rubles. The live site uses the client's copy and photos. The site went live on December 3."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed, including the explicit on-time launch.",
+        "The ordinary rationale explains the match without inventing a deviation or an unconfirmed condition."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W2-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó una web de una sola página en el dominio del cliente con portada, horarios, entrenadores, precios y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. No hay sección de reseñas y no se entregaron los archivos fuente de Figma. Se completaron las dos rondas de cambios. Se entregó el 3 de diciembre."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence naming both explicitly omitted items.",
+        "Exactly two short rationale lines: the missing reviews section and the Figma sources that were not handed over. Each omission appears once."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W3-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se prepararon y entregaron un logotipo y los colores de marca de una cafetería."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence identifying the unrelated work.",
+        "One short rationale line identifies both the requested yoga studio website and the submitted cafe logo and brand colors."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W4-DELIVERY-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó una web de una sola página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron las maquetas de Figma. Se completaron y cerraron las dos rondas de cambios. Se entregó el 23 de diciembre."
+      },
+      "criteria": [
+        "partially_meets with no mismatch. The launch date and other unstated conditions are unconfirmed.",
+        "One finding pairs the December 10 launch deadline with December 23 as delivery and states that the launch date is unconfirmed. Neither rationale nor evidence calls this a late launch."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-W4-LAUNCH-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó una web de una sola página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron las maquetas de Figma. Se completaron y cerraron las dos rondas de cambios. Se entregó el 23 de diciembre. La web se lanzó el 23 de diciembre."
+      },
+      "criteria": [
+        "does_not_meet with mismatch evidence identifying December 10 as the launch deadline and December 23 as the launch date.",
+        "One finding pairs the two launch dates and identifies the confirmed late launch once."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
+    },
+    {
+      "id": "ANY895-FULL-ES",
+      "scenario_id": "acceptance_builder.check_v1",
+      "family": "deviations",
+      "source_language": "es",
+      "expected_language": "es",
+      "input": {
+        "brief_text": "Necesitamos rediseñar la web de una sola página del estudio de yoga. Debe incluir portada, horarios, entrenadores, precios, reseñas y formulario de reserva. La web debe ser adaptable y enviar las reservas al correo del estudio. Nosotros aportaremos los textos y fotos. El plazo es de tres semanas desde el inicio y el lanzamiento debe ser el 10 de diciembre como máximo. El presupuesto es de 90 000 rublos. Se incluyen dos rondas de cambios. Aprobaré personalmente las maquetas. Hay que entregar la web en nuestro dominio y los archivos fuente de Figma.",
+        "deliverable_text": "Se entregó la web de una página en el dominio del cliente con portada, horarios, entrenadores, precios, reseñas y formulario de reserva. El diseño es adaptable y las reservas llegan al correo del estudio. Se entregaron los archivos de Figma. Se completaron las dos rondas de cambios. Entrega el 3 de diciembre. El trabajo comenzó el 12 de noviembre y usted aprobó personalmente las maquetas el 18 de noviembre. El coste final fue de 90 000 rublos. La web publicada utiliza los textos y las fotos del cliente. La web se lanzó el 3 de diciembre."
+      },
+      "criteria": [
+        "meets_expectations with all four criteria confirmed, including the explicit on-time launch.",
+        "The ordinary rationale explains the match without inventing a deviation or an unconfirmed condition."
+      ],
+      "provenance": "Translation of the ANY-895 delivery finding inputs."
     }
   ]
 }

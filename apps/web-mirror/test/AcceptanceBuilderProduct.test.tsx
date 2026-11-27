@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AcceptanceBuilderProduct, checkDefinition, draftDefinition } from "../src/products/acceptanceBuilder/AcceptanceBuilderProduct";
 import { hasAuthoredText } from "../src/products/shared/authoredText";
@@ -82,6 +82,14 @@ const checkOutput = (suffix: Suffix | ".insufficient_brief" = "") => ({
 });
 
 const emptyExtraction = { values: { analysis_language: "en" }, missing_fields: [...LIST_FIELDS], confidence: {} };
+
+const checkCases = [
+  { id: "W2", status: "mismatch", verdict: "does_not_meet", findings: ["Нет блока отзывов.", "Исходники Figma не переданы."] },
+  { id: "W3", status: "mismatch", verdict: "does_not_meet", findings: ["Вместо сайта йога-студии переданы логотип и фирменные цвета для кафе."] },
+  { id: "W4-DELIVERY", status: "partial", verdict: "partially_meets", findings: ["Срок запуска — 10 декабря. Работа сдана 23 декабря. Дата запуска не подтверждена."] },
+  { id: "W4-LAUNCH", status: "mismatch", verdict: "does_not_meet", findings: ["Срок запуска — 10 декабря. Сайт запущен 23 декабря."] },
+  { id: "FULL", status: "match", verdict: "meets_expectations", findings: [] },
+] as const;
 
 afterEach(() => {
   cleanup();
@@ -484,16 +492,72 @@ describe("Acceptance Builder page", () => {
     for (const { description } of missing) expect(openGaps).toContain(description);
   });
 
-  it("check: leads with the verdict, states its scope and copies verdict lines from the deltas", async () => {
-    await run("check", checkOutput());
+  it("check: an empty finding leaves the verdict, scope note and full evidence accessible", async () => {
+    const output = checkOutput();
+    await run("check", { ...output, comparison: { ...output.comparison, rationale: "\r\n \u200b" } });
     await waitFor(() => expect(screen.getAllByText(/judged on four general review criteria/i).length).toBeGreaterThan(0));
+    expect(screen.getByText("Verdict: partially meets expectations.").nextElementSibling?.tagName).toBe("P");
 
     fireEvent.click(screen.getByRole("button", { name: "Copy" }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
     const copied = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(copied.startsWith("Verdict\nVerdict: partially meets expectations.\nScope coverage: not fully confirmed. ")).toBe(true);
+    expect(copied.startsWith("Verdict: partially meets expectations.\n\nScope coverage: not fully confirmed. ")).toBe(true);
     expect(copied).toContain("\nRequirement fit: confirmed. ");
     expect(copied).toContain("\n\nAcceptance criteria\n- ");
+  });
+
+  it.each(checkCases)("check $id leads with findings and keeps full evidence in the recap and Copy", async ({ status, verdict, findings }) => {
+    const output = {
+      extracted: { ...emptyExtraction, values: { analysis_language: "ru" } },
+      comparison: {
+        verdict, confidence: 1,
+        rationale: findings.length ? [...findings, "", `  ${findings[0]}  `].join("\r\n") : "Все условия подтверждены.",
+        deltas: DELTA_CRITERIA.map((criterion_id, index) => ({
+          criterion_id, status: index === 0 ? status : "match", evidence: `Подробное основание ${index + 1}.`,
+        })),
+      },
+    };
+    expect(extractCheckResult(output)?.comparison?.verdict).toBe(verdict);
+    await run("check", output);
+    const copy = await screen.findByRole("button", { name: "Copy" });
+    const recap = screen.getByText("Structured recap");
+    const details = recap.closest("details")!;
+    const lead = details.parentElement!.firstElementChild!;
+    const verdictText = `Вердикт: ${verdict === "meets_expectations" ? "соответствует ожиданиям" : verdict === "partially_meets" ? "частично соответствует ожиданиям" : "не соответствует ожиданиям"}.`;
+    expect(lead.textContent).toBe(verdictText);
+    expect(details.open).toBe(false);
+    if (findings.length) {
+      const list = lead.nextElementSibling as HTMLElement;
+      expect(list.tagName).toBe("UL");
+      expect(within(list).getAllByRole("listitem").map((item) => item.textContent)).toEqual(findings);
+      expect(list.nextElementSibling?.nextElementSibling).toBe(details);
+    } else {
+      expect(lead.nextElementSibling?.nextElementSibling).toBe(details);
+      expect(within(details).getByText(output.comparison.rationale)).toBeTruthy();
+    }
+    fireEvent.click(recap);
+    expect(details.open).toBe(true);
+    const evidence = within(details).getAllByText(/Подробное основание/).map((row) => row.textContent!);
+    expect(evidence).toHaveLength(4);
+    expect(evidence.map((row) => row.split(". ").at(-1))).toEqual(output.comparison.deltas.map((delta) => delta.evidence));
+    fireEvent.click(copy);
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+    const copied = vi.mocked(navigator.clipboard.writeText).mock.calls[0]![0];
+    const copiedLead = [verdictText, ...findings.map((line) => `- ${line}`)].join("\n");
+    const copiedEvidence = findings.length ? evidence : [...evidence, output.comparison.rationale];
+    expect(copied).toMatch(`${copiedLead}\n\n${copiedEvidence.join("\n")}\n\n`);
+    for (const line of findings) expect(copied.split(line)).toHaveLength(2);
+  });
+
+  it("check: clipboard failure reveals the full selectable text", async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error("clipboard blocked"));
+    await run("check", checkOutput());
+    const copy = await screen.findByRole("button", { name: "Copy" });
+    expect(screen.queryByText(/Scope coverage: not fully confirmed/, { selector: "p" })?.closest("details")).toBeTruthy();
+    fireEvent.click(copy);
+    const select = await screen.findByRole("button", { name: "Select text" });
+    fireEvent.click(select);
+    expect(window.getSelection()?.toString()).toContain("Scope coverage: not fully confirmed.");
   });
 
   it.each([false, true])("focuses the brief for an insufficient result, including attachment=%s", async (attached) => {
@@ -752,6 +816,11 @@ describe("Acceptance Builder page", () => {
     await screen.findByRole("button", { name: "New task" });
     expect((screen.getByRole("radio", { name: mode === "draft" ? "Draft criteria" : "Check deliverable" }) as HTMLInputElement).checked).toBe(true);
     expect(made.calls.some((c) => c.key.endsWith("/start"))).toBe(false);
+    if (mode === "check") {
+      const finding = await screen.findByRole("listitem");
+      expect(finding.textContent).toBe(checkOutput().comparison.rationale);
+      expect(finding.closest("details")).toBeNull();
+    }
   });
 
   it("switches mode, and disables the switch while a run is active", async () => {

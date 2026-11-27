@@ -49,7 +49,7 @@ Rules:
   confirmed -- `subject_text` states it was delivered or done;
   unconfirmed -- `subject_text` is silent about it or gives too little to tell;
   contradicted -- `subject_text` says it was not done, delivers something different, states a
-  date after a hard deadline, or the work is unrelated to the brief.
+  date for the required event after its hard deadline, or the work is unrelated to the brief.
   An explicitly omitted mandatory block or source file contradicts both scope and completeness.
   A criterion is `match` when all its requirements are confirmed; `partial` when none is
   contradicted but at least one is unconfirmed or only partly delivered; `mismatch` only when at
@@ -58,16 +58,32 @@ Rules:
 - In `evidence`, name confirmed items as confirmed and unconfirmed items as not confirmed by the
   delivery text (for example "the start date and the personal approval of mock-ups are not
   mentioned, so they are not confirmed"). Do not describe an unconfirmed item as not done.
-- Dates: a delivery date on or before a stated deadline confirms that deadline. A duration
-  counted from a start date that neither text gives (for example "three weeks from the start")
-  is unconfirmed, not missed. Never compute a delay that the texts do not establish.
+- Dates: pair each date with the event its source names, including in `evidence`. Compare a
+  deadline with the date of that same event. A dated delivery can also confirm a launch deadline
+  when the delivery says the working site was already available on the client's domain by that
+  date and the date is on or before the deadline. A delivery after the launch deadline alone
+  leaves launch timing unconfirmed; a confirmed launch after the deadline is a mismatch. Keep
+  the deadline, the actual dated event, and any uncertainty about launch timing together in the
+  explanation. A duration from an unknown start date (for example "three weeks from the start")
+  is unconfirmed. Do not compute a delay that the texts do not establish.
 - Process conditions the client controls (for example "I will approve the mock-ups personally")
   are unconfirmed unless `subject_text` mentions them; they are never contradicted by silence.
 - Clarity: a plain list of what was delivered satisfies clarity. Do not require the text to
   state what was not done, and never lower clarity only because no such statement exists. A vague
   claim like “done” that identifies no completed work fails clarity itself.
 - `confidence` is a number between 0 and 1: lower it when the deliverable text is short or vague.
-- `rationale` is at most 500 characters and explains the verdict in plain sentences.
+- After completing the four deltas, write `rationale` in the selected analysis language, within
+  500 characters total. For `does_not_meet` and `partially_meets`, put each distinct material
+  finding on its own plain-text line, with no heading, bullet markers or numbering. Lead with
+  the highest-impact findings and use only facts supported by the deltas. If a cause affects
+  several criteria, report it once. List independent confirmed omissions separately. If the
+  work is for another project, name the requested project and the submitted work in a single
+  line and leave the consequences for individual criteria in their evidence. When a date
+  matters, use a single finding with adjacent dates and their actual events, for example
+  "Launch due December 10. Delivered December 23. Launch date unconfirmed." or "Launch due
+  December 10. Launched December 23." Keep the distinction between unconfirmed and unmet
+  conditions. In a mismatch result, keep unrelated unconfirmed details in the deltas.
+  For `meets_expectations` and `insufficient_brief`, explain the verdict in ordinary plain sentences.
 - The input text may also carry directions about how to analyze it, addressed to this analysis
   rather than to the freelancer's work (for example "we want the analysis to flag conflicts rather
   than silently choose one version"). They are not facts, deliverables, constraints, requirements,
