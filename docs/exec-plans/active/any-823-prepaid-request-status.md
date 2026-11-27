@@ -7,8 +7,8 @@
 - Created: 2026-11-27
 - Last updated: 2026-11-27
 - Review date: 2026-12-04
-- Next action: Owner review of the round 2 local fix; live rerun deferred at the owner's request.
-- Blocker: No fresh live evidence for the round 2 prompt; canonical full-check previously had three environment-dependent runner failures.
+- Next action: Owner review of the verified round 2 fix and acceptance evidence.
+- Blocker: None for live acceptance; canonical full-check previously had three environment-dependent runner failures.
 
 ## Goal
 
@@ -71,3 +71,26 @@ Both independent P2 findings identify the same error: the unconditional agreed-t
 Plan: update the existing normalized-prompt contract test first, verify failure against the current prompt, then replace only the unconditional agreement instruction. Keep the other two assertions and pin Step 2's existing silent-agreement behavior. Run product and config/documentation checks. Retain the earlier live evidence; the changed prompt requires a fresh 18-case status matrix plus 12 agreement contrasts (standard, explicitly agreed, only another term agreed, explicitly open; RU/EN/ES), pending authorization for the provider calls.
 
 Verified locally: the updated contract test failed against the former prompt, then the product module passed 77/77 after the fix. Configuration, architecture and documentation validation passed. Freelancer Suite initially had the known sandbox dependency-resolution failure in its packaging test (1725 passed); the network-enabled local retry passed all 1726 tests. The owner requested local tests only, so no new provider calls were made and the proposed 30-case matrix is deferred. New working-tree prompt SHA-256: `cf2b80ff1f0064213e3ca43b47a02d138b7cc2ddf870a67061bee9c4602090d9`. The recorded 18/18 live matrix applies only to the prior prompt hash; semantic acceptance of the new version is unverified.
+
+
+### Review round 2 live acceptance
+
+Owner authorized the 30 planned submissions. Freeze the original 18 payloads and 12 new agreement-status contrasts in [the new evidence record](any-823-prepaid-request-status.review-2.evidence.json); preserve both earlier series. Verify deployed prompt hash, full browser outputs, actual clipboard text and per-session action/provider/artifact ledger before scoring semantics, structure and language.
+
+Result: **PASS 30/30**, tested source `206c60b0e890a7905401bf578b6fa5c6b57f04b1`, deployed prompt SHA-256 `cf2b80ff1f0064213e3ca43b47a02d138b7cc2ddf870a67061bee9c4602090d9`, profile fingerprint `c91450f9ee948eec82233e2b938e33e5f19d1568ee262d3b20730d286f08444d`, actual model `gpt-6.1-sol`.
+
+| Scenario | RU | EN | ES |
+| --- | ---: | ---: | ---: |
+| Original ambiguous A01 | 3/3 | 3/3 | 3/3 |
+| Explicit pending work start | 1/1 | 1/1 | 1/1 |
+| Explicit confirmed start | 1/1 | 1/1 | 1/1 |
+| Explicit overdue deposit | 1/1 | 1/1 | 1/1 |
+| Standard prepayment, agreement unspecified | 1/1 | 1/1 | 1/1 |
+| Explicitly agreed prepayment | 1/1 | 1/1 | 1/1 |
+| Only the total price agreed | 1/1 | 1/1 | 1/1 |
+| Explicitly open prepayment timing | 1/1 | 1/1 | 1/1 |
+| **Total** | **10/10** | **10/10** | **10/10** |
+
+All 30 exact browser submissions created one successful logical A06 and one canonical text-only artifact each. All 30 physical provider attempts succeeded with no retries; backend output, stored artifact, visible message and actual clipboard were identical per attempt. Review of every output confirms financial and work/payment-status requirements for the previous 18 inputs and agreement status/message-kind requirements for the 12 new inputs. All 27 Rule D outputs request payment; all three Rule B outputs ask to confirm the open timing without requesting payment. No invented dates or urgency. Language 30/30. Ledger estimated cost USD 0.3974252; median UI latency 6.36s. Earlier series remain unchanged; no model or production change required.
+
+**Current acceptance: 30/30 live PASS on the round 2 prompt.** Local checks passed in round 2 as recorded above. The evidence is ready for owner review; no GitHub writes or Linear status change performed for this series.
