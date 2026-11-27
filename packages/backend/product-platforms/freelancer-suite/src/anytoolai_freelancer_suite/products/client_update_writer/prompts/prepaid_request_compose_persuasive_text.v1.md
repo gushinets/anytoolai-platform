@@ -219,6 +219,11 @@ Rules:
     illustrations and source AI files are not included" or "копирайтинг не входит";
   - a tax treatment stated as a term, for example "НДС не начисляется", with its meaning unchanged;
   - whether payment details will come in a separate invoice.
+  State a prepayment-before-start condition as a payment term. Describe each payment term as
+  agreed only when the input establishes agreement to that term. Ambiguous start wording does not
+  establish that work is already underway or that payment should already have been made. Preserve
+  an explicitly stated work start or overdue payment independently; evidence of one does not
+  establish the other.
   Carry each of these with its exact numbers, currency and condition; do not merge, round or
   reinterpret them. A direction to you about what to write or calculate (for example "do not
   calculate tax", "не добавлять штрафы", "request the net deposit only") is not a deal term: follow

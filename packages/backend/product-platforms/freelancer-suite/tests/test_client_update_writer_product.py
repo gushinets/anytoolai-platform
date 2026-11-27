@@ -591,6 +591,28 @@ def test_prepaid_request_prompt_preserves_the_payment_arrangement() -> None:
     assert "explicit withholding directions still win" in prompt
 
 
+def test_prepaid_request_prompt_preserves_work_and_payment_status_independently() -> None:
+    prompt = _normalized_prepaid_prompt()
+
+    assert "State a prepayment-before-start condition as a payment term." in prompt
+    assert (
+        "Describe each payment term as agreed only when the input establishes agreement to that "
+        "term." in prompt
+    )
+    assert (
+        "Notes that merely describe the payment consistently with the fields, without saying "
+        "anything about agreement, open nothing." in prompt
+    )
+    assert (
+        "Ambiguous start wording does not establish that work is already underway or that "
+        "payment should already have been made." in prompt
+    )
+    assert (
+        "Preserve an explicitly stated work start or overdue payment independently; "
+        "evidence of one does not establish the other." in prompt
+    )
+
+
 def test_prepaid_request_prompt_keeps_percentage_attached_to_total() -> None:
     prompt = _normalized_prepaid_prompt()
 
