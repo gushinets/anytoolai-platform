@@ -27,6 +27,7 @@ from client_update_writer_eval import (
     configuration_problems,
     digest,
     evidence_status,
+    review_input_text,
     revision_problems,
     validate_manifest_identity,
     validate_runs,
@@ -102,7 +103,7 @@ def render_run(series: str, run: dict, status: str, case: dict, evidence_issues:
     )
     return (
         f"<h2>{html.escape(series + '/' + run['id'])} — {status}</h2>"
-        f"<h3>Input</h3><pre>{html.escape(case['progress_notes'])}</pre>"
+        f"<h3>Input</h3><pre>{html.escape(review_input_text(case))}</pre>"
         f"<h3>Full output</h3><pre>{html.escape(output)}</pre>"
         f"<h3>Review questions</h3><ol>{questions}</ol>"
         f"<details><summary>Evidence and provider ledger</summary><pre>{evidence}</pre></details>"
