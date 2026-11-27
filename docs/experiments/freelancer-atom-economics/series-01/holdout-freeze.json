@@ -1,0 +1,42 @@
+{
+  "frozen_at_utc": "2026-11-25T09:56:09.522275+00:00",
+  "files": {
+    "acceptance_builder_holdout.json": {
+      "sha256": "6998d03350a8e81ce7ee5a000cfc310fd19e7f6731e4b6536d41b31c60960dc4",
+      "pairs": 12
+    },
+    "brief_decoder_holdout.json": {
+      "sha256": "d266fa4db0349ede3394a1d156b2bfe137f38981f44e34036fed728c479159d1",
+      "pairs": 12
+    },
+    "client_update_writer_holdout.json": {
+      "sha256": "da6dcb68afced164c38b5ea34ddef58b314c288f7d3c8d0500d7547d94403ab8",
+      "pairs": 9
+    },
+    "proposal_ai_holdout.json": {
+      "sha256": "7d9490391544256661f7e72250c04df1d4869201c66d5ac07856d760ea399660",
+      "pairs": 6
+    },
+    "task_finder_holdout.json": {
+      "sha256": "d35b984687661d0ce4f3b774c4179d79807568d74f19ba3db8e25e6a211c3672",
+      "pairs": 6
+    }
+  },
+  "prompt_counts": {
+    "acceptance_builder.extract.v1": 3,
+    "acceptance_builder.detect_issues.v1": 3,
+    "acceptance_builder.generate_questions.v1": 3,
+    "acceptance_builder.compare.v1": 3,
+    "brief_decoder.extract_brief.v1": 3,
+    "brief_decoder.detect_issues.v1": 3,
+    "brief_decoder.generate_questions.v1": 3,
+    "brief_decoder.generate_summary.v1": 3,
+    "client_update_writer.update_compose_reply.v1": 3,
+    "client_update_writer.reply_draft_compose_reply.v1": 3,
+    "client_update_writer.prepaid_request_compose_persuasive_text.v1": 3,
+    "proposal_ai.detect_experience_gaps.v1": 3,
+    "proposal_ai.compose_persuasive_text.v1": 3,
+    "task_finder.compare.v1": 3,
+    "task_finder.score.v1": 3
+  }
+}
