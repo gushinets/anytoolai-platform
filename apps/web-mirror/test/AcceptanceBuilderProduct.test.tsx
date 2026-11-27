@@ -670,6 +670,72 @@ describe("Acceptance Builder page", () => {
     expect(screen.getByText(/Récapitulatif/)).toBeTruthy();
   });
 
+  it("retains each mode's raw unsent inputs across switches without starting a run", async () => {
+    const r = routesFor(IDS.draft);
+    const made = makeClientCapturingRequests({
+      ...bothModesRoutes(draftOutput()),
+      [r.QUOTA]: Array.from({ length: 9 }, () => quotaResponse(IDS.draft)),
+    });
+    const { unmount } = render(<AcceptanceBuilderProduct client={made.client} />);
+    const draft = "  Draft brief A\nLine two  ";
+    fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: draft } });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    const finished = await screen.findByLabelText<HTMLTextAreaElement>("Finished work");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(finished.value).toBe("");
+    fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "Check brief B" } });
+    fireEvent.change(finished, { target: { value: "Delivery B" } });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe(draft);
+    expect(screen.queryByLabelText("Finished work")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("Delivery B");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("Check brief B");
+    fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe(draft);
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("Check brief B");
+
+    unmount();
+    render(<AcceptanceBuilderProduct client={made.client} />);
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe("");
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(made.calls.filter((c) => c.key.endsWith("/start"))).toHaveLength(0);
+    expect(made.calls.filter((c) => c.key.startsWith("GET /v1/scenario-sessions/"))).toHaveLength(0);
+  });
+
+  it("New task clears only the active mode's retained inputs", async () => {
+    const r = routesFor(IDS.draft);
+    const made = makeClientCapturingRequests({
+      ...bothModesRoutes(draftOutput()),
+      [r.QUOTA]: Array.from({ length: 10 }, () => quotaResponse(IDS.draft)),
+    });
+    render(<AcceptanceBuilderProduct client={made.client} />);
+    fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "Draft brief A" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    fireEvent.change(await screen.findByLabelText("Finished work"), { target: { value: "Delivery B" } });
+    fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "Check brief B" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe("Draft brief A");
+    fireEvent.click(screen.getByRole("button", { name: "Draft criteria" }));
+    fireEvent.click(await screen.findByRole("button", { name: "New task" }));
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("Delivery B");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("Check brief B");
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe("");
+    expect(made.calls.filter((c) => c.key.endsWith("/start"))).toHaveLength(1);
+  });
+
   it("attaches once: a mode round trip does not re-poll or re-report the handoff session", async () => {
     const events: ProductRunEvent[] = [];
     const base = routes("draft", draftOutput());
@@ -692,6 +758,8 @@ describe("Acceptance Builder page", () => {
     const ended = vi.fn();
     render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" onEvent={(e) => events.push(e)} onAttachEnd={ended} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(made.calls.filter((c) => c.key.endsWith("/start"))).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
     await waitFor(() => expect(screen.getByLabelText("Finished work")).toBeTruthy());

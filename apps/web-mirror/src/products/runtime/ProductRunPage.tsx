@@ -307,7 +307,14 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   selection,
   onAttachBegin,
   onAttachEnd,
-}: ProductRunPageProps<V, R> & { selection: ProductSelection }) {
+  initialVisitValues,
+  onVisitValuesChange,
+}: ProductRunPageProps<V, R> & {
+  selection: ProductSelection;
+  initialVisitValues?: V;
+  /** Synchronous user edits; null means the active form was reset. */
+  onVisitValuesChange?: (values: V | null) => void;
+}) {
   const attachSessionId = selection.kind === "session" ? selection.sessionId : undefined;
   const { Fields, Result } = definition;
   const paid = client.portalIdentity !== undefined;
@@ -391,7 +398,9 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     };
   }, []);
 
-  const [values, setValues] = useState<V>(definition.emptyValues);
+  const [values, setValues] = useState<V>(
+    selection.kind === "form" ? initialVisitValues ?? definition.emptyValues : definition.emptyValues,
+  );
   const valuesRef = useLatest(values);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
   const rejectedInputRef = useRef<{ input: V; errors: Partial<Record<keyof V, FieldError>> } | null>(null);
@@ -1334,6 +1343,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     }
     if (paid) forgetChosenAttachSession(productId);
     setValues(definition.emptyValues);
+    onVisitValuesChange?.(null);
     if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});
     rejectedInputRef.current = null;
@@ -1374,6 +1384,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     setManualDraft(null);
     const next = { ...values, [field]: value };
     setValues(next);
+    onVisitValuesChange?.(next);
     if (draftKey !== null) {
       saveDraftValues(draftKey, next);
       saveProductDraftScenario(productId, scenarioId, draftOwner);

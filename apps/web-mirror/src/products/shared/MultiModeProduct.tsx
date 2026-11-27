@@ -28,6 +28,7 @@ export function MultiModeProduct<Id extends string, R>({
   legend,
   name,
   modes,
+  retainModeInputsForVisit = false,
   ...attach
 }: AttachProps & {
   client: PlatformApiClient;
@@ -38,8 +39,11 @@ export function MultiModeProduct<Id extends string, R>({
   name: string;
   /** The first mode is the initial one. */
   modes: readonly [ProductMode<Id, R>, ...ProductMode<Id, R>[]];
+  /** Keep each mode's edited values until this product unmounts. */
+  retainModeInputsForVisit?: boolean;
 }) {
   const [locked, setLocked] = useState(false);
+  const modeInputs = useRef(new Map<string, Record<string, unknown>>());
   const selection = useProductSelection(client, modes.map((mode) => mode.definition), attach);
   const { state } = selection;
   const mode = modes.find((mode) => state.kind === "ready" && mode.definition.scenarioId === state.selection.scenarioId) ?? modes[0];
@@ -80,6 +84,12 @@ export function MultiModeProduct<Id extends string, R>({
         onLockedChange={setLocked}
         visitId={visitId}
         selection={state.selection}
+        initialVisitValues={retainModeInputsForVisit ? modeInputs.current.get(mode.definition.scenarioId) : undefined}
+        onVisitValuesChange={retainModeInputsForVisit ? (values: Record<string, unknown> | null) => {
+          const scenarioId = mode.definition.scenarioId;
+          if (values === null) modeInputs.current.delete(scenarioId);
+          else modeInputs.current.set(scenarioId, values);
+        } : undefined}
         onAttachBegin={attach.onAttachBegin}
         onAttachEnd={attach.onAttachEnd}
       />}
