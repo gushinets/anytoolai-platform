@@ -1,0 +1,513 @@
+[
+  {
+    "scenario_case_id": "bd-h01-labels",
+    "scenario_id": "brief_decoder.decode_v1",
+    "product_id": "brief_decoder",
+    "inputs": {
+      "ru": {
+        "brief_text": "Нужны обновлённые этикетки для трёх размеров банок с джемом, чтобы команда типографии могла напечатать серию. Сдайте один редактируемый исходник с отдельной монтажной областью на каждый размер и PDF для печати на каждый размер. Мы передадим актуальный логотип и тексты; контуры и размеры ещё не утверждены, сейчас есть только черновые. На каждой этикетке оставьте точную фразу «Keep chilled.» Типография требует печать в один чёрный цвет, а отдел маркетинга требует цветной CMYK для тех же файлов. Сам тираж в работу не входит. Желаемая дата сдачи — 2026-12-11; исполнитель её ещё не подтвердил. Бюджет — не более 380 USD."
+      },
+      "en": {
+        "brief_text": "We need updated labels for three sizes of jam jar so the print team can produce the run. Deliver one editable source file with a separate artboard per size and a print PDF for each size. We will provide the current logo and copy; the dielines and dimensions are still draft and have not been approved. Keep the exact words “Keep chilled.” on each label. The printer requires a single black ink, while marketing requires full-color CMYK for those same files. Printing the run is out of scope. The preferred delivery date is 2026-12-11; the freelancer has not confirmed it yet. The budget is no more than 380 USD."
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Три размера банок, одна монтажная область на размер в одном исходнике и три PDF для типографии.",
+        "Контуры и размеры не утверждены. Типография и маркетинг требуют разные цветовые режимы для одних файлов.",
+        "Точная фраза Keep chilled., тираж исключён; 2026-12-11 — желаемая неподтверждённая дата, 380 USD — верхний предел."
+      ],
+      "required": [
+        "Вернуть штатный конечный результат brief_decoder.decode_v1, исходный бриф дословно и четыре раздела документа в порядке шаблона.",
+        "Вывод пригоден для чтения и передачи: 3 размера, один исходник с отдельной областью на размер и PDF на каждый, точная фраза Keep chilled., ограничения и отсутствие печати тиража.",
+        "Указать желаемый неподтверждённый срок 2026-12-11 и верхний предел 380 USD. Назвать неутверждённые контуры и противоречие между типографией и маркетингом. Показать, что работу начинать рано.",
+        "В результате есть вопросы, соответствующие фактическим проблемам и индексам, включая подтверждение размеров и выбор режима цвета. Документ сохраняет дословные строки реально пройденных шагов в исходном порядке. Авторский текст на языке брифа."
+      ],
+      "prohibited": [
+        "Придуманные условия, выбранный цвет, подтверждённая дата, другая цена или включение тиража. Потеря предупреждений о контуре или цвете. Перевод фразы Keep chilled. или сокращение фактических списков в документе."
+      ],
+      "allowed": [
+        "Порядок находок и их формулировки определяются фактически выполненными шагами. Вопрос о желаемой дате полезен, если A04 выделил отдельный риск срока."
+      ]
+    },
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/packaging-design/PET-Bottle-Label-Design",
+        "date": "2026-11-25",
+        "date_basis": "дата проверки карточки заказа",
+        "adaptation": "Из открытого заказа взяты задача оформления этикетки, редактируемый исходник, PDF и размеры упаковки как вход. Банки, число размеров, стороны, фраза, расхождение, лимит и сроки составлены для эксперимента. Все фиксированные промежуточные результаты составлены для эксперимента."
+      }
+    ],
+    "max_steps": 4,
+    "step_prompts": [
+      "brief_decoder.extract_brief.v1",
+      "brief_decoder.detect_issues.v1",
+      "brief_decoder.generate_questions.v1",
+      "brief_decoder.generate_summary.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "pa-h02-accessibility-pilot",
+    "scenario_id": "proposal_ai.generate_v1",
+    "product_id": "proposal_ai",
+    "inputs": {
+      "ru": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "Нужен ручной аудит формы бронирования по WCAG 2.2 AA. Для полного аудита обязателен предыдущий опыт с NVDA в Chrome на Windows и VoiceOver в Safari на macOS. Без проверки в NVDA полный аудит не принимается. Моё предложение клиенту ограничено предварительной проверкой формы с клавиатуры и в VoiceOver в Safari на macOS. Предоставлю отчёт с шагами воспроизведения, ссылками на критерии и приоритетом каждой проблемы. Нужен доступ к тестовой форме до начала. Исправления и проверка в NVDA в моё предложение не входят.",
+        "freelancer_positioning": "Провожу ручные проверки доступности веб-форм по WCAG 2.2 AA. В проекте для формы записи на занятия проверены клавиатура и VoiceOver в Safari на macOS, а в отчёте указаны шаги, критерии и приоритеты. Практики проверки с NVDA у меня нет.",
+        "tone": "firm"
+      },
+      "en": {
+        "result_contract": "proposal_ai.field_errors_v1",
+        "task_text": "The client needs a manual WCAG 2.2 AA audit of a booking form. The full audit requires previous experience using NVDA in Chrome on Windows and VoiceOver in Safari on macOS. The client will not accept a full audit without NVDA testing. My offer is limited to a preliminary form review using the keyboard and VoiceOver in Safari on macOS. I will deliver a report with reproduction steps, criterion references and priority per issue. Access to the test form is required before work starts. Fixes and NVDA testing are outside my offer.",
+        "freelancer_positioning": "I manually test web forms against WCAG 2.2 AA. For a class enrollment form I tested keyboard navigation and VoiceOver in Safari on macOS and documented reproduction steps, criteria and priorities. I haven't tested with NVDA.",
+        "tone": "firm"
+      }
+    },
+    "rubric": {
+      "workflow_id": "proposal_ai.generate_v1",
+      "outcome": "send_ready_proposal",
+      "output_fields": [
+        "text",
+        "gaps"
+      ],
+      "expected_gap_categories": [
+        "experience_gap"
+      ],
+      "expected_gap_count": 1,
+      "required": [
+        "Workflow завершился с выходом {text, gaps} в запрошенной локали по продуктовому контракту.",
+        "В gaps применяются критерии A04, в text применяются критерии A06 этой же сценарной пары.",
+        "Фактический результат A04 передан в claims_to_avoid шага A06 и отражён в gaps."
+      ],
+      "prohibited": [
+        "Критическое нарушение из рубрики любого атома или подмена реального A04 фиксированным выходом."
+      ],
+      "allowed": [
+        "Формулировки в рамках рубрик обоих атомов."
+      ]
+    },
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/accessibility-testing/Page-WCAG-Audit",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, абсолютная дата публикации не указана.",
+        "adaptation": "Пересказ заказа о ручном аудите с двумя скринридерами. Составлены форма бронирования и условия предварительной проверки. Профиль и фиксированный выход A04 для отдельного прогона A06 составлены."
+      }
+    ],
+    "max_steps": 2,
+    "step_prompts": [
+      "proposal_ai.detect_experience_gaps.v1",
+      "proposal_ai.compose_persuasive_text.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "ab-holdout-draft-02-explainer-voice",
+    "scenario_id": "acceptance_builder.draft_v1",
+    "product_id": "acceptance_builder",
+    "inputs": {
+      "ru": {
+        "brief_text": "Заказываем три ролика о работе программы. Каждый — 90–120 секунд, 1080p MP4. Для каждого нужны отдельный SRT и редактируемый файл проекта. Раскадровку передайте до 5 декабря, чтобы мы её согласовали. Брендбук и текст дадим. В каждом ролике должна быть закадровая озвучка. Сдайте все ролики без закадровой озвучки. Количество раундов правок не ограничено."
+      },
+      "en": {
+        "brief_text": "We are commissioning three videos explaining our software. Each must be 90–120 seconds and delivered as a 1080p MP4. Include a separate SRT and an editable project file for each video. Send the storyboard by December 5 for our approval. We'll supply the brand guide and copy. Every video must have a voice-over. Deliver all videos without a voice-over. There is no limit on revision rounds."
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Сдать три ролика, по 90–120 секунд каждый, 1080p MP4, отдельный SRT и редактируемый проект на каждый.",
+        "Раскадровка до 5 декабря. Финальная дата не названа. Брендбук и текст предоставляет заказчик.",
+        "Два прямых взаимоисключающих правила об озвучке. Число раундов правок не ограничено."
+      ],
+      "required": [
+        "Итоговый черновик сохраняет форматы, три ролика, диапазон длительности, раскадровку до 5 декабря и источник материалов. Оба конфликтующих условия об озвучке отсутствуют в `extracted.values.acceptance_criteria`.",
+        "В рисках выделены одно противоречие с обеими формулировками и открытый объём правок. В вопросах есть выбор по озвучке и отдельный вопрос о границе правок.",
+        "Текст объяснений и вопросов на языке брифа, а ссылки вопросов соответствуют фактическим issues."
+      ],
+      "prohibited": [
+        "Утвердить любую из версий об озвучке. Приписать дату 5 декабря финальным роликам или установить предел правок.",
+        "Считать озвучку решённой. Выдумать число раундов, дату финала или бюджет.",
+        "Просить подтвердить уже ясную длительность/формат, предлагать произвольное число раундов или менять дату раскадровки."
+      ],
+      "allowed": [
+        "Клиентские вопросы ссылаются на фактически полученные issues сценария. Индексы не обязаны совпадать с фиксированным входом A05."
+      ]
+    },
+    "sources": [
+      {
+        "ref": "https://www.freelancer.com/projects/2d-animation-explainer-video/need-software-explainer-video-series",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "Форматы, длительность, число роликов и раскадровка по объявлению №40611627. Срок раскадровки, противоречие об озвучке и открытые раунды составлены."
+      }
+    ],
+    "max_steps": 3,
+    "step_prompts": [
+      "acceptance_builder.extract.v1",
+      "acceptance_builder.detect_issues.v1",
+      "acceptance_builder.generate_questions.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "ab-holdout-check-01-accessible-pdf",
+    "scenario_id": "acceptance_builder.check_v1",
+    "product_id": "acceptance_builder",
+    "inputs": {
+      "ru": {
+        "brief_text": "Сделайте доступную версию инструкции `guide.pdf` с тегами, закладками и логичным порядком чтения. Внешний вид должен совпасть с исходником. Обязательно прогоните PAC и вручную подтвердите экранным диктором порядок чтения таблицы на странице 4. Передайте исправленный PDF и короткий отчёт об обеих проверках. Исходник мы предоставим.",
+        "deliverable_text": "Передал обновлённый `guide.pdf` с тегами, закладками и прежним внешним видом. В отчёте PAC ошибок нет. Экранным диктором не проверял: проверка порядка чтения таблицы на странице 4 ещё не выполнена. В переданном отчёте об этом написано."
+      },
+      "en": {
+        "brief_text": "Make `guide.pdf` accessible with tags, bookmarks and a logical reading order. Keep the original appearance. You must run PAC and manually confirm the table reading order on page 4 with a screen reader. Deliver the corrected PDF and a brief report covering both checks. We will supply the original.",
+        "deliverable_text": "I handed over the updated `guide.pdf` with tags, bookmarks and its original appearance. PAC reports no errors. I did not use a screen reader, so the table reading order on page 4 has yet to be checked. That is noted in the report I handed over."
+      }
+    },
+    "rubric": {
+      "facts": [
+        "PDF и отчёт есть. По сдаче теги, закладки и внешнее соответствие указаны.",
+        "PAC не выявил ошибок. Обязательная ручная проверка страницы 4 не сделана. Фактическое поведение таблицы неизвестно."
+      ],
+      "required": [
+        "Указать, что отсутствие самостоятельной ручной проверки мешает принять результат. PAC не заменяет экранный диктор.",
+        "Засчитать переданные файлы и прямо отличить отсутствие проверки от обнаруженной ошибки в таблице.",
+        "В извлечении есть PDF и отчёт, PAC и отдельная ручная проверка страницы 4, сохранение внешнего вида и исходник от заказчика. Язык анализа соответствует брифу."
+      ],
+      "prohibited": [
+        "Приписать непроверенной таблице исправный или неверный порядок чтения. Назвать PDF или отчёт отсутствующими.",
+        "Приписать документу подтверждённую фактическую или юридическую доступность."
+      ],
+      "allowed": [
+        "Можно оценить комплект как полученный или как неполный из-за содержания отчёта. Для основной проверки обязательная ручная проверка отсутствует в обоих случаях."
+      ],
+      "allowed_verdicts": [
+        "does_not_meet"
+      ],
+      "criterion_statuses": {
+        "scope_coverage": [
+          "partial",
+          "mismatch"
+        ],
+        "requirement_fit": [
+          "mismatch"
+        ],
+        "completeness": [
+          "match",
+          "partial"
+        ],
+        "clarity": [
+          "match"
+        ]
+      }
+    },
+    "sources": [
+      {
+        "ref": "https://www.my.freelancer.com/projects/adobe-acrobat/pdf-ada-compliance-conversion",
+        "date": "2026-11-25",
+        "date_basis": "Дата проверки страницы, на сайте указана относительная дата публикации.",
+        "adaptation": "По объявлению №40256672 пересказаны доступность PDF, сохранение макета, проверки и отчёт. Названия файлов, тестовый фрагмент и сведения о сдаче составлены."
+      }
+    ],
+    "max_steps": 2,
+    "step_prompts": [
+      "acceptance_builder.extract.v1",
+      "acceptance_builder.compare.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "cuw-h01-ebook-accessibility",
+    "scenario_id": "client_update_writer.update_v1",
+    "product_id": "client_update_writer",
+    "inputs": {
+      "ru": {
+        "tone": "warm",
+        "progress_notes": "Статус проверки доступности электронной книги. Из 8 глав полностью проверено 5, в 2 ещё идёт проверка, 1 не начата. В уже проверенных главах найдены таблицы без заголовков. Передайте, пожалуйста, исходники таблиц к главам 7 и 8 к 3 декабря 2026. После получения продолжится проверка. Финальная передача согласована на 10 декабря 2026. Если исходники придут позже 3 декабря, дату передачи нужно пересогласовать. Новая дата пока неизвестна. Договор: 820 EUR. Перевод вне объёма. Это апдейт без запроса оплаты.",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      },
+      "en": {
+        "tone": "warm",
+        "progress_notes": "E-book accessibility review update. Out of 8 chapters, 5 have been fully checked, 2 are being checked, and 1 has not been started. The completed checks found tables without headers. Please send the editable table files for chapters 7 and 8 by December 3, 2026. The review will continue once they arrive. Final delivery is agreed for December 10, 2026. If the table files arrive after December 3, the delivery date must be renegotiated. A new date is not yet known. Contract: EUR 820. Translation is outside scope. This update does not request payment.",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1100
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Проверка доступности из 8 глав: 5 готовы, 2 проверяются, 1 не начата.",
+        "Найдены таблицы без заголовков. Нужны редактируемые исходники таблиц для глав 7 и 8.",
+        "Исходники к 3 декабря 2026. Передача согласована на 10 декабря 2026. При опоздании нужна новая договорённость. Договор 820 EUR и перевод вне объёма."
+      ],
+      "required": [
+        "Переданы все три статуса с общим количеством глав и факт о заголовках таблиц.",
+        "Запрошены исходники для обеих глав с указанным сроком. После получения проверка продолжится.",
+        "Статус согласованной передачи и порядок пересогласования сохранены. Указаны договорная сумма и исключение перевода.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Выдуманные заголовки или точное количество дефектов. Другие числа, сроки или валюта. Оплата, счёт или обещание новой даты. Завершённый перевод."
+      ],
+      "allowed": [
+        "Даты можно написать в естественном порядке для локали, и код валюты можно поставить до или после суммы. Просьба передать исходники может стоять в text или call_to_action."
+      ]
+    },
+    "sources": [
+      {
+        "ref": "tests/fixtures/client_update_writer_eval/commercial_terms.json#V06-ru",
+        "date": "2026-11-06",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Сохранён тип проверки модальности. Ниша, этапы, числа, даты, ограничения и тексты составлены заново."
+      }
+    ],
+    "max_steps": 1,
+    "step_prompts": [
+      "client_update_writer.update_compose_reply.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "cuw-h04-testimonials-rounds",
+    "scenario_id": "client_update_writer.reply_draft_v1",
+    "product_id": "client_update_writer",
+    "inputs": {
+      "ru": {
+        "tone": "warm",
+        "client_message": "Можем добавить второй раунд правок в текущую цену? Войдёт ли в него новый блок отзывов для страницы? Ранее согласовали сдачу на 10 декабря 2026.",
+        "reply_goal": "Подтвердить второй раунд в текущей цене. Новый блок отзывов в этот раунд не входит, его можно обсудить и оценить отдельно. Подтвердить согласованную сдачу 10 декабря 2026. Цену отдельной работы пока не обсуждали.",
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 750
+        }
+      },
+      "en": {
+        "tone": "warm",
+        "client_message": "Can we include a second revision round in the current price? Will it cover a new testimonials section on the page? We previously agreed on December 10, 2026 for delivery.",
+        "reply_goal": "Confirm a second revision round at the current price. The new testimonials section is excluded from that round and can be discussed and estimated separately. Confirm the agreed delivery on December 10, 2026. The price of the separate work has not been discussed.",
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 750
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Второй раунд принят в текущей цене. Блок отзывов исключён из него, возможны отдельное обсуждение и оценка.",
+        "Сдача согласована на 10 декабря 2026. Сумма допработ неизвестна."
+      ],
+      "required": [
+        "Дан прямой ответ на каждый запрос с правильным статусом. Назван именно новый блок отзывов.",
+        "Подтверждена исходная дата без нового требования подтвердить её.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "Скопированное сообщение состоит из text и необязательного call_to_action. Просьба к клиенту встречается один раз."
+      ],
+      "prohibited": [
+        "Смешение согласованного раунда и блока отзывов. Выдуманные цена, сроки, объём или условие подтверждения."
+      ],
+      "allowed": [
+        "Можно сказать об отдельной оценке как о возможном шаге. Активная просьба к клиенту не требуется."
+      ]
+    },
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#reply_draft",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "Использован паттерн входа client_message/reply_goal. Переговоры, условия и даты составлены для holdout."
+      }
+    ],
+    "max_steps": 1,
+    "step_prompts": [
+      "client_update_writer.reply_draft_compose_reply.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "cuw-h07-audio-deposit-remainder",
+    "scenario_id": "client_update_writer.prepaid_request_v1",
+    "product_id": "client_update_writer",
+    "inputs": {
+      "ru": {
+        "tone": "neutral",
+        "billing_context": {
+          "notes": "Согласован аванс за очистку звука для аудиогида. Из аванса 900 EUR получено 250 EUR, остаток аванса 650 EUR должен поступить к 9 декабря 2026. Согласовано, что очистка начнётся после поступления остатка. Отдельная оплата 400 EUR за финальную сборку согласована после передачи, к остатку этого аванса она не относится.",
+          "amount": "900 EUR",
+          "due_date": "9 декабря 2026"
+        },
+        "constraints": {
+          "language": "ru",
+          "output_format": "plain_text",
+          "max_length": 1000
+        }
+      },
+      "en": {
+        "tone": "neutral",
+        "billing_context": {
+          "notes": "A deposit has been agreed for audio cleanup on the audio guide. EUR 250 of the EUR 900 deposit was received, and the remaining EUR 650 deposit is due by December 9, 2026. Audio cleanup is agreed to start after the remaining deposit arrives. A separate EUR 400 payment for final assembly is agreed for after handover and is unrelated to this remaining deposit.",
+          "amount": "EUR 900",
+          "due_date": "December 9, 2026"
+        },
+        "constraints": {
+          "language": "en",
+          "output_format": "plain_text",
+          "max_length": 1000
+        }
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Получено 250 EUR из аванса 900 EUR. Осталось 650 EUR до 9 декабря 2026.",
+        "Очистка звука стартует после остатка. Ещё 400 EUR за финальную сборку платятся отдельно после передачи."
+      ],
+      "required": [
+        "Вежливо и прямо просит перечислить только 650 EUR с указанным сроком.",
+        "Поясняет предмет, полученную сумму и согласованное условие старта. Отдельные 400 EUR сохранены как отдельный платёж после передачи.",
+        "Просит дать знать после отправки платежа.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта.",
+        "В итоговом артефакте готовое сообщение находится в text."
+      ],
+      "prohibited": [
+        "Требование уплатить 900 или 400 EUR сейчас, произвольная валюта, другой срок, способ платежа, реквизиты, номер счёта, просьба подтвердить получение денег."
+      ],
+      "allowed": [
+        "Порядок суммы и валюты и формат даты можно адаптировать к локали."
+      ]
+    },
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_client_update_writer_bundle.py#prepaid_request",
+        "date": "2026-11-11",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "От базовой проверки согласованного аванса взят тип сообщения. Предмет, остаток, суммы и даты составлены для опыта."
+      }
+    ],
+    "max_steps": 1,
+    "step_prompts": [
+      "client_update_writer.prepaid_request_compose_persuasive_text.v1"
+    ]
+  },
+  {
+    "scenario_case_id": "tf-h01-catalogue-csv",
+    "scenario_id": "task_finder.fit_v1",
+    "product_id": "task_finder",
+    "inputs": {
+      "ru": {
+        "task_text": "Нужна нормализация каталога из 600 строк CSV с помощью Python и pandas: привести два поля цены к общему виду, убрать повторы по SKU, отдать очищенный CSV и короткий отчёт о повторах. Доставка до 11 декабря 2026, фиксированный бюджет 420 EUR, удалённо.",
+        "freelancer_positioning": "Пишу скрипты на Python и pandas для товарных каталогов. На предыдущем проекте нормализовал два поля цены и дедуплицировал по SKU CSV на 1200 строк, передал очищенный файл и отчёт о повторах. Беру заказы до 2000 строк, могу выполнить к 11 декабря 2026 за фиксированные 420 EUR, работаю удалённо."
+      },
+      "en": {
+        "task_text": "Normalize a 600-row catalogue CSV with Python and pandas: standardize two price fields, remove duplicates by SKU, and deliver the cleaned CSV plus a short duplicate report. Due December 11, 2026, fixed budget EUR 420, remote.",
+        "freelancer_positioning": "I write Python and pandas scripts for product catalogues. On a previous project I standardized two price fields and removed duplicates by SKU from a 1,200-row CSV, then delivered the cleaned file and duplicate report. I take jobs up to 2,000 rows, can deliver by December 11, 2026 for a fixed EUR 420, and work remotely."
+      }
+    },
+    "rubric": {
+      "facts": [
+        "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+        "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+      ],
+      "required": [
+        "В артефакте оба независимых результата: comparison с ожидаемым вердиктом strong_fit и match со взвешенной оценкой.",
+        "В объяснениях отражены все четыре критерия и каждое явно заявленное ограничение. Исходные задача и профиль сохранены в предназначенных для handoff полях.",
+        "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+      ],
+      "prohibited": [
+        "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+      ],
+      "allowed": [
+        "Фиксированные подписи интерфейса остаются английскими. Требование языка относится к сгенерированным пояснениям."
+      ],
+      "comparison": {
+        "facts": [
+          "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+          "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+        ],
+        "required": [
+          "Вердикт следует из статусов четырёх критериев. Каждый критерий подкреплён фактом или указанием недостающих сведений.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+        ],
+        "allowed": [
+          "Допустимы близкий пересказ и дословная цитата. Категория, статусы и идентификаторы сохраняются по схеме."
+        ],
+        "allowed_verdicts": [
+          "strong_fit"
+        ],
+        "criterion_statuses": {
+          "skills_fit": [
+            "match"
+          ],
+          "experience_fit": [
+            "match"
+          ],
+          "scope_fit": [
+            "match"
+          ],
+          "constraints_fit": [
+            "match"
+          ]
+        }
+      },
+      "match": {
+        "facts": [
+          "Python и pandas заявлены с обеих сторон. Профиль подтверждает такой же проект, включая два поля цены, повторы по SKU и форматы сдачи.",
+          "Размер 600 строк укладывается в 2000. Срок, цена 420 EUR и удалённая работа указаны как совместимые."
+        ],
+        "required": [
+          "Оценки всех четырёх критериев объяснены текстом. Подтверждённые соответствия высоки, явный пробел или отсутствие сведений получают низкую оценку.",
+          "Итоговый score равен взвешенной средней по всем четырём критериям с округлением до целого.",
+          "Авторский текст в языке текущего входа. Технические ключи, enum и исходные наименования остаются в формате контракта."
+        ],
+        "prohibited": [
+          "Профиль не доказывает уже сданный результат для текущего заказчика. Не добавлять другие валюты, даты, задачи или инструменты."
+        ],
+        "allowed": [
+          "Число на конкретном критерии свободно в пределах хорошо обоснованной оценки. Диапазоны служат ориентиром при слепом разборе."
+        ],
+        "criterion_ids": [
+          "skills_fit",
+          "experience_fit",
+          "scope_fit",
+          "constraints_fit"
+        ],
+        "criterion_score_ranges": {
+          "skills_fit": [
+            75,
+            100
+          ],
+          "experience_fit": [
+            75,
+            100
+          ],
+          "scope_fit": [
+            75,
+            100
+          ],
+          "constraints_fit": [
+            75,
+            100
+          ]
+        }
+      }
+    },
+    "sources": [
+      {
+        "ref": "apps/platform-api/tests/test_task_finder_bundle.py#TASK_TEXT",
+        "date": "2026-10-10",
+        "date_basis": "Дата последнего коммита файла в Git на ревизии 452b879c3f8a.",
+        "adaptation": "За основу взяты структура проекта и четырёхкритериальная проверка. Задача и профиль для сильного совпадения составлены заново."
+      }
+    ],
+    "max_steps": 2,
+    "step_prompts": [
+      "task_finder.compare.v1",
+      "task_finder.score.v1"
+    ]
+  }
+]

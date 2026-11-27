@@ -1,0 +1,4 @@
+# Preserve the original bytes of the frozen CRLF fixtures.
+/proposal_ai.json -text whitespace=cr-at-eol
+/proposal_ai_holdout.json -text whitespace=cr-at-eol
+/scenario-probes.json -text whitespace=cr-at-eol
