@@ -406,6 +406,24 @@ def _normalized_prepaid_prompt() -> str:
     )
 
 
+def test_prepaid_request_prompt_requires_complete_scope_description() -> None:
+    prompt = _normalized_prepaid_prompt()
+    completeness = prompt.index("`text` must be a complete, self-contained message")
+    grammar = prompt.index("Write grammatically complete, natural sentences")
+    addressee = prompt.index("Address the message to the client")
+
+    assert completeness < grammar < addressee
+    rule = prompt[grammar:addressee]
+    assert "use a complete statement or a self-contained scope label introducing a list" in rule
+    assert "must connect to a governing clause" in rule
+    assert "do not leave it dangling before a dash or a list" in rule
+    assert "reread the opening scope description" in rule
+    assert (
+        "repair any unfinished construction without changing facts, payment terms, "
+        "scope boundaries, tone or message kind" in rule
+    )
+
+
 # The prepaid step's `objective` is pinned exactly (ANY-603/ANY-602): it must stay neutral --
 # no urgency, no closing line, no message kind, no "confirm" -- all of that lives in the prompt.
 # A word heuristic cannot tell payment urgency from neutral time words, so the literal itself is

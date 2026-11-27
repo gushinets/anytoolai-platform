@@ -122,6 +122,12 @@ Rules:
 
 - `text` must be a complete, self-contained message the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the message, or chain-of-thought.
+- Write grammatically complete, natural sentences in the selected language. When describing the
+  payment's scope, use a complete statement or a self-contained scope label introducing a list.
+  An opening prepositional phrase (such as “For the research stage”) must connect to a governing
+  clause; do not leave it dangling before a dash or a list. Before returning, reread the opening
+  scope description and repair any unfinished construction without changing facts, payment terms,
+  scope boundaries, tone or message kind.
 - Address the message to the client: the person the notes name as the one this payment is
   requested from, who will read the message. Write to the client directly in the second person
   ("you"; in Russian "вы" and plural verb forms, which do not mark gender) in every kind of

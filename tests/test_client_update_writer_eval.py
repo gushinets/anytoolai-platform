@@ -3,7 +3,11 @@
 import hashlib
 import importlib.util
 import json
+import os
+import signal
+import subprocess
 import sys
+import time
 import zipfile
 from copy import deepcopy
 from pathlib import Path
@@ -34,7 +38,7 @@ def windows_default_text_encoding(monkeypatch):
     monkeypatch.setattr(Path, "open", legacy_open)
 
 
-def worker_file(path, router, prompt="prompt", policy_ref="default_text_generation_v1"):
+def worker_file(path, router, prompt=None, policy_ref="default_text_generation_v1"):
     if path == eval_module.LIVE_PROFILE:
         return json.dumps({"enabled_products": {
             "client_update_writer": {"provider_policy_ref": policy_ref}
@@ -43,8 +47,14 @@ def worker_file(path, router, prompt="prompt", policy_ref="default_text_generati
         return (ROOT / "configs/kernel/provider_policies.yaml").read_text(encoding="utf-8")
     if path == eval_module.ROUTER:
         return router
-    assert path.endswith("/prompts/update_compose_reply.v1.md"), path
-    return prompt
+    assert path in {
+        f"/app/{eval_module.PRODUCT}/prompts/{filename}"
+        for filename in eval_module.PROMPT_BY_MODE.values()
+    }, path
+    return (
+        (ROOT / path.removeprefix("/app/")).read_text(encoding="utf-8")
+        if prompt is None else prompt
+    )
 
 
 def record():
@@ -403,6 +413,56 @@ def test_collector_overrides_only_deployed_product_group(
     assert eval_module.configuration_problems(manifest) == []
 
 
+@pytest.mark.parametrize(("suite_name", "prompt_name"), [
+    ("screening.json", "update_compose_reply.v1.md"),
+    ("prepaid_scope_grammar.json", "prepaid_request_compose_persuasive_text.v1.md"),
+])
+@pytest.mark.parametrize("stale", [False, True])
+def test_collector_binds_suite_to_current_worker_prompt(tmp_path, suite_name, prompt_name, stale):
+    original = (ROOT / "configs/kernel/litellm_router.yaml").read_text(encoding="utf-8")
+    prompt_path = f"{eval_module.PRODUCT}/prompts/{prompt_name}"
+    prompt = (ROOT / prompt_path).read_text(encoding="utf-8")
+    args = SimpleNamespace(
+        suite=eval_module.FIXTURE.with_name(suite_name), model="openai/gpt-6-luna",
+        reasoning="medium", repeats=None, out=tmp_path, resume=True, project="local",
+        max_attempts=0,
+    )
+    with (
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     worker_file(a[-1], original, "stale prompt" if stale else None)) as docker,
+        patch.object(eval_module, "collection_revision", return_value={
+            "git_sha": "a" * 40, "git_dirty": False,
+        }),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+    ):
+        if stale:
+            with pytest.raises(ValueError, match="worker prompt differs from checkout"):
+                eval_module.collect(args)
+            write.assert_not_called()
+            assert not (tmp_path / "manifest.json").exists()
+        else:
+            eval_module.collect(args)
+            manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+            assert manifest["prompt_sha256"] == hashlib.sha256(prompt.encode()).hexdigest()
+        browser.assert_not_called()
+        assert docker.call_args.args == ("local", "platform-worker", "cat", f"/app/{prompt_path}")
+
+
+@pytest.mark.parametrize("modes", [("update", "prepaid_request"), ("reply_draft",), (None,), ([],)])
+def test_collector_rejects_mixed_or_unsupported_modes_before_worker_access(tmp_path, modes):
+    suite = json.loads(eval_module.FIXTURE.read_text(encoding="utf-8"))
+    suite["cases"] = [{**case, "mode": mode} for case, mode in zip(suite["cases"], modes)]
+    path = tmp_path / "suite.json"
+    path.write_text(json.dumps(suite), encoding="utf-8")
+    with (
+        patch.object(eval_module, "_docker") as docker,
+        pytest.raises(ValueError, match="suite .*mode"),
+    ):
+        eval_module.collect(SimpleNamespace(suite=path))
+    docker.assert_not_called()
+
+
 def test_missing_active_group_rejected_before_worker_mutation(tmp_path):
     original = json.dumps({"model_list": [{
         "model_name": "anytoolai.default_text", "litellm_params": {"model": "openai/gpt-6-luna"},
@@ -462,6 +522,17 @@ def saved_verdict(directory):
     return json.loads((directory / "verdicts.jsonl").read_text(encoding="utf-8").splitlines()[-1])
 
 
+def read_private_review_file(capsys):
+    captured = capsys.readouterr()
+    prefix = "Откройте локальный файл проверки: "
+    path = Path(next(line.removeprefix(prefix) for line in captured.out.splitlines()
+                     if line.startswith(prefix)))
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o077 == 0
+        assert path.parent.stat().st_mode & 0o077 == 0
+    return path, path.read_text(encoding="utf-8"), captured.out + captured.err
+
+
 def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp_path, capsys):
     directory, run = review_directory(tmp_path)
     observation = {
@@ -474,9 +545,16 @@ def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp
     (tmp_path / "agent-observations.json").write_text(
         json.dumps({"observations": [observation]}), encoding="utf-8"
     )
-    with patch(
-        "builtins.input", side_effect=["", "invalid", "n", "Readiness is misstated", "Still", "y"]
-    ):
+    answers = iter(["", "invalid", "n", "Readiness is misstated", "Still", "y"])
+    private_view = []
+
+    def answer(prompt):
+        assert "Preserves readiness." not in prompt
+        if not private_view:
+            private_view.append(read_private_review_file(capsys))
+        return next(answers)
+
+    with patch("builtins.input", side_effect=answer):
         review_module.review(directory, " Putilin ", "sol-medium")
     verdict = saved_verdict(directory)
     assert verdict["reviewer"] == "Putilin"
@@ -485,10 +563,13 @@ def test_interactive_review_requires_explicit_decisions_and_records_identity(tmp
     assert verdict["answers"][0]["reason"] == "Readiness is misstated"
     assert verdict["critical_error"] is True
     assert report_module.human_status(run, verdict) == ("FAIL", True)
-    display = capsys.readouterr().out
-    assert "Internal complete; tests fail." in display
-    assert "Still in progress." in display
-    assert "agent suggests yes" in display
+    [(path, view, console)] = private_view
+    console += capsys.readouterr().out
+    for value in ("Internal complete; tests fail.", "Still in progress.",
+                  "Preserves readiness.", "agent suggests yes", "Agent explanation"):
+        assert value in view
+        assert value not in console
+    assert not path.parent.exists()
     # A confirmed verdict is not requested again, even for another reviewer.
     with patch("builtins.input", side_effect=AssertionError("already reviewed")):
         review_module.review(directory, "Another reviewer")
@@ -540,10 +621,20 @@ def test_review_discards_stale_or_differently_attributed_partial_decisions(tmp_p
     (tmp_path / "agent-observations.json").write_text(
         json.dumps({"observations": [observation]}), encoding="utf-8"
     )
-    with patch("builtins.input", side_effect=["n", "New assessment", "", "n"]):
+    answers = iter(["n", "New assessment", "", "n"])
+    private_view = []
+
+    def answer(_prompt):
+        if not private_view:
+            private_view.append(read_private_review_file(capsys))
+        return next(answers)
+
+    with patch("builtins.input", side_effect=answer):
         review_module.review(directory, "Putilin")
     assert saved_verdict(directory)["answers"][0]["reason"] == "New assessment"
-    assert "STALE SUGGESTION" not in capsys.readouterr().out
+    [(path, view, console)] = private_view
+    assert "STALE SUGGESTION" not in view + console + capsys.readouterr().out
+    assert not path.parent.exists()
 
 
 def test_unknown_or_skipped_review_is_pending_and_eof_preserves_progress(tmp_path):
@@ -581,6 +672,74 @@ def test_collector_dispatches_offline_review_without_docker():
         eval_module.main(["review", "--reviewer", "Putilin", "--directory", "results"])
     offline.assert_called_once_with(["--reviewer", "Putilin", "--directory", "results"])
     collect.assert_not_called()
+
+
+def test_review_main_restores_previous_sigterm_handler():
+    previous = signal.getsignal(signal.SIGTERM)
+
+    def terminate(*_args):
+        handler = signal.getsignal(signal.SIGTERM)
+        assert handler is review_module.interrupt_review
+        handler(signal.SIGTERM, None)
+
+    with (
+        patch.object(review_module, "review", side_effect=terminate),
+        pytest.raises(SystemExit) as stopped,
+    ):
+        review_module.main(["--directory", ".", "--reviewer", "Putilin"])
+    assert stopped.value.code == 128 + signal.SIGTERM
+    assert signal.getsignal(signal.SIGTERM) == previous
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Windows forced process termination is not catchable SIGTERM")
+@pytest.mark.parametrize("entrypoint", [
+    ["client_update_writer_review.py"],
+    ["client_update_writer_eval.py", "review"],
+])
+def test_sigterm_removes_private_review_file_and_preserves_saved_verdict(tmp_path, entrypoint):
+    directory, run = review_directory(tmp_path, questions=["Ready?", "Dates?"])
+    private_root = tmp_path / "private"
+    private_root.mkdir()
+    console = tmp_path / "console.log"
+    script, *subcommand = entrypoint
+    env = {**os.environ, "TMPDIR": str(private_root), "PYTHONIOENCODING": "utf-8",
+           "LITELLM_LOCAL_MODEL_COST_MAP": "True"}
+    command = [sys.executable, "-u", str(ROOT / "scripts/agent" / script), *subcommand,
+               "--directory", str(directory), "--reviewer", "Putilin"]
+    with console.open("w", encoding="utf-8") as log, subprocess.Popen(
+        command, stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", env=env, cwd=ROOT,
+    ) as process:
+        def wait_for_prompt(prompt):
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                text = console.read_text(encoding="utf-8", errors="replace")
+                if prompt in text:
+                    return text
+                if process.poll() is not None:
+                    pytest.fail(f"Review exited before prompt: {text}")
+                time.sleep(0.02)
+            pytest.fail(f"Timed out waiting for {prompt}: {console.read_text(encoding='utf-8', errors='replace')}")
+
+        try:
+            output = wait_for_prompt("Пункт 1/2")
+            [path] = private_root.glob("anytoolai-review-*/case.txt")
+            assert "Internal complete; tests fail." in path.read_text(encoding="utf-8")
+            assert "Internal complete; tests fail." not in output
+            assert process.stdin is not None
+            process.stdin.write("y\n")
+            process.stdin.flush()
+            wait_for_prompt("Пункт 2/2")
+            before = (directory / "verdicts.jsonl").read_bytes()
+            process.terminate()
+            assert process.wait(timeout=10) == 128 + signal.SIGTERM
+            assert not path.parent.exists()
+            assert (directory / "verdicts.jsonl").read_bytes() == before
+            assert report_module.human_status(run, saved_verdict(directory))[0] == "PENDING"
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
 
 
 def experiment_manifests():
@@ -684,6 +843,56 @@ def test_report_preserves_utf8_with_legacy_default_encoding(tmp_path):
     assert text in (tmp_path / "report.html").read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("case_index", [0, 6])  # Payment request and settled acknowledgment.
+@pytest.mark.parametrize("interruption", [review_module.ReviewStopped, EOFError])
+def test_prepaid_review_and_report_show_all_billing_fields(capsys, case_index, interruption):
+    suite = json.loads(eval_module.FIXTURE.with_name("prepaid_scope_grammar.json").read_text(
+        encoding="utf-8"
+    ))
+    case = suite["cases"][case_index]
+    run = {**record(), "id": case["id"], "input": case}
+    rendered = report_module.render_run("luna-medium", run, "PENDING", case, [])
+    row = {"reviewer": "Putilin", "answers": [{"decision": None} for _ in case["criteria"]]}
+    private_view = []
+
+    def stop(prompt):
+        assert case["criteria"][0] not in prompt
+        private_view.append(read_private_review_file(capsys))
+        raise interruption
+
+    saved = []
+    with (
+        patch.object(review_module, "choose", side_effect=stop),
+        pytest.raises(interruption),
+    ):
+        review_module.review_run(run, row, None, saved.append)
+    [(path, view, console)] = private_view
+    console += capsys.readouterr().out
+    assert not saved
+    assert not path.parent.exists()
+    assert eval_module.review_input_text(case) in view
+    assert report_module.html.escape(eval_module.review_input_text(case)) in rendered
+    for value in case["billing_context"].values():
+        assert value in view
+        assert value not in console
+        assert report_module.html.escape(value) in rendered
+    for value in (*case["criteria"], *run["output"].values()):
+        assert value in view
+        assert value not in console
+
+
+def test_review_stops_before_decisions_if_private_file_cannot_be_written(tmp_path):
+    directory, _ = review_directory(tmp_path)
+    with (
+        patch.object(Path, "write_text", side_effect=OSError("cannot write private review")),
+        patch.object(review_module, "choose") as choose,
+        pytest.raises(OSError, match="cannot write private review"),
+    ):
+        review_module.review(directory, "Putilin")
+    choose.assert_not_called()
+    assert not (directory / "verdicts.jsonl").exists()
+
+
 @pytest.mark.usefixtures("valid_report_runtime")
 @pytest.mark.parametrize(
     "change",
@@ -769,7 +978,9 @@ def resume_collection(tmp_path):
             }
         ]
     }
-    prompt = "fixed prompt"
+    prompt = (ROOT / eval_module.PRODUCT / "prompts/update_compose_reply.v1.md").read_text(
+        encoding="utf-8"
+    )
     manifest = {
         "suite_sha256": eval_module.digest(suite),
         "model": "openai/gpt-6.1-sol",
