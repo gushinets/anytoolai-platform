@@ -6,7 +6,7 @@ import { ProductShellContext } from "../runtime/ProductShellContext";
 import type { PlatformApiClient } from "@anytoolai/ce-kit";
 import type { AttachProps } from "../runtime/attachSession";
 import { ProductQuotaStore } from "../runtime/quotaAdmission";
-import { ResolvedProductRunPage } from "../runtime/ProductRunPage";
+import { ResolvedProductRunPage, type VisitFormSnapshot } from "../runtime/ProductRunPage";
 import { ProductSelectionStatus, useProductSelection } from "../runtime/useProductSelection";
 import type { ProductDefinition, ProductRunEvent } from "../runtime/productDefinition";
 import { ModeSwitch } from "./ModeSwitch";
@@ -43,7 +43,7 @@ export function MultiModeProduct<Id extends string, R>({
   retainModeInputsForVisit?: boolean;
 }) {
   const [locked, setLocked] = useState(false);
-  const modeInputs = useRef(new Map<string, Record<string, unknown>>());
+  const modeForms = useRef(new Map<string, VisitFormSnapshot<Record<string, unknown>>>());
   const selection = useProductSelection(client, modes.map((mode) => mode.definition), attach);
   const { state } = selection;
   const mode = modes.find((mode) => state.kind === "ready" && mode.definition.scenarioId === state.selection.scenarioId) ?? modes[0];
@@ -84,11 +84,11 @@ export function MultiModeProduct<Id extends string, R>({
         onLockedChange={setLocked}
         visitId={visitId}
         selection={state.selection}
-        initialVisitValues={retainModeInputsForVisit ? modeInputs.current.get(mode.definition.scenarioId) : undefined}
-        onVisitValuesChange={retainModeInputsForVisit ? (values: Record<string, unknown> | null) => {
+        initialVisitForm={retainModeInputsForVisit ? modeForms.current.get(mode.definition.scenarioId) : undefined}
+        onVisitFormChange={retainModeInputsForVisit ? (change: VisitFormSnapshot<Record<string, unknown>> | null) => {
           const scenarioId = mode.definition.scenarioId;
-          if (values === null) modeInputs.current.delete(scenarioId);
-          else modeInputs.current.set(scenarioId, values);
+          if (change === null) modeForms.current.delete(scenarioId);
+          else modeForms.current.set(scenarioId, { ...modeForms.current.get(scenarioId), ...change });
         } : undefined}
         onAttachBegin={attach.onAttachBegin}
         onAttachEnd={attach.onAttachEnd}
