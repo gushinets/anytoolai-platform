@@ -1194,13 +1194,13 @@
       },
       "count": 45,
       "technical_pass": 45,
-      "ready_to_send": 34,
-      "semantic_failures": 11,
+      "ready_to_send": 33,
+      "semantic_failures": 12,
       "grammar_failures": 0,
       "pending_review": 0,
       "physical_calls": 49,
       "estimated_cost_usd": 0.02116537,
-      "estimated_cost_per_usable_usd": 0.0006225108823529412,
+      "estimated_cost_per_usable_usd": 0.0006413748484848485,
       "median_ui_ms": 8549.063823,
       "attempts": [
         {
@@ -1682,9 +1682,9 @@
           },
           "trace_sha256": "90e58b545a698e49d5d8744c2ae6233b26cb642eed749417d56427fbb55aa54d",
           "semantic_verdict": {
-            "status": "PASS",
+            "status": "FAIL",
             "grammar_failure": false,
-            "reason": "Natural text and correct message kind; no payment demand or payment-report request."
+            "reason": "No payment demand, but “paying in full for the agreed research stage” can overstate settlement of the whole stage when only receipt of the full advance was confirmed. Conservative semantic failure."
           }
         },
         {

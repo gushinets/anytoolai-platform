@@ -75,29 +75,32 @@ outputs, trace hashes, ledger fields, and individual semantic assessments.
 
 | Model | Ready | Grammar errors | Semantic failures | Physical calls | Estimated USD/usable | Median UI seconds |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Luna | 34/45 | 0 | 11 | 49 | 0.000623 | 8.55 |
+| Luna | 33/45 | 0 | 12 | 49 | 0.000641 | 8.55 |
 | Terra | 45/45 | 0 | 0 | 54 | 0.003719 | 10.74 |
 | Sol | 44/45 | 0 | 1 | 45 | 0.006792 | 8.76 |
 
 Costs are runtime ledger estimates including retries, not provider invoices. All A/B/C
 controls selected the correct message kind and contained no payment demand or request to
-report payment. Luna omitted required stage-start conditions in nine payment requests and
-returned Russian in two English controls. Sol's Russian settlement control `CU-P-RU-A-1`
-is conservatively failed: its wording might strengthen full receipt of the advance into full
-payment of the stage. Terra kept the advance acknowledgment unambiguous. Its three English
-original-case outputs elide the explicit adjective "separate", but identify the agreed research
-stage and its boundaries; this is not treated as a scope loss. Minor currency wording is a
+report payment. Luna omitted required stage-start conditions in nine payment requests,
+returned Russian in two English controls, and overstated settlement in English control
+`CU-P-EN-A` attempt 2. The same settlement criterion applies to Sol's Russian control
+`CU-P-RU-A-1`: wording that can strengthen full receipt of the advance into full payment
+of the stage is a conservative failure; explicitly acknowledging receipt of the full advance
+remains valid. All 27 settlement controls were rechecked against this criterion; no other
+verdict changes were needed. Terra kept the advance acknowledgment unambiguous. Its three
+English original-case outputs elide the explicit adjective "separate", but identify the agreed
+research stage and its boundaries; this is not treated as a scope loss. Minor currency wording is a
 non-critical polish caveat. Semantic scoring accepts meaningful paraphrases, not exact strings.
 
 The historical dangling fragment did not recur even on the baseline. All candidate outputs
 had grammatically complete statements or meaningful scope constructions, including legitimate
 prepositional openings. The small regression test pins the prevention rule, but these finite
 samples do not demonstrate a causal reduction in grammar errors. No further grammar prompt
-refinement was justified; remaining Luna failures concern commercial-condition retention and
-language, not the target construction. The model comparison is more informative than adding
-more instructions. Terra is the strongest measured full-matrix candidate at lower estimated
-cost per usable response than Sol; keep the existing model configuration until a separate
-owner-approved, broader model decision. Sol passes all 18 targeted payment requests.
+refinement was justified; remaining Luna failures concern commercial-condition retention,
+settlement wording and language, not the target construction. The model comparison is more
+informative than adding more instructions. Terra is the strongest measured full-matrix candidate
+at lower estimated cost per usable response than Sol; keep the existing model configuration
+until a separate owner-approved, broader model decision. Sol passes all 18 targeted payment requests.
 
 ## Validation results
 
@@ -121,6 +124,22 @@ owner-approved, broader model decision. Sol passes all 18 targeted payment reque
 - Exact Russian fixture input and the 15-case structure were verified, along with 153 distinct
   sessions, all technical conditions and the restored Sol router. Final documentation and
   whitespace checks passed.
+
+## Code review follow-up
+
+- Corrected the Luna settlement assessment and recomputed the full-matrix aggregates above.
+  All raw inputs, outputs, trace hashes, provider records and payment-request aggregates remain
+  unchanged.
+- The reusable Python collector previously hashed the Update prompt irrespective of suite
+  mode. It now selects the prompt from the suite's single supported mode (omitted mode still
+  means Update), verifies worker content against the checkout before producing a manifest or
+  mutating the router, and rejects mixed or unsupported modes. Both offline review surfaces
+  render the complete Prepaid billing context rather than assuming Update notes.
+- The original 153 attempts used the lower-level browser collector with independently verified
+  Prepaid prompt hashes. This tooling fix enables future collection through the Python CLI;
+  it does not retroactively attribute the historical evidence to that CLI or require new paid runs.
+- After these fixes, 416 focused evaluation, product, prompt and API tests passed; config,
+  architecture, documentation and whitespace checks passed. No runtime prompt was changed.
 
 ## Handoff
 

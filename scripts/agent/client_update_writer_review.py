@@ -23,6 +23,7 @@ from typing import Literal
 from client_update_writer_eval import (
     configuration_problems,
     digest,
+    review_input_text,
     revision_problems,
     validate_manifest_identity,
     validate_runs,
@@ -149,7 +150,7 @@ def review_run(
     reviewer = row["reviewer"]
     questions = run["input"]["criteria"]
     print(f"Модель: {run['model']}; reasoning: {run['reasoning_effort']}; проверяющий: {reviewer}")
-    print(f"\nИсходный запрос:\n{run['input']['progress_notes']}")
+    print(f"\nИсходный запрос:\n{review_input_text(run['input'])}")
     print("\nОтвет модели (text и call_to_action вместе):")
     print(json.dumps(run["output"], ensure_ascii=False, indent=2))
     if observation and matches(observation, run):

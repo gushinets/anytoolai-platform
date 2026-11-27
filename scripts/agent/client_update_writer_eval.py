@@ -15,7 +15,8 @@ Offline human review: use the review subcommand with --directory, --reviewer and
 The worker router is overridden only inside its container, read back, and restored
 in finally. Run one collector at a time on this isolated stack. Never use a production stack.
 Commit source changes before collecting; resume requires the same clean Git revision.
-This identifies the checkout, not the container build; keep the stack on that revision.
+The suite's single mode selects the prompt, which must match the checkout. Other container
+source is not verified by this check; keep the stack on that revision.
 """
 
 from __future__ import annotations
@@ -51,6 +52,10 @@ PRODUCT = (
     "packages/backend/product-platforms/freelancer-suite/src/"
     "anytoolai_freelancer_suite/products/client_update_writer"
 )
+PROMPT_BY_MODE = {
+    "update": "update_compose_reply.v1.md",
+    "prepaid_request": "prepaid_request_compose_persuasive_text.v1.md",
+}
 ROUTER = "/app/configs/kernel/litellm_router.yaml"
 POLICIES = "/app/configs/kernel/provider_policies.yaml"
 LIVE_PROFILE = "/app/live-profile-manifest.json"
@@ -65,16 +70,22 @@ def digest(value: object) -> str:
     ).hexdigest()
 
 
-def validate_suite(suite: dict) -> None:
+def validate_suite(suite: dict) -> str:
+    """Validate a single-mode suite and return its prompt filename."""
     if not isinstance(suite, dict):
         raise ValueError("suite must be an object")
     cases = suite.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("suite must contain cases")
     seen = set()
+    modes = set()
     for case in cases:
         if not isinstance(case, dict):
             raise ValueError("suite case must be an object")
+        mode = case.get("mode", "update")
+        if not isinstance(mode, str) or mode not in PROMPT_BY_MODE:
+            raise ValueError("suite case has an unsupported mode")
+        modes.add(mode)
         case_id = case.get("id")
         if not isinstance(case_id, str) or not case_id.strip() or case_id in seen:
             raise ValueError("suite case ids must be nonempty and unique")
@@ -84,12 +95,21 @@ def validate_suite(suite: dict) -> None:
             not isinstance(question, str) or not question.strip() for question in criteria
         ):
             raise ValueError("suite cases must have nonempty criteria")
+    if len(modes) != 1:
+        raise ValueError("suite must contain a single mode for its prompt hash")
     repeats, minimum = suite.get("repeats"), suite.get("minimum_usable")
     if type(repeats) is not int or type(minimum) is not int or not 1 <= minimum <= repeats:
         raise ValueError("suite requires integer 1 <= minimum_usable <= repeats")
     limit = suite.get("max_median_ui_ms")
     if type(limit) not in (int, float) or not math.isfinite(limit) or limit < 0:
         raise ValueError("suite requires a finite nonnegative max_median_ui_ms")
+    return PROMPT_BY_MODE[modes.pop()]
+
+
+def review_input_text(case: dict) -> str:
+    if case.get("mode", "update") == "prepaid_request":
+        return json.dumps(case["billing_context"], ensure_ascii=False, indent=2)
+    return case["progress_notes"]
 
 
 def source_revision(record: dict) -> str | None:
@@ -394,7 +414,7 @@ def require_collection_ready(observed: dict) -> None:
 
 def collect(args: argparse.Namespace) -> None:
     suite = json.loads(args.suite.read_text(encoding="utf-8"))
-    validate_suite(suite)
+    prompt_path = f"{PRODUCT}/prompts/{validate_suite(suite)}"
     if args.model not in suite["models"] or args.reasoning not in suite["reasoning"]:
         raise ValueError("configuration outside frozen matrix")
     repeats = suite["repeats"] if args.repeats is None else args.repeats
@@ -412,8 +432,10 @@ def collect(args: argparse.Namespace) -> None:
     router = selected_router(baseline, args.model, args.reasoning, model_group=model_group)
     selected = yaml.safe_dump(router)
     prompt = _docker(
-        args.project, "platform-worker", "cat", f"/app/{PRODUCT}/prompts/update_compose_reply.v1.md"
+        args.project, "platform-worker", "cat", f"/app/{prompt_path}"
     )
+    if prompt != (ROOT / prompt_path).read_text(encoding="utf-8"):
+        raise ValueError("worker prompt differs from checkout; rebuild the live profile")
     snapshot = {
         "suite": suite,
         "suite_sha256": digest(suite),

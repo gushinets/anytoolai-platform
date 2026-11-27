@@ -34,7 +34,7 @@ def windows_default_text_encoding(monkeypatch):
     monkeypatch.setattr(Path, "open", legacy_open)
 
 
-def worker_file(path, router, prompt="prompt", policy_ref="default_text_generation_v1"):
+def worker_file(path, router, prompt=None, policy_ref="default_text_generation_v1"):
     if path == eval_module.LIVE_PROFILE:
         return json.dumps({"enabled_products": {
             "client_update_writer": {"provider_policy_ref": policy_ref}
@@ -43,8 +43,14 @@ def worker_file(path, router, prompt="prompt", policy_ref="default_text_generati
         return (ROOT / "configs/kernel/provider_policies.yaml").read_text(encoding="utf-8")
     if path == eval_module.ROUTER:
         return router
-    assert path.endswith("/prompts/update_compose_reply.v1.md"), path
-    return prompt
+    assert path in {
+        f"/app/{eval_module.PRODUCT}/prompts/{filename}"
+        for filename in eval_module.PROMPT_BY_MODE.values()
+    }, path
+    return (
+        (ROOT / path.removeprefix("/app/")).read_text(encoding="utf-8")
+        if prompt is None else prompt
+    )
 
 
 def record():
@@ -403,6 +409,56 @@ def test_collector_overrides_only_deployed_product_group(
     assert eval_module.configuration_problems(manifest) == []
 
 
+@pytest.mark.parametrize(("suite_name", "prompt_name"), [
+    ("screening.json", "update_compose_reply.v1.md"),
+    ("prepaid_scope_grammar.json", "prepaid_request_compose_persuasive_text.v1.md"),
+])
+@pytest.mark.parametrize("stale", [False, True])
+def test_collector_binds_suite_to_current_worker_prompt(tmp_path, suite_name, prompt_name, stale):
+    original = (ROOT / "configs/kernel/litellm_router.yaml").read_text(encoding="utf-8")
+    prompt_path = f"{eval_module.PRODUCT}/prompts/{prompt_name}"
+    prompt = (ROOT / prompt_path).read_text(encoding="utf-8")
+    args = SimpleNamespace(
+        suite=eval_module.FIXTURE.with_name(suite_name), model="openai/gpt-6-luna",
+        reasoning="medium", repeats=None, out=tmp_path, resume=True, project="local",
+        max_attempts=0,
+    )
+    with (
+        patch.object(eval_module, "_docker", side_effect=lambda *a:
+                     worker_file(a[-1], original, "stale prompt" if stale else None)) as docker,
+        patch.object(eval_module, "collection_revision", return_value={
+            "git_sha": "a" * 40, "git_dirty": False,
+        }),
+        patch.object(eval_module, "write_router") as write,
+        patch.object(eval_module.subprocess, "run") as browser,
+    ):
+        if stale:
+            with pytest.raises(ValueError, match="worker prompt differs from checkout"):
+                eval_module.collect(args)
+            write.assert_not_called()
+            assert not (tmp_path / "manifest.json").exists()
+        else:
+            eval_module.collect(args)
+            manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+            assert manifest["prompt_sha256"] == hashlib.sha256(prompt.encode()).hexdigest()
+        browser.assert_not_called()
+        assert docker.call_args.args == ("local", "platform-worker", "cat", f"/app/{prompt_path}")
+
+
+@pytest.mark.parametrize("modes", [("update", "prepaid_request"), ("reply_draft",), (None,), ([],)])
+def test_collector_rejects_mixed_or_unsupported_modes_before_worker_access(tmp_path, modes):
+    suite = json.loads(eval_module.FIXTURE.read_text(encoding="utf-8"))
+    suite["cases"] = [{**case, "mode": mode} for case, mode in zip(suite["cases"], modes)]
+    path = tmp_path / "suite.json"
+    path.write_text(json.dumps(suite), encoding="utf-8")
+    with (
+        patch.object(eval_module, "_docker") as docker,
+        pytest.raises(ValueError, match="suite .*mode"),
+    ):
+        eval_module.collect(SimpleNamespace(suite=path))
+    docker.assert_not_called()
+
+
 def test_missing_active_group_rejected_before_worker_mutation(tmp_path):
     original = json.dumps({"model_list": [{
         "model_name": "anytoolai.default_text", "litellm_params": {"model": "openai/gpt-6-luna"},
@@ -684,6 +740,25 @@ def test_report_preserves_utf8_with_legacy_default_encoding(tmp_path):
     assert text in (tmp_path / "report.html").read_text(encoding="utf-8")
 
 
+def test_prepaid_review_and_report_show_all_billing_fields(capsys):
+    suite = json.loads(eval_module.FIXTURE.with_name("prepaid_scope_grammar.json").read_text(
+        encoding="utf-8"
+    ))
+    case = suite["cases"][0]
+    run = {**record(), "id": case["id"], "input": case}
+    rendered = report_module.render_run("luna-medium", run, "PENDING", case, [])
+    row = {"reviewer": "Putilin", "answers": [{"decision": None} for _ in case["criteria"]]}
+    with (
+        patch.object(review_module, "choose", side_effect=review_module.ReviewStopped),
+        pytest.raises(review_module.ReviewStopped),
+    ):
+        review_module.review_run(run, row, None, lambda _: None)
+    display = capsys.readouterr().out
+    for value in case["billing_context"].values():
+        assert value in display
+        assert report_module.html.escape(value) in rendered
+
+
 @pytest.mark.usefixtures("valid_report_runtime")
 @pytest.mark.parametrize(
     "change",
@@ -769,7 +844,9 @@ def resume_collection(tmp_path):
             }
         ]
     }
-    prompt = "fixed prompt"
+    prompt = (ROOT / eval_module.PRODUCT / "prompts/update_compose_reply.v1.md").read_text(
+        encoding="utf-8"
+    )
     manifest = {
         "suite_sha256": eval_module.digest(suite),
         "model": "openai/gpt-6.1-sol",
