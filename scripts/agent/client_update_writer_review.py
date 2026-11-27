@@ -1,4 +1,4 @@
-"""Review saved Update outputs offline, one criterion at a time.
+"""Review saved Client Update Writer outputs offline, one criterion at a time.
 
 Experimental review aid; it does not reopen ANY-624's accepted live review.
 Known limitations and the frozen scope are documented in
@@ -8,13 +8,19 @@ python scripts/agent/client_update_writer_eval.py review \
     --directory <results-directory> --series sol-medium --reviewer Putilin
 
 Decisions append to verdicts.jsonl, which the existing report command consumes.
-No provider calls. Agent observations are shown separately, never accepted automatically.
+No provider calls. Open the temporary local review file printed for each run before
+answering its numbered criteria. Full input, output, criteria and matching agent observations
+are displayed in that file, not on stdout. Cleanup also runs on catchable SIGTERM;
+forced process termination (such as SIGKILL) cannot unwind Python context managers.
+Agent observations are shown separately, never accepted automatically.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import signal
+import tempfile
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +29,7 @@ from typing import Literal
 from client_update_writer_eval import (
     configuration_problems,
     digest,
+    review_input_text,
     revision_problems,
     validate_manifest_identity,
     validate_runs,
@@ -146,22 +153,41 @@ def review(directory: Path, reviewer: str, series: str | None = None) -> None:
 def review_run(
     run: dict, row: dict, observation: dict | None, save: Callable[[dict], None]
 ) -> None:
-    reviewer = row["reviewer"]
     questions = run["input"]["criteria"]
-    print(f"Модель: {run['model']}; reasoning: {run['reasoning_effort']}; проверяющий: {reviewer}")
-    print(f"\nИсходный запрос:\n{run['input']['progress_notes']}")
-    print("\nОтвет модели (text и call_to_action вместе):")
-    print(json.dumps(run["output"], ensure_ascii=False, indent=2))
+    sections = [
+        f"Запуск: {run['id']}; модель: {run['model']}; reasoning: {run['reasoning_effort']}",
+        f"Проверяющий: {row['reviewer']}",
+        f"Исходный запрос:\n{review_input_text(run['input'])}",
+        "Ответ модели (text и call_to_action вместе):\n"
+        + json.dumps(run["output"], ensure_ascii=False, indent=2),
+        "Пункты проверки:\n" + "\n".join(
+            f"{index}. {question}" for index, question in enumerate(questions, 1)
+        ),
+    ]
     if observation and matches(observation, run):
-        print(f"\nПредварительная оценка агента всего ответа: {observation['suggestion']}")
-        print(observation["reason"])
-        print("Это подсказка для всего ответа, а не подтверждённые оценки отдельных пунктов.")
+        sections.append(
+            f"Предварительная оценка агента всего ответа: {observation['suggestion']}\n"
+            f"{observation['reason']}\n"
+            "Это подсказка для всего ответа, а не подтверждённые оценки отдельных пунктов."
+        )
     else:
-        print("\nНет актуальной предварительной оценки агента для этих хешей.")
+        sections.append("Нет актуальной предварительной оценки агента для этих хешей.")
+    # Full review content is private regardless of product mode; stdout is not a private display.
+    with tempfile.TemporaryDirectory(prefix="anytoolai-review-") as directory:
+        path = Path(directory) / "case.txt"
+        path.write_text("\n\n".join(sections) + "\n", encoding="utf-8")
+        path.chmod(0o600)
+        print(f"\nОткройте локальный файл проверки: {path}")
+        print("Сверяйте пронумерованные пункты в файле перед ответом.")
+        _review_answers(run, row, save)
+
+
+def _review_answers(run: dict, row: dict, save: Callable[[dict], None]) -> None:
+    questions = run["input"]["criteria"]
     for index, question in enumerate(questions):
         if row["answers"][index]["decision"] in ("yes", "no"):
             continue
-        answer = choose(f"\nПункт {index + 1}/{len(questions)}: {question}")
+        answer = choose(f"\nПункт {index + 1}/{len(questions)} (см. локальный файл)")
         if answer == "s":
             continue
         if answer == "y":
@@ -192,18 +218,26 @@ def review_run(
     print(f"Итог: {human_status(run, row)[0]}")
 
 
+def interrupt_review(signum, _frame) -> None:
+    # Unwind the active private review directory while preserving a termination exit status.
+    raise SystemExit(128 + signum)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
     parser.add_argument("--reviewer", required=True)
     parser.add_argument("--series", help="Only review this configuration, e.g. sol-medium")
     args = parser.parse_args(argv)
+    previous_handler = signal.signal(signal.SIGTERM, interrupt_review)
     try:
         review(args.directory, args.reviewer, args.series)
     except (ReviewStopped, EOFError, KeyboardInterrupt):
         print("\nПроверка остановлена. Сохранённые решения останутся при следующем запуске.")
     except (ValueError, OSError) as exc:
         parser.exit(2, f"Ошибка: {exc}\n")
+    finally:
+        signal.signal(signal.SIGTERM, previous_handler)
 
 
 if __name__ == "__main__":

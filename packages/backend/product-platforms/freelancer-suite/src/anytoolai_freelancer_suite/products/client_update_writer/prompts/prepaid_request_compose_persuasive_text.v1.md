@@ -122,6 +122,12 @@ Rules:
 
 - `text` must be a complete, self-contained message the caller can send as-is — do not include
   placeholders such as `[Client Name]`, meta-commentary about the message, or chain-of-thought.
+- Write grammatically complete, natural sentences in the selected language. When describing the
+  payment's scope, use a complete statement or a self-contained scope label introducing a list.
+  An opening prepositional phrase (such as “For the research stage”) must connect to a governing
+  clause; do not leave it dangling before a dash or a list. Before returning, reread the opening
+  scope description and repair any unfinished construction without changing facts, payment terms,
+  scope boundaries, tone or message kind.
 - Address the message to the client: the person the notes name as the one this payment is
   requested from, who will read the message. Write to the client directly in the second person
   ("you"; in Russian "вы" and plural verb forms, which do not mark gender) in every kind of
@@ -213,6 +219,11 @@ Rules:
     illustrations and source AI files are not included" or "копирайтинг не входит";
   - a tax treatment stated as a term, for example "НДС не начисляется", with its meaning unchanged;
   - whether payment details will come in a separate invoice.
+  State a prepayment-before-start condition as a payment term. Describe each payment term as
+  agreed only when the input establishes agreement to that term. Ambiguous start wording does not
+  establish that work is already underway or that payment should already have been made. Preserve
+  an explicitly stated work start or overdue payment independently; evidence of one does not
+  establish the other.
   Carry each of these with its exact numbers, currency and condition; do not merge, round or
   reinterpret them. A direction to you about what to write or calculate (for example "do not
   calculate tax", "не добавлять штрафы", "request the net deposit only") is not a deal term: follow
