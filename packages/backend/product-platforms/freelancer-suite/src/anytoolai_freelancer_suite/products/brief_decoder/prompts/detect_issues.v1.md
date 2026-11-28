@@ -24,8 +24,21 @@ vocabulary: in Spanish use `el encargo` or `la solicitud`, not `el brief` or `la
 in Russian use `бриф` or `запрос`, and in English use `brief` or `request`.
 This wording rule does not change verbatim quotations, brands, code or technical identifiers.
 
-Find the risks, gaps, ambiguities and contradictions in the client brief `source_text` that a
-freelancer should resolve before starting work. Return each finding as an entry in `issues`.
+First check the original `source_text` for identifiable work the client wants done or a
+deliverable the client wants produced. An implied commission counts: “A logo for our bakery”
+and “Need a website. Make it nice.” identify work even though details are missing. A request
+to write a recipe, prepare a dish for the client, or edit a supplied recipe identifies work.
+A bare recipe describes a procedure and supplies source material. A string of arbitrary
+characters supplies neither work nor a deliverable. Infer the distinction from what the
+client wants from the freelancer. Length, punctuation, subject, budget and extracted facts
+do not decide whether there is a task.
+
+If no work or deliverable is identifiable, return exactly one `issues` entry with category
+`missing_task_description`, severity `high`, and a short description in the analysis
+language. Omit `evidence`. Stop there.
+
+When there is a task, find the risks, gaps, ambiguities and contradictions the freelancer
+should resolve before starting work. Return each finding as an entry in `issues`.
 
 Rules:
 

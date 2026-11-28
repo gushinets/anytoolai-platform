@@ -7,6 +7,9 @@
     "briefTextPlaceholder": "Collez le brief, la demande ou l’annonce du client.",
     "briefTextHelp": "Collez le brief tel quel. Un brief plus long donne des questions plus précises."
   },
+  "validation": {
+    "missing_task_description": "Décrivez ce que le client attend de vous. Par exemple : « Rédigez une recette pour notre newsletter. »"
+  },
   "decode": {
     "submit": "Décoder le brief",
     "running": "Décodage de votre brief…",
@@ -64,6 +67,7 @@
     "scope_risk": "Risque de périmètre",
     "timeline_risk": "Risque de délai",
     "budget_risk": "Risque budgétaire",
-    "contradiction": "Contradiction"
+    "contradiction": "Contradiction",
+    "missing_task_description": "Clarification de la demande du client"
   }
 }

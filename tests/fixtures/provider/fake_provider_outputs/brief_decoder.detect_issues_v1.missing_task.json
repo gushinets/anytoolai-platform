@@ -1,0 +1,18 @@
+{
+  "response_json": {
+    "issues": [
+      {
+        "category": "missing_task_description",
+        "severity": "high",
+        "description": "The text gives no identifiable work for the client."
+      }
+    ]
+  },
+  "input_tokens": 100,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.detect_issues_v1.missing_task"
+  }
+}

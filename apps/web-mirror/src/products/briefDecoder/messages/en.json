@@ -7,6 +7,9 @@
     "briefTextPlaceholder": "Paste the client’s brief, request, or job post.",
     "briefTextHelp": "Paste the brief as written. Longer briefs give more precise questions."
   },
+  "validation": {
+    "missing_task_description": "Describe what the client wants you to do or deliver. For example, “Write a recipe for our newsletter.”"
+  },
   "decode": {
     "submit": "Decode brief",
     "running": "Decoding your brief…",
@@ -64,6 +67,7 @@
     "scope_risk": "Scope risk",
     "timeline_risk": "Timeline risk",
     "budget_risk": "Budget risk",
-    "contradiction": "Contradiction"
+    "contradiction": "Contradiction",
+    "missing_task_description": "Client task clarification"
   }
 }
