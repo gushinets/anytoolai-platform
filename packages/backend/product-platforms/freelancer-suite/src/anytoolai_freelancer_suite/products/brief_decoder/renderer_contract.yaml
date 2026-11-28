@@ -14,11 +14,19 @@ renderer_contract:
       description: >-
         Risks and gaps, each with `category`, `severity`, `description` and optional `evidence`.
         An empty list is valid and renders as "no issues found".
+        If any issue has category `missing_task_description`, the product page shows a
+        localized error on the brief field and hides the result, Copy and Acceptance Builder
+        handoff. On recovery, `brief_text` from the matching artifact supplies the rejected
+        input and restores the untouched form. The artifact still has all four parts and
+        ordinary run accounting.
     - part_id: clarifying_questions
       field: questions
       description: >-
         Questions to send the client, in the given (priority) order, each tied to its issue by
-        `source_issue_index`. An empty list is valid and renders as "no clarifying questions were
+        `source_issue_index`. A05 generates questions using the ordinary issue categories.
+        Version 2 results created with the previous A05 taxonomy can carry a
+        `missing_task_description` question label. Only an issue with that category triggers
+        field feedback. An empty list is valid and renders as "no clarifying questions were
         generated" -- this is not a readiness claim: an empty `questions` list does not mean the
         brief is complete or fit to start (see the artifact's own `issues` and
         `brief.missing_fields`, not this part alone). Only `summary_document` makes a readiness

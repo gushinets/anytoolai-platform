@@ -7,6 +7,9 @@
     "briefTextPlaceholder": "Pegue el brief, la solicitud o la oferta del cliente.",
     "briefTextHelp": "Pegue el brief tal cual. Un brief más largo genera preguntas más precisas."
   },
+  "validation": {
+    "missing_task_description": "Describe qué quiere el cliente que hagas o entregues. Por ejemplo: «Escribe una receta para nuestro boletín»."
+  },
   "decode": {
     "submit": "Analizar brief",
     "running": "Analizando su brief…",
@@ -64,6 +67,7 @@
     "scope_risk": "Riesgo de alcance",
     "timeline_risk": "Riesgo de plazo",
     "budget_risk": "Riesgo de presupuesto",
-    "contradiction": "Contradicción"
+    "contradiction": "Contradicción",
+    "missing_task_description": "Aclaración del encargo"
   }
 }

@@ -3,10 +3,15 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { BriefDecoderProduct } from "../src/products/briefDecoder/BriefDecoderProduct";
 import { BriefDecoderResultView } from "../src/products/briefDecoder/BriefDecoderResult";
 import { BRIEF_DECODER_MESSAGES } from "../src/products/briefDecoder/messages";
 import { extractBriefDecoderResult } from "../src/products/briefDecoder/parseBriefDecoder";
 import { LOCALE_STORAGE_KEY } from "../src/i18n/localeStorage";
+import {
+  guestIdentityResponse, makeClient, quotaResponse, resultResponse, routesFor,
+  runtimeConfigResponse, sessionResponse, startResponse,
+} from "./fixtures/platformResponses";
 import { makeRender } from "./support/renderWithI18n";
 import { LOCALES } from "../src/i18n";
 import { LanguageSwitcher } from "../src/i18n/LanguageSwitcher";
@@ -33,6 +38,44 @@ for (const [locale, copyLabel] of [["ru", "Скопировать"], ["en", "Cop
     expect(copy.startsWith(`${BRIEF_DECODER_MESSAGES[locale].result.brief}\n`)).toBe(true);
   });
 }
+
+it("updates a visible missing-task hint in every locale while keeping the Russian draft", async () => {
+  const ids = { productId: "brief_decoder", scenarioId: "brief_decoder.decode_v1" } as const;
+  const routes = routesFor(ids);
+  const { client, calls } = makeClient({
+    [routes.RUNTIME_CONFIG]: [runtimeConfigResponse(ids)],
+    [routes.GUEST_IDENTITY]: [guestIdentityResponse()],
+    [routes.QUOTA]: [quotaResponse(ids)],
+    [routes.START]: [startResponse()],
+    [routes.SESSION]: [sessionResponse()],
+    [routes.RESULT]: [resultResponse(ids, {
+      output: {
+        ...fixtures["ANY761-BD-RU-borscht"],
+        issues: [{ category: "missing_task_description", severity: "high", description: "Нет задачи клиента." }],
+      },
+    })],
+  });
+  const brief = "Рецепт борща: свёкла, капуста, говядина. Варить два часа.";
+  render(<BriefDecoderProduct client={client} />);
+  const field = await screen.findByLabelText<HTMLTextAreaElement>("Client brief");
+  const switcher = screen.getByRole("combobox", { name: "Language" });
+  fireEvent.change(field, { target: { value: brief } });
+  fireEvent.click(screen.getByRole("button", { name: "Decode brief" }));
+  await screen.findByText(BRIEF_DECODER_MESSAGES.en.validation.missing_task_description);
+
+  const translations = new Set<string>();
+  for (const locale of LOCALES) {
+    fireEvent.change(switcher, { target: { value: locale } });
+    const message = BRIEF_DECODER_MESSAGES[locale].validation.missing_task_description;
+    translations.add(message);
+    const hint = await screen.findByText(message);
+    expect(hint.getAttribute("role")).toBe("alert");
+    expect(field.getAttribute("aria-describedby")?.split(" ")).toContain(hint.id);
+    expect(field.value).toBe(brief);
+  }
+  expect(translations.size).toBe(LOCALES.length);
+  expect(calls.filter((call) => call.key === routes.START)).toHaveLength(1);
+});
 
 it.each(LOCALES)("copies Russian questions unchanged with %s action labels", async (locale) => {
   window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);

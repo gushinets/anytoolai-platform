@@ -24,7 +24,11 @@ from proposal_ai_eval import _docker, _git_state, _parse_compose_project, _reque
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SUITE = "tests/fixtures/brief_language_eval/cases.json"
 VERDICT_SUITE = "tests/fixtures/acceptance_verdict_eval/cases.json"
-SUITE_PATHS = {name: ROOT / name for name in (DEFAULT_SUITE, VERDICT_SUITE)}
+SUITE_PATHS = {
+    DEFAULT_SUITE: ROOT / DEFAULT_SUITE,
+    VERDICT_SUITE: ROOT / VERDICT_SUITE,
+    "task-presence": ROOT / "tests/fixtures/brief_decoder_eval/task_presence.json",
+}
 WORKER_PYTHON = "/app/apps/platform-worker/.venv/bin/python"
 PRODUCTS = (
     ROOT / "packages/backend/product-platforms/freelancer-suite/src"
@@ -214,6 +218,22 @@ def analysis_language_matches(record: dict, *, historical: bool = False) -> bool
     return actual is not None and expected is not None and actual == expected
 
 
+def task_presence_matches(case: dict, output: dict) -> bool:
+    if output["brief_text"] != case["input"]["brief_text"]:
+        return False
+    issues = output["issues"]
+    marker = "missing_task_description"
+    if not case["expected_missing_task"]:
+        return all(issue["category"] != marker for issue in issues)
+    return (
+        len(issues) == 1
+        and issues[0]["category"] == marker
+        and issues[0]["severity"] == "high"
+        and "evidence" not in issues[0]
+        and not output["questions"]
+    )
+
+
 def review_status(record: dict, review: dict, *, historical: bool = False) -> str:
     """Grade current evidence. Historical contracts require an explicit archive replay."""
     if review.get("evidence_sha256") != digest(record):
@@ -230,10 +250,20 @@ def review_status(record: dict, review: dict, *, historical: bool = False) -> st
         decisions += list(review[group].values())
     if any(value is not None and type(value) is not bool for value in decisions):
         raise ValueError("review decisions must be true, false or null")
-    if False in decisions or not analysis_language_matches(record, historical=historical):
+    output = record.get("output")
+    case = record["case"]
+    if (
+        False in decisions
+        or not analysis_language_matches(record, historical=historical)
+        or (
+            output
+            and case.get("family") == "task-presence"
+            and not task_presence_matches(case, output)
+        )
+    ):
         return "FAIL"
     ledger = record.get("ledger") or {}
-    if not record.get("output") or not ledger.get("calls"):
+    if not output or not ledger.get("calls"):
         return "PENDING"
     actions, artifacts = ledger.get("actions", []), ledger.get("artifacts", [])
     if not actions or not artifacts or not record.get("session_id") or not record.get("result_id"):
@@ -245,7 +275,7 @@ def review_status(record: dict, review: dict, *, historical: bool = False) -> st
         raise ValueError("ledger belongs to another session")
     artifact_ids = {artifact["id"] for artifact in artifacts}
     action_ids = {action["id"] for action in actions}
-    scenario = record["case"]["scenario_id"]
+    scenario = case["scenario_id"]
     expected_steps = {
         "brief_decoder.decode_v1": {
             "extract",
@@ -256,7 +286,6 @@ def review_status(record: dict, review: dict, *, historical: bool = False) -> st
         DRAFT: {"extract", "detect_issues", "generate_questions"},
         CHECK: {"extract", "compare"},
     }[scenario]
-    output = record["output"]
     if historical and scenario.startswith("acceptance_builder.") and "document" in output:
         expected_steps.add("generate_document")
     if historical and scenario == DRAFT and "issues" not in output:
@@ -290,7 +319,7 @@ def review_status(record: dict, review: dict, *, historical: bool = False) -> st
         or None in decisions
     ):
         return "PENDING"
-    family = record["case"].get("family")
+    family = case.get("family")
     if family in DECISION_FIELDS:
         if "detect_issues" not in expected_steps:
             return "FAIL"

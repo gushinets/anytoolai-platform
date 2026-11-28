@@ -5,9 +5,9 @@
 - State: active
 - Owner: agent
 - Created: 2026-11-27
-- Last updated: 2026-11-27
-- Review date: 2026-11-27
-- Next action: User-approved push and review of the remediation.
+- Last updated: 2026-11-28
+- Review date: 2026-11-28
+- Next action: User-approved push after merge verification.
 - Blocker: none for ticket acceptance; additional backend quick-check has three reproduced baseline/environment failures.
 
 ## Goal and scope
@@ -45,3 +45,5 @@ Keep raw Draft and Check form values independently for the mounted product visit
 | 2026-11-27 | First frontend-check attempt passed lint/typecheck but unrelated CE-kit ESLint fixture test timed out at 5 seconds during concurrent build. Retry without concurrent smoke/build planned. | Rerun |
 | 2026-11-27 | Additional `quick-check`: config, architecture, docs and generated docs passed; pytest 4380 passed, 3 failed, 12 skipped, 723 deselected. Three unchanged runner tests failed: `test_prod_stack_running_reflects_compose_ps_output`, `test_prod_stack_running_propagates_timeout` (local `.env.prod` triggers an unexpected mocked Compose config probe), `test_activation_marker_is_readable_by_non_root_api_user` (passwordless sudo unavailable). All three reproduced on an archived clean c92e3524 revision with a harmless placeholder `.env.prod`, without copying credentials; unrelated to this frontend fix. | Finish frontend gate |
 | 2026-11-27 | Final retry of canonical `frontend-check` passed (exit 0): lint/typecheck; web-mirror 1196/1196, Atom Lab browser 349/349, CE-kit 423/423, shared-ui 55/55; generated API contract current and builds passed. Final three-product focused rerun 267/267. Documentation validation passed. | User-approved push and review |
+| 2026-11-28 | Merged main at adf99c0e; resolved the shared result-field validation conflict with ANY-849 by retaining its artifact-verified input recovery and the visit snapshot update for known submitted inputs only. | Verify both products and shared runtime |
+| 2026-11-28 | After integration: eight focused frontend suites passed 553/553 (Acceptance Builder, Brief Decoder including language cases, Client Update Writer, ProposalAI, shared run-page/handoff, paid journey). Web-mirror typecheck, changed runtime lint, config/architecture/docs validation, generated docs check and production web build passed. With a fresh isolated fake-provider stack using merged product definitions and fixtures, Acceptance Builder smoke passed 12/12 including accepted and declined Brief Decoder handoffs; Brief Decoder smoke passed 9/9 including missing-task feedback and correction. Both reports had zero skipped, failed or flaky tests. | Local merge commit and user-approved push |

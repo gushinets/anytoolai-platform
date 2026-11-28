@@ -136,6 +136,9 @@ export type ProductDefinition<V extends Record<string, unknown>, R> = {
   extractResult: (output: Record<string, unknown>) => R | null;
   /** A parsed result may request corrected input instead of a result view or copy activation. */
   resultFieldErrors?: (result: R) => Partial<Record<keyof V, FieldError>>;
+  /** The input echoed by a canonical result. Used as the rejected submission's baseline
+   * after the runtime correlates the artifact with the active session. */
+  submittedInputFromResult?: (result: R) => V | null;
   /**
    * Whether a completed run's result counts as "viewed" (`web.result_viewed`). Optional, default
    * true. A product whose viewed-activation is narrower than "a result rendered" (Brief Decoder: a

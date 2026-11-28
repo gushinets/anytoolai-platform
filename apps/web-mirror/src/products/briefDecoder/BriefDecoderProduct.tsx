@@ -13,6 +13,7 @@ import {
 import type { ProductDefinition, ProductFieldsProps, ProductRunEvent } from "../runtime/productDefinition";
 import { ExampleDisclosure } from "../shared/ExampleDisclosure";
 import { TextAreaField } from "../shared/TextAreaField";
+import { isRecord } from "../shared/resultGuards";
 import { BriefDecoderResultView } from "./BriefDecoderResult";
 import { extractBriefDecoderResult, hasQuestions, type BriefDecoderResult } from "./parseBriefDecoder";
 
@@ -23,6 +24,16 @@ export type BriefDecoderValues = { briefText: string };
 
 function validate(values: BriefDecoderValues): Partial<Record<keyof BriefDecoderValues, FieldError>> {
   return collectFieldErrors<BriefDecoderValues>([["briefText", requiredBackendTrimmedFieldError(values.briefText, BRIEF_TEXT_MAX_LENGTH)]]);
+}
+
+function normalizeValues(values: BriefDecoderValues): BriefDecoderValues {
+  return { briefText: trimBackendWhitespace(values.briefText) };
+}
+
+function parseSubmittedBrief(briefText: unknown): BriefDecoderValues | null {
+  if (typeof briefText !== "string") return null;
+  const values = { briefText };
+  return validate(values).briefText ? null : values;
 }
 
 function BriefDecoderFields({ values, errors, disabled, onChange }: ProductFieldsProps<BriefDecoderValues>) {
@@ -63,8 +74,14 @@ export const briefDecoderDefinition: ProductDefinition<BriefDecoderValues, Brief
   hasDescription: true,
   emptyValues: { briefText: "" },
   validate,
-  toInput: (values) => ({ brief_text: trimBackendWhitespace(values.briefText) }),
+  normalizeValues,
+  toInput: (values) => ({ brief_text: normalizeValues(values).briefText }),
+  parseInputValues: (input) => isRecord(input) ? parseSubmittedBrief(input.brief_text) : null,
   extractResult: extractBriefDecoderResult,
+  submittedInputFromResult: (result) => parseSubmittedBrief(result.sourceBriefText),
+  resultFieldErrors: (result) => result.issues.some((issue) => issue.category === "missing_task_description")
+    ? { briefText: { code: "product", key: "validation.missing_task_description" } }
+    : {},
   emitsResultViewed: hasQuestions,
   // `handoffs.yaml`: `brief_decoder_to_acceptance_builder_v1` (immediate, user-confirmed).
   handoff: { handoffDefinitionId: "brief_decoder_to_acceptance_builder_v1", targetProductId: "acceptance_builder" },

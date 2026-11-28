@@ -1,0 +1,244 @@
+{
+  "cases": [
+    {
+      "id": "ANY849-JUNK",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": null,
+      "expected_language": "en",
+      "family": "task-presence",
+      "provenance": "Exact input from the ANY-849 production recheck attachment on 2026-11-11.",
+      "input": {
+        "brief_text": "asdf ::: 12345 !!!"
+      },
+      "expected_missing_task": true,
+      "criteria": [
+        "There is no identifiable client commission or desired deliverable in the original text."
+      ]
+    },
+    {
+      "id": "ANY849-RU-BARE-RECIPE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "task-presence",
+      "provenance": "Exact input from the ANY-849 production recheck attachment on 2026-11-11.",
+      "input": {
+        "brief_text": "Рецепт борща: свёкла, капуста, говядина. Варить два часа."
+      },
+      "expected_missing_task": true,
+      "criteria": [
+        "There is no identifiable client commission or desired deliverable in the original text."
+      ]
+    },
+    {
+      "id": "ANY849-RU-WRITE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "task-presence",
+      "provenance": "Synthetic short commission.",
+      "input": {
+        "brief_text": "Напишите рецепт борща."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-RU-EDIT",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "task-presence",
+      "provenance": "Synthetic editing commission with source material.",
+      "input": {
+        "brief_text": "Рецепт борща: свёкла, капуста, говядина. Варить два часа.\n\nОтредактируйте этот текст для нашей кулинарной книги."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-RU-VAGUE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "task-presence",
+      "provenance": "Synthetic translation of the existing weak-brief control.",
+      "input": {
+        "brief_text": "Нужен сайт. Сделайте красиво."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-RU-DELIVERABLE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "ru",
+      "expected_language": "ru",
+      "family": "task-presence",
+      "provenance": "Synthetic deliverable stated without an imperative verb.",
+      "input": {
+        "brief_text": "Логотип для нашей пекарни."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-EN-BARE-RECIPE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "task-presence",
+      "provenance": "Synthetic translation from the ANY-761 language suite.",
+      "input": {
+        "brief_text": "Borscht recipe: beetroot, cabbage, beef. Cook for two hours."
+      },
+      "expected_missing_task": true,
+      "criteria": [
+        "There is no identifiable client commission or desired deliverable in the original text."
+      ]
+    },
+    {
+      "id": "ANY849-EN-WRITE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "task-presence",
+      "provenance": "Synthetic short commission.",
+      "input": {
+        "brief_text": "Write a borscht recipe."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-EN-EDIT",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "task-presence",
+      "provenance": "Synthetic editing commission with source material.",
+      "input": {
+        "brief_text": "Borscht recipe: beetroot, cabbage, beef. Cook for two hours.\n\nEdit this for our cookbook."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-EN-VAGUE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "task-presence",
+      "provenance": "Synthetic weak-brief control from the existing product fixtures.",
+      "input": {
+        "brief_text": "Need a website. Make it nice."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-EN-DELIVERABLE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "en",
+      "expected_language": "en",
+      "family": "task-presence",
+      "provenance": "Synthetic deliverable stated without an imperative verb.",
+      "input": {
+        "brief_text": "A logo for our bakery."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-ES-BARE-RECIPE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "task-presence",
+      "provenance": "Synthetic translation from the ANY-761 language suite.",
+      "input": {
+        "brief_text": "Receta de borsch: remolacha, col, carne de res. Cocinar durante dos horas."
+      },
+      "expected_missing_task": true,
+      "criteria": [
+        "There is no identifiable client commission or desired deliverable in the original text."
+      ]
+    },
+    {
+      "id": "ANY849-ES-WRITE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "task-presence",
+      "provenance": "Synthetic short commission.",
+      "input": {
+        "brief_text": "Escribe una receta de borsch."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-ES-EDIT",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "task-presence",
+      "provenance": "Synthetic editing commission with source material.",
+      "input": {
+        "brief_text": "Receta de borsch: remolacha, col, carne de res. Cocinar durante dos horas.\n\nEdita este texto para nuestro libro de cocina."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-ES-VAGUE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "task-presence",
+      "provenance": "Synthetic translation of the existing weak-brief control.",
+      "input": {
+        "brief_text": "Necesitamos un sitio web. Haz que se vea bien."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    },
+    {
+      "id": "ANY849-ES-DELIVERABLE",
+      "scenario_id": "brief_decoder.decode_v1",
+      "source_language": "es",
+      "expected_language": "es",
+      "family": "task-presence",
+      "provenance": "Synthetic deliverable stated without an imperative verb.",
+      "input": {
+        "brief_text": "Un logotipo para nuestra panadería."
+      },
+      "expected_missing_task": false,
+      "criteria": [
+        "The analysis accepts the client commission or desired deliverable, even when details are missing."
+      ]
+    }
+  ]
+}
