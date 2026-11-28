@@ -52,7 +52,7 @@ const ACTION_CONFIG_IDS = [
   "brief_decoder.generate_summary_v1",
 ];
 
-type Suffix = "" | ".weak_input" | ".no_issues";
+type Suffix = "" | ".weak_input" | ".no_issues" | ".missing_task";
 type Output = {
   brief: { values: Partial<Record<BriefField, string | string[]>>; missing_fields: BriefField[] };
   issues: { category: keyof typeof CATEGORY_LABELS; severity: keyof typeof SEVERITY_LABELS; description: string; evidence?: string }[];
@@ -213,6 +213,48 @@ test.describe("Brief Decoder web product", () => {
     await page.getByRole("button", { name: "Decode brief" }).click();
     await expect(page.getByText("Client brief: required.")).toBeVisible();
     expect(starts).toEqual([]);
+  });
+
+  test("missing task: shows field feedback and accepts a corrected brief", async ({ page }) => {
+    const starts = trackScenarioStarts(page, START_ROUTE_PATTERN);
+    const clientEvents = trackClientEvents(page);
+    const junk = "asdf ::: 12345 !!!";
+    await page.route("**/v1/results/**", async (route) => {
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        response,
+        json: { ...body, output: { ...composedOutput(".missing_task"), brief_text: junk } },
+      });
+    }, { times: 1 });
+    await page.goto(PRODUCT_URL);
+    const field = page.getByRole("textbox", { name: "Client brief" });
+    const submit = page.getByRole("button", { name: "Decode brief", exact: true });
+    const copy = page.getByRole("button", { name: "Copy", exact: true });
+    const handoff = page.getByRole("button", { name: "Create acceptance criteria" });
+    await field.fill(junk);
+    await submit.click();
+    const hint = page.locator("#brief-decoder-brief-text-error");
+    await expect(hint).toContainText("Describe what the client wants you to do or deliver.", { timeout: 60_000 });
+    await expect(field).toHaveAttribute("aria-invalid", "true");
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue(junk);
+    await expect(copy).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy questions", exact: true })).toHaveCount(0);
+    await expect(handoff).toHaveCount(0);
+    expect(clientEvents).not.toContain("web.result_viewed");
+
+    await field.fill(` ${junk}\n`);
+    await submit.click();
+    await expect(hint).toBeVisible();
+    expect(starts).toHaveLength(1);
+
+    await field.fill("Write a borscht recipe.");
+    await expect(hint).toHaveCount(0);
+    await submit.click();
+    await expect(copy).toBeVisible({ timeout: 60_000 });
+    await expect(handoff).toBeVisible();
+    expect(starts).toHaveLength(2);
   });
 
   test("weak input: four questions copied as plain text with one copy activation and one result_viewed", async ({

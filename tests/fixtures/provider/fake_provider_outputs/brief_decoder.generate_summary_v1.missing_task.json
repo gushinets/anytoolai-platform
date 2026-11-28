@@ -1,0 +1,40 @@
+{
+  "response_json": {
+    "sections": [
+      {
+        "id": "overview",
+        "title": "Project overview",
+        "content": "The brief does not state what the client wants."
+      },
+      {
+        "id": "key-details",
+        "title": "Key details",
+        "content": "No deliverables, deadline, budget or constraints were found in the brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      },
+      {
+        "id": "gaps",
+        "title": "Gaps and risks",
+        "content": "- The text gives no identifiable work for the client.\nProject goal, deliverables, deadline, budget, target audience and constraints are missing; the client should confirm them."
+      },
+      {
+        "id": "next-steps",
+        "title": "Questions to ask",
+        "content": "No clarifying questions were generated for this brief.",
+        "metadata": {
+          "kind": "list"
+        }
+      }
+    ],
+    "summary": "The brief is not ready to start work. Ask the client what they want done or delivered."
+  },
+  "input_tokens": 100,
+  "output_tokens": 40,
+  "latency_ms": 10,
+  "estimated_cost": 0.0,
+  "metadata": {
+    "fixture_id": "brief_decoder.generate_summary_v1.missing_task"
+  }
+}

@@ -1011,11 +1011,20 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     resultFetchSettledRef.current = true;
     const inputErrors: Partial<Record<keyof V, FieldError>> = definition.resultFieldErrors?.(extracted) ?? {};
     if (Object.keys(inputErrors).length > 0) {
-      // Recovered runs can belong to an older draft; only mark fields still matching that input.
-      const submittedValues = normalizeValues(activeInputRef.current ?? definition.emptyValues);
-      // Unknown attachment inputs may explain empty fields, but cannot establish rejection identity.
-      rejectedInputRef.current = activeInputRef.current === null ? null : { input: submittedValues, errors: inputErrors };
-      const currentValues = normalizeValues(valuesRef.current);
+      const artifact = resultResult.value;
+      const recoveredInput = artifact.scenarioSessionId === scenarioSessionId && artifact.resultArtifactId === resultArtifactId
+        ? definition.submittedInputFromResult?.(extracted) ?? null
+        : null;
+      const submittedInput = recoveredInput ?? activeInputRef.current;
+      const submittedValues = normalizeValues(submittedInput ?? definition.emptyValues);
+      rejectedInputRef.current = submittedInput === null ? null : { input: submittedValues, errors: inputErrors };
+
+      const draft = valuesRef.current;
+      // The original state object identifies an untouched form. Edits, including clearing
+      // the field again, create a different draft.
+      const restoredInput = draft === definition.emptyValues ? recoveredInput : null;
+      if (restoredInput !== null) setValues(restoredInput);
+      const currentValues = normalizeValues(restoredInput ?? draft);
       const currentErrors: Partial<Record<keyof V, FieldError>> = {};
       for (const field in inputErrors) {
         liveValidationFieldsRef.current.add(field);

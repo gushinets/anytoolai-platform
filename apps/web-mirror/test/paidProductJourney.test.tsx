@@ -18,6 +18,8 @@ import { englishForAllLocales, makeRender } from "./support/renderWithI18n";
 
 import { ProposalAIProduct, proposalAiDefinition } from "../src/products/proposalAi/ProposalAIProduct";
 import { PROPOSAL_AI_MESSAGES } from "../src/products/proposalAi/messages";
+import { BriefDecoderProduct, briefDecoderDefinition } from "../src/products/briefDecoder/BriefDecoderProduct";
+import { BRIEF_DECODER_MESSAGES } from "../src/products/briefDecoder/messages";
 import { productDraftKey, saveDraftRun, saveDraftValues } from "../src/products/runtime/draftStorage";
 
 const routerPush = vi.hoisted(() => vi.fn());
@@ -103,6 +105,58 @@ it("restores the selected mode and accepted result without a start", async () =>
   await screen.findByText("Generated result text.");
   expect((screen.getByRole("radio", { name: "Check" }) as HTMLInputElement).checked).toBe(true);
   expect(starts).toHaveLength(0);
+});
+
+it.each(["accepted", "pending"] as const)("recovers a rejected Brief Decoder submission from %s paid recovery", async (kind) => {
+  const product = { productId: briefDecoderDefinition.productId, scenarioId: briefDecoderDefinition.scenarioId };
+  const briefText = "Рецепт борща: свёкла, капуста, говядина. Варить два часа.";
+  const client = createPlatformApiClient();
+  const persistence = getPaidPersistence(client)!;
+  const recovery = { version: 1, owner, ...product } as const;
+  persistPaidStartRecovery(persistence, kind === "accepted"
+    ? { ...recovery, kind, scenarioSessionId: "session_1" }
+    : {
+        ...recovery, kind, idempotencyKey: "original_brief_key",
+        request: { ...product, frontendId: "web_mirror", input: { brief_text: briefText } },
+      });
+  routeFetch(product.scenarioId);
+  const routed = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (url, init) => {
+    const path = new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname;
+    if (path.endsWith("/runtime-config")) {
+      return runtimeConfigResponse(product, {
+        scenarios: [{
+          scenario_id: product.scenarioId,
+          version: 1,
+          allowed_next_actions: ["copy_result"],
+          input_renderer_hint: { renderer: "json_schema", schema_ref: "brief_decoder.decode_input_v1", schema_version: 1 },
+          output_renderer_hint: { renderer: "json_schema", schema_ref: "brief_decoder.decode_output_v1", schema_version: 2 },
+        }],
+      });
+    }
+    if (path.startsWith("/v1/results/")) {
+      return resultResponse(product, {
+        schema_ref: "brief_decoder.decode_output_v1",
+        schema_version: 2,
+        output: {
+          brief_text: briefText, brief: { values: {} }, questions: [],
+          issues: [{ category: "missing_task_description", severity: "high", description: "Нет задачи клиента." }],
+          document: { sections: [], summary: "Уточните задачу клиента." },
+        },
+      });
+    }
+    return routed(url, init);
+  });
+  const renderBrief = makeRender(BRIEF_DECODER_MESSAGES);
+  renderBrief(<BriefDecoderProduct client={client} />);
+  await screen.findByText(BRIEF_DECODER_MESSAGES.en.validation.missing_task_description);
+  expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe(briefText);
+  expect(readPaidStartRecovery(persistence, product.productId)).toBeNull();
+  fireEvent.submit(screen.getByRole("form"));
+  expect(starts).toHaveLength(kind === "accepted" ? 0 : 1);
+  if (kind === "pending") {
+    expect(new Headers(starts[0]!.headers).get("Idempotency-Key")).toBe("original_brief_key");
+  }
 });
 
 it("retries a restored uncertain request without validating an empty product form", async () => {

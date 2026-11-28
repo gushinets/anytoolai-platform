@@ -481,7 +481,8 @@
               "scope_risk",
               "timeline_risk",
               "budget_risk",
-              "contradiction"
+              "contradiction",
+              "missing_task_description"
             ]
           },
           "description": {
@@ -543,7 +544,8 @@
               "scope_risk",
               "timeline_risk",
               "budget_risk",
-              "contradiction"
+              "contradiction",
+              "missing_task_description"
             ]
           },
           "source_issue_index": {

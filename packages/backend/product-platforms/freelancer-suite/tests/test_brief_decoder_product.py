@@ -233,7 +233,9 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     steps = _steps()
     fields = _literal(steps["extract"]["input_mapping"]["fields"])
     taxonomy = _literal(steps["detect_issues"]["input_mapping"]["taxonomy"])
-    assert _literal(steps["generate_questions"]["input_mapping"]["taxonomy"]) == taxonomy
+    question_taxonomy = _literal(steps["generate_questions"]["input_mapping"]["taxonomy"])
+    assert set(taxonomy) == {*question_taxonomy, "missing_task_description"}
+    assert "missing_task_description" not in question_taxonomy
     schema = _load_schema("brief_decoder.decode_output_v1")["properties"]
     value_properties = schema["brief"]["properties"]["values"]["properties"]
 
@@ -242,6 +244,7 @@ def test_config_owned_literals_agree_with_the_output_schema() -> None:
     assert set(schema["brief"]["properties"]["missing_fields"]["items"]["enum"]) == set(field_names)
     assert set(schema["brief"]["properties"]["confidence"]["properties"]) == set(field_names)
     assert set(schema["issues"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
+    # The read schema also accepts the previous A05 taxonomy for stored version 2 results.
     assert set(schema["questions"]["items"]["properties"]["category"]["enum"]) == set(taxonomy)
     assert _literal(steps["extract"]["input_mapping"]["strict"]) is False
     # Code review finding (me #7): the canonical schema's question cap must equal what A05 is
@@ -2162,6 +2165,8 @@ def test_renderer_contract_agrees_with_workflow_and_scenario() -> None:
     # every output field is either a rendered part or explicitly excluded (brief_text is the
     # verbatim input echoed for the handoff, never rendered)
     assert contract["excluded_fields"] == ["brief_text"]
+    issues_part = next(part for part in contract["parts"] if part["part_id"] == "issues")
+    assert "missing_task_description" in issues_part["description"]
     assert {part["field"] for part in contract["parts"]} | set(contract["excluded_fields"]) == set(
         output_schema["properties"]
     )

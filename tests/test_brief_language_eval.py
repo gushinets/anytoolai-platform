@@ -582,6 +582,73 @@ def test_verdict_suite_covers_the_ticket_in_three_languages():
         )
 
 
+def test_task_presence_suite_selection(monkeypatch, tmp_path):
+    out = tmp_path / "results"
+    args = cli_args("run", out) + ["--suite", "task-presence"]
+    args[args.index("--scenario") + 1] = "brief_decoder.decode_v1"
+    monkeypatch.setattr(sys, "argv", args)
+    monkeypatch.setattr(evaluation, "_docker", Mock(return_value="{}"))
+    monkeypatch.setattr(evaluation, "_git_state", lambda: {})
+    collector = Mock(
+        side_effect=lambda args, case, attempt, snapshot: {
+            "case": case,
+            "error": None,
+            "evidence_error": None,
+        }
+    )
+    monkeypatch.setattr(evaluation, "collect", collector)
+
+    assert evaluation.main() == 0
+    cases = [call.args[1] for call in collector.call_args_list]
+    by_id = {case["id"]: case for case in cases}
+    languages = ("ru", "en", "es")
+    controls = ("WRITE", "EDIT", "VAGUE", "DELIVERABLE")
+    assert len(by_id) == len(cases) == 1 + len(languages) * (1 + len(controls))
+    assert {case["family"] for case in cases} == {"task-presence"}
+    assert by_id["ANY849-JUNK"]["input"]["brief_text"] == "asdf ::: 12345 !!!"
+    assert by_id["ANY849-JUNK"]["expected_missing_task"] is True
+    historical = {case["id"]: case for case in CASES}
+    for language in languages:
+        prefix = f"ANY849-{language.upper()}-"
+        recipe = by_id[prefix + "BARE-RECIPE"]
+        assert recipe["input"] == historical[f"ANY761-BD-{language.upper()}-borscht"]["input"]
+        assert recipe["expected_missing_task"] is True
+        for suffix in controls:
+            case = by_id[prefix + suffix]
+            assert case["expected_language"] == language
+            assert case["expected_missing_task"] is False
+
+
+@pytest.mark.parametrize(
+    ("expected_missing", "actual_missing", "status"),
+    [
+        (True, True, "PASS"),
+        (True, False, "FAIL"),
+        (False, True, "FAIL"),
+        (False, False, "PASS"),
+    ],
+)
+def test_task_presence_review_requires_matching_decision(expected_missing, actual_missing, status):
+    run = record(steps=("extract", "detect_issues", "generate_questions", "generate_document"))
+    run["case"] = deepcopy(next(case for case in CASES if case["id"] == "ANY761-BD-RU-borscht"))
+    run["case"].update(family="task-presence", expected_missing_task=expected_missing)
+    output = deepcopy(CANONICAL[run["case"]["id"]])
+    output["brief_text"] = run["case"]["input"]["brief_text"]
+    if actual_missing:
+        output["issues"] = [
+            {
+                "category": "missing_task_description",
+                "severity": "high",
+                "description": "Нет задачи клиента.",
+            }
+        ]
+        output["questions"] = []
+    run["output"] = output
+    run["ledger"]["artifacts"][0]["content_json"] = output
+
+    assert evaluation.review_status(run, completed_review(run)) == status
+
+
 def test_deviation_suite_covers_the_ticket_in_three_languages():
     suite = evaluation.SUITE_PATHS[evaluation.VERDICT_SUITE]
     cases = [
