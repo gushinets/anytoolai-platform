@@ -622,6 +622,121 @@ describe("Acceptance Builder page", () => {
     }
   });
 
+  it("retains the rejected Check brief across mode switches until a successful correction", async () => {
+    const r = routesFor(IDS.check);
+    const made = makeClientCapturingRequests({
+      ...bothModesRoutes(draftOutput()),
+      [r.START]: Array.from({ length: 3 }, () => startResponse()),
+      [r.SESSION]: Array.from({ length: 6 }, () => sessionResponse({ scenario_id: IDS.check.scenarioId })),
+      [r.RESULT]: [resultResponse(IDS.check, { output: checkOutput(".insufficient_brief") }),
+        resultResponse(IDS.check, { output: checkOutput() }), resultResponse(IDS.check, { output: checkOutput() })],
+      [r.QUOTA]: Array.from({ length: 20 }, () => quotaResponse(IDS.check)),
+    });
+    const hint = ACCEPTANCE_BUILDER_MESSAGES.en.validation.insufficient_brief;
+    const starts = () => made.calls.filter((call) => call.key === r.START);
+    const brief = () => screen.getByLabelText<HTMLTextAreaElement>("Client brief");
+    const changeBrief = (value: string) => fireEvent.change(brief(), { target: { value } });
+    const submit = () => fireEvent.submit(screen.getByRole("form"));
+    async function switchTo(mode: "Draft criteria" | "Check deliverable") {
+      fireEvent.click(screen.getByRole("radio", { name: mode }));
+      await screen.findByRole("button", { name: mode });
+    }
+
+    render(<AcceptanceBuilderProduct client={made.client} />);
+    await screen.findByLabelText("Client brief");
+    await switchTo("Check deliverable");
+    changeBrief(" hello");
+    fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "Delivered a site." } });
+    submit();
+    await screen.findByText(hint);
+    submit();
+    expect(starts()).toHaveLength(1);
+
+    await switchTo("Draft criteria");
+    changeBrief("hello");
+    expect(screen.queryByText(hint)).toBeNull();
+    await switchTo("Check deliverable");
+    expect(brief().value).toBe(" hello");
+    expect(screen.getByText(hint)).toBeTruthy();
+    submit();
+    expect(starts()).toHaveLength(1);
+    expect(screen.getByText(hint)).toBeTruthy();
+
+    changeBrief("hello\u0085");
+    fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "Updated delivery." } });
+    submit();
+    expect(starts()).toHaveLength(1);
+    expect(screen.getByText(hint)).toBeTruthy();
+
+    changeBrief("Deliver a website.");
+    expect(screen.queryByText(hint)).toBeNull();
+    await switchTo("Draft criteria");
+    await switchTo("Check deliverable");
+    expect(screen.queryByText(hint)).toBeNull();
+    changeBrief("hello");
+    expect(screen.getByText(hint)).toBeTruthy();
+    submit();
+    expect(starts()).toHaveLength(1);
+    changeBrief("Deliver a website.");
+    submit();
+    await screen.findByRole("button", { name: "New task" });
+    expect(starts()).toHaveLength(2);
+
+    await switchTo("Draft criteria");
+    await switchTo("Check deliverable");
+    changeBrief("hello");
+    expect(screen.queryByText(hint)).toBeNull();
+    submit();
+    await screen.findByRole("button", { name: "New task" });
+    expect(starts()).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    await switchTo("Draft criteria");
+    await switchTo("Check deliverable");
+    expect(brief().value).toBe("");
+    expect(screen.queryByText(hint)).toBeNull();
+  });
+
+  it.each(["fresh visit", "unknown attachment"] as const)("does not retain a rejection for a %s", async (kind) => {
+    const attached = kind === "unknown attachment";
+    const r = routesFor(IDS.check);
+    const made = makeClientCapturingRequests({
+      ...bothModesRoutes(draftOutput()),
+      [r.START]: [startResponse(), startResponse()],
+      [r.SESSION]: Array.from({ length: 4 }, () => sessionResponse({ scenario_id: IDS.check.scenarioId })),
+      [r.RESULT]: [resultResponse(IDS.check, { output: checkOutput(".insufficient_brief") }),
+        resultResponse(IDS.check, { output: checkOutput() })],
+      [r.QUOTA]: Array.from({ length: 10 }, () => quotaResponse(IDS.check)),
+    });
+    const hint = ACCEPTANCE_BUILDER_MESSAGES.en.validation.insufficient_brief;
+    const fillCheck = async () => {
+      fireEvent.change(await screen.findByLabelText("Finished work"), { target: { value: "Delivered a site." } });
+      fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "hello" } });
+    };
+    const { unmount } = render(<AcceptanceBuilderProduct client={made.client} attachSessionId={attached ? "session_1" : undefined} />);
+    if (!attached) {
+      await screen.findByLabelText("Client brief");
+      fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+      await fillCheck();
+      fireEvent.submit(screen.getByRole("form"));
+    }
+    await screen.findByText(hint);
+    if (attached) {
+      fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    } else {
+      unmount();
+      render(<AcceptanceBuilderProduct client={made.client} />);
+    }
+    await screen.findByRole("button", { name: "Draft criteria" });
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(screen.queryByText(hint)).toBeNull();
+    await fillCheck();
+    fireEvent.submit(screen.getByRole("form"));
+    await screen.findByRole("button", { name: "New task" });
+    expect(made.calls.filter((call) => call.key === r.START)).toHaveLength(attached ? 1 : 2);
+  });
+
   it("renders the negative verdict with the explicitly missing item", async () => {
     const output = checkOutput(".weak_input");
     const deltas = output.comparison.deltas as { status: string; evidence: string }[];
@@ -670,6 +785,72 @@ describe("Acceptance Builder page", () => {
     expect(screen.getByText(/Récapitulatif/)).toBeTruthy();
   });
 
+  it("retains each mode's raw unsent inputs across switches without starting a run", async () => {
+    const r = routesFor(IDS.draft);
+    const made = makeClientCapturingRequests({
+      ...bothModesRoutes(draftOutput()),
+      [r.QUOTA]: Array.from({ length: 9 }, () => quotaResponse(IDS.draft)),
+    });
+    const { unmount } = render(<AcceptanceBuilderProduct client={made.client} />);
+    const draft = "  Draft brief A\nLine two  ";
+    fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: draft } });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    const finished = await screen.findByLabelText<HTMLTextAreaElement>("Finished work");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(finished.value).toBe("");
+    fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "Check brief B" } });
+    fireEvent.change(finished, { target: { value: "Delivery B" } });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe(draft);
+    expect(screen.queryByLabelText("Finished work")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("Delivery B");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("Check brief B");
+    fireEvent.change(screen.getByLabelText("Finished work"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe(draft);
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("Check brief B");
+
+    unmount();
+    render(<AcceptanceBuilderProduct client={made.client} />);
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe("");
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(made.calls.filter((c) => c.key.endsWith("/start"))).toHaveLength(0);
+    expect(made.calls.filter((c) => c.key.startsWith("GET /v1/scenario-sessions/"))).toHaveLength(0);
+  });
+
+  it("New task clears only the active mode's retained inputs", async () => {
+    const r = routesFor(IDS.draft);
+    const made = makeClientCapturingRequests({
+      ...bothModesRoutes(draftOutput()),
+      [r.QUOTA]: Array.from({ length: 10 }, () => quotaResponse(IDS.draft)),
+    });
+    render(<AcceptanceBuilderProduct client={made.client} />);
+    fireEvent.change(await screen.findByLabelText("Client brief"), { target: { value: "Draft brief A" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    fireEvent.change(await screen.findByLabelText("Finished work"), { target: { value: "Delivery B" } });
+    fireEvent.change(screen.getByLabelText("Client brief"), { target: { value: "Check brief B" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe("Draft brief A");
+    fireEvent.click(screen.getByRole("button", { name: "Draft criteria" }));
+    fireEvent.click(await screen.findByRole("button", { name: "New task" }));
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Finished work")).value).toBe("Delivery B");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("Check brief B");
+    fireEvent.click(screen.getByRole("radio", { name: "Draft criteria" }));
+    expect((await screen.findByLabelText<HTMLTextAreaElement>("Client brief")).value).toBe("");
+    expect(made.calls.filter((c) => c.key.endsWith("/start"))).toHaveLength(1);
+  });
+
   it("attaches once: a mode round trip does not re-poll or re-report the handoff session", async () => {
     const events: ProductRunEvent[] = [];
     const base = routes("draft", draftOutput());
@@ -692,6 +873,8 @@ describe("Acceptance Builder page", () => {
     const ended = vi.fn();
     render(<AcceptanceBuilderProduct client={made.client} attachSessionId="session_1" onEvent={(e) => events.push(e)} onAttachEnd={ended} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "New task" })).toBeTruthy());
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Client brief").value).toBe("");
+    expect(made.calls.filter((c) => c.key.endsWith("/start"))).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("radio", { name: "Check deliverable" }));
     await waitFor(() => expect(screen.getByLabelText("Finished work")).toBeTruthy());
