@@ -297,6 +297,14 @@ export function ProductRunPage<V extends Record<string, unknown>, R>(props: Prod
   return <ResolvedProductRunPage {...props} selection={selection.state.selection} />;
 }
 
+type RejectedInput<V> = { input: V; errors: Partial<Record<keyof V, FieldError>> };
+
+/** Form-owned data that must survive a mode remount, not a fresh product visit. */
+export type VisitFormSnapshot<V> = {
+  values?: V;
+  rejectedInput?: RejectedInput<V> | null;
+};
+
 export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   definition,
   client,
@@ -307,7 +315,14 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
   selection,
   onAttachBegin,
   onAttachEnd,
-}: ProductRunPageProps<V, R> & { selection: ProductSelection }) {
+  initialVisitForm,
+  onVisitFormChange,
+}: ProductRunPageProps<V, R> & {
+  selection: ProductSelection;
+  initialVisitForm?: VisitFormSnapshot<V>;
+  /** Merge edits and known-input verdicts; null resets the active form. */
+  onVisitFormChange?: (change: VisitFormSnapshot<V> | null) => void;
+}) {
   const attachSessionId = selection.kind === "session" ? selection.sessionId : undefined;
   const { Fields, Result } = definition;
   const paid = client.portalIdentity !== undefined;
@@ -391,11 +406,23 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     };
   }, []);
 
-  const [values, setValues] = useState<V>(definition.emptyValues);
+  const [values, setValues] = useState<V>(
+    selection.kind === "form" ? initialVisitForm?.values ?? definition.emptyValues : definition.emptyValues,
+  );
   const valuesRef = useLatest(values);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>({});
-  const rejectedInputRef = useRef<{ input: V; errors: Partial<Record<keyof V, FieldError>> } | null>(null);
-  const liveValidationFieldsRef = useRef(new Set<keyof V>());
+  const initialRejection = selection.kind === "form" ? initialVisitForm?.rejectedInput ?? null : null;
+  const rejectedInputRef = useRef(initialRejection);
+  const liveValidationFieldsRef = useRef(new Set<keyof V>(Object.keys(initialRejection?.errors ?? {})));
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof V, FieldError>>>(() => {
+    const errors: Partial<Record<keyof V, FieldError>> = {};
+    if (initialRejection !== null) {
+      const validated = validateFields(values);
+      for (const field in initialRejection.errors) {
+        if (validated[field]) errors[field] = validated[field];
+      }
+    }
+    return errors;
+  });
   const [phase, setPhase] = useState<Phase<R>>({ kind: "idle" });
   const quotaExhausted = quotaSnapshot.status === "exhausted" || (quotaAdmission === null && phase.kind === "quota-exhausted");
   // Ambiguous/accepted retries retain timing; a definite rejection lets the next start reset it.
@@ -1018,6 +1045,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       const submittedInput = recoveredInput ?? activeInputRef.current;
       const submittedValues = normalizeValues(submittedInput ?? definition.emptyValues);
       rejectedInputRef.current = submittedInput === null ? null : { input: submittedValues, errors: inputErrors };
+      if (submittedInput !== null) onVisitFormChange?.({ rejectedInput: rejectedInputRef.current });
 
       const draft = valuesRef.current;
       // The original state object identifies an untouched form. Edits, including clearing
@@ -1053,6 +1081,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
       return;
     }
     rejectedInputRef.current = null;
+    if (activeInputRef.current !== null) onVisitFormChange?.({ rejectedInput: null });
     // `scenario_completed` is emitted by the commit-time effect on `phase` below, not here:
     // `setPhase` only queues the update, so emitting here would report a result that never
     // rendered (unmount, navigation, a renderer that throws).
@@ -1343,6 +1372,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     }
     if (paid) forgetChosenAttachSession(productId);
     setValues(definition.emptyValues);
+    onVisitFormChange?.(null);
     if (draftKey !== null) clearProductDraft(draftKey);
     setFieldErrors({});
     rejectedInputRef.current = null;
@@ -1383,6 +1413,7 @@ export function ResolvedProductRunPage<V extends Record<string, unknown>, R>({
     setManualDraft(null);
     const next = { ...values, [field]: value };
     setValues(next);
+    onVisitFormChange?.({ values: next });
     if (draftKey !== null) {
       saveDraftValues(draftKey, next);
       saveProductDraftScenario(productId, scenarioId, draftOwner);

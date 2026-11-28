@@ -121,6 +121,7 @@ export function AcceptanceBuilderProduct({ client, onEvent, visitId, ...attach }
       client={client}
       onEvent={onEvent}
       visitId={visitId}
+      retainModeInputsForVisit
       legend={t("modes.legend")}
       name="acceptance-builder-mode"
       modes={[
